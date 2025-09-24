@@ -1,22 +1,33 @@
-// src/lib/loadGoogleMaps.js
-let loadingPromise = null;
+﻿// src/lib/loadGoogleMaps.js
+import { GOOGLE_MAPS_KEY } from "../config/env.js";
 
-export function loadGoogleMaps() {
+let loadingPromise = null;
+let requestedLibraries = new Set(["places", "geometry"]);
+
+export function loadGoogleMaps(options = {}) {
   if (typeof window !== "undefined" && window.google && window.google.maps) {
     return Promise.resolve(window.google);
   }
+
+  const extraLibraries = Array.isArray(options.libraries)
+    ? options.libraries
+    : [];
+  extraLibraries.forEach((lib) => {
+    if (lib) requestedLibraries.add(lib);
+  });
+
   if (loadingPromise) return loadingPromise;
 
-  const key = process.env.REACT_APP_GOOGLE_MAPS_KEY; // <- one consistent name
+  const key = GOOGLE_MAPS_KEY;
   if (!key) {
     return Promise.reject(
-      new Error("Missing REACT_APP_GOOGLE_MAPS_KEY in environment")
+      new Error("Missing Google Maps API key (GOOGLE_MAPS_KEY) in environment")
     );
   }
 
   const params = new URLSearchParams({
     key,
-    libraries: "places,geometry",
+    libraries: Array.from(requestedLibraries).join(","),
     v: "weekly",
   });
 
