@@ -29,35 +29,73 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Allow multiple origins (CSV) + no-origin (Thunder/CLI)
+// CORS configuration -----------------------------------------------------
+const normalizeOrigin = (origin) => {
+  if (!origin) return "";
+  try {
+    const url = new URL(origin);
+    const needsPort =
+      url.port &&
+      !(
+        (url.protocol === "http:" && url.port === "80") ||
+        (url.protocol === "https:" && url.port === "443")
+      );
+    return `${url.protocol}//${url.hostname}${needsPort ? `:${url.port}` : ""}`;
+  } catch {
+    return origin.replace(/\/$/, "");
+  }
+};
+
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "https://www.localgmbboss.com",
   "https://localgmbboss.com",
-];
+  "https://serviceops.onrender.com",
+].map(normalizeOrigin);
 
 const configuredOrigins = (process.env.CORS_ORIGIN || "")
   .split(",")
-  .map((s) => s.trim())
+  .map((s) => normalizeOrigin(s.trim()))
   .filter(Boolean);
 
-const ALLOWED = Array.from(
-  new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredOrigins])
-);
+const allowedOrigins = new Set([
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...configuredOrigins,
+]);
 
 const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin || ALLOWED.includes(origin)) return cb(null, true);
-    return cb(new Error(`Not allowed by CORS: ${origin}`));
+    if (process.env.CORS_ALLOW_ALL === "true") return cb(null, true);
+
+    const normalizedOrigin = normalizeOrigin(origin);
+
+    if (!origin || allowedOrigins.has(normalizedOrigin)) return cb(null, true);
+
+    const isDev =
+      !process.env.NODE_ENV || process.env.NODE_ENV === "development";
+    const isLocalhost =
+      normalizedOrigin.startsWith("http://localhost") ||
+      normalizedOrigin.startsWith("http://127.0.0.1");
+
+    if (isDev && isLocalhost) return cb(null, true);
+
+    return cb(new Error(`Origin not allowed by CORS: ${origin}`));
   },
   methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: false,
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  credentials: true,
+  optionsSuccessStatus: 200,
 };
 
+const prettyAllowedOrigins = [...allowedOrigins].filter(Boolean);
+if (prettyAllowedOrigins.length) {
+  console.log("CORS allowed origins:", prettyAllowedOrigins.join(", "));
+} else {
+  console.log("CORS allowed origins: (none)");
+}
+
 app.use(cors(corsOptions));
-// ✅ Express 5: use a RegExp, not "*"
 app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
@@ -93,10 +131,24 @@ app.use((err, _req, res, _next) => {
 
 (async () => {
   await connectDB(process.env.MONGO_URI);
-  app.listen(PORT, () =>
-    console.log(`🚀 API listening on http://localhost:${PORT}`)
-  );
+  app.listen(PORT, () => {
+    const env = process.env.NODE_ENV || "development";
+    console.log(`API listening on port ${PORT} (env: ${env})`);
+
+    const externalUrl =
+      process.env.RENDER_EXTERNAL_URL ||
+      process.env.PUBLIC_URL ||
+      process.env.APP_BASE_URL;
+
+    if (externalUrl) {
+      console.log(`External URL: ${externalUrl}`);
+    }
+  });
 })();
+
+
+
+
 
 
 
