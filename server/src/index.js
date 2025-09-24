@@ -30,12 +30,21 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Allow multiple origins (CSV) + no-origin (Thunder/CLI)
-const ALLOWED = (
-  process.env.CORS_ORIGIN || "http://localhost:3000,http://127.0.0.1:3000"
-)
+const DEFAULT_ALLOWED_ORIGINS = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "https://www.localgmbboss.com",
+  "https://localgmbboss.com",
+];
+
+const configuredOrigins = (process.env.CORS_ORIGIN || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+
+const ALLOWED = Array.from(
+  new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredOrigins])
+);
 
 const corsOptions = {
   origin: (origin, cb) => {
@@ -88,5 +97,6 @@ app.use((err, _req, res, _next) => {
     console.log(`🚀 API listening on http://localhost:${PORT}`)
   );
 })();
+
 
 

@@ -1,20 +1,8 @@
-// src/lib/api.js
+﻿// src/lib/api.js
 import axios from "axios";
+import { API_BASE_URL } from "../config/env.js";
 
-const metaEnv = (() => {
-  try {
-    return import.meta.env;
-  } catch (err) {
-    return undefined;
-  }
-})();
-
-const API =
-  (metaEnv && metaEnv.VITE_API_URL) ||
-  process.env.REACT_APP_API_URL ||
-  "http://localhost:5000";
-
-export const api = axios.create({ baseURL: API });
+export const api = axios.create({ baseURL: API_BASE_URL });
 
 // keep one token key only
 let AUTH_TOKEN = localStorage.getItem("auth_token") || "";

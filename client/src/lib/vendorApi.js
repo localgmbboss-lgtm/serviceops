@@ -1,8 +1,8 @@
-// client/src/lib/vendorApi.js
+﻿// client/src/lib/vendorApi.js
 import axios from "axios";
-const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
+import { API_BASE_URL } from "../config/env.js";
 
-export const vendorApi = axios.create({ baseURL: API });
+export const vendorApi = axios.create({ baseURL: API_BASE_URL });
 
 vendorApi.interceptors.request.use((config) => {
   const token = localStorage.getItem("vendorToken");
