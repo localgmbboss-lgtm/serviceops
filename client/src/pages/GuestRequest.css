@@ -1,0 +1,760 @@
+/* src/pages/GuestRequest.css - Uber Style */
+:root {
+    /* Uber Color Palette */
+    --white: #ffffffFFF;
+    --black: var(--color-text)000;
+    --dark-gray: var(--color-text);
+    --primary-blue: var(--color-primary);
+    --primary-blue-dark: var(--color-primary);
+    --accent-green: var(--color-success);
+    --alert-red: var(--color-danger);
+    --medium-gray: var(--muted);
+    --light-gray: var(--surface-soft);
+    --dark-blue: var(--color-text);
+    --border-gray: var(--surface-soft);
+    --hover-blue: var(--surface-soft);
+
+    /* Typography */
+    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-size-xs: 12px;
+    --font-size-sm: 14px;
+    --font-size-md: 16px;
+    --font-size-lg: 18px;
+    --font-size-xl: 20px;
+    --font-size-2xl: 24px;
+
+    /* Spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 20px;
+    --space-2xl: 24px;
+    --space-3xl: 32px;
+
+    /* Border Radius */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Base Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    background: var(--white);
+    color: var(--black);
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+}
+
+.guest-request-container {
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--white);
+    min-height: 100vh;
+    position: relative;
+}
+
+/* Header Styles - Uber-like */
+.request-header {
+    background: var(--white);
+    padding: var(--space-xl) var(--space-lg) var(--space-lg);
+    border-bottom: 1px solid var(--border-gray);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow-sm);
+}
+
+.request-header h1 {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    color: var(--black);
+    margin-bottom: var(--space-xs);
+    text-align: center;
+}
+
+.subtitle {
+    color: var(--medium-gray);
+    font-size: var(--font-size-sm);
+    text-align: center;
+    font-weight: 400;
+}
+
+/* Progress Indicator - Uber Style */
+.progress-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: var(--space-xl) 0 var(--space-lg);
+    position: relative;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+    min-width: 60px;
+}
+
+.step-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--light-gray);
+    color: var(--medium-gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-xs);
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.step.active .step-number {
+    background: var(--primary-blue);
+    color: var(--white);
+    border-color: var(--primary-blue);
+}
+
+.step-label {
+    font-size: var(--font-size-xs);
+    color: var(--medium-gray);
+    font-weight: 500;
+    text-align: center;
+}
+
+.step.active .step-label {
+    color: var(--black);
+    font-weight: 600;
+}
+
+.step-connector {
+    height: 2px;
+    background: var(--light-gray);
+    flex: 1;
+    max-width: 40px;
+    margin: 0 var(--space-xs);
+    position: relative;
+    top: -14px;
+}
+
+.step.active~.step-connector {
+    background: var(--primary-blue);
+}
+
+/* Form Styles - Uber Minimalist */
+.request-form {
+    background: var(--white);
+    padding: 0 var(--space-lg) var(--space-3xl);
+}
+
+.form-step {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.form-step h2 {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--black);
+    margin-bottom: var(--space-xs);
+}
+
+.step-description {
+    color: var(--medium-gray);
+    margin-bottom: var(--space-xl);
+    font-size: var(--font-size-sm);
+    font-weight: 400;
+}
+
+.form-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.input-group.full-width {
+    width: 100%;
+}
+
+.input-group label {
+    font-weight: 600;
+    color: var(--black);
+    margin-bottom: var(--space-sm);
+    font-size: var(--font-size-sm);
+}
+
+.input-group input,
+.input-group textarea,
+.select-wrapper select {
+    padding: var(--space-md);
+    border: 1px solid var(--border-gray);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
+    transition: all 0.2s ease;
+    background: var(--white);
+    color: var(--black);
+    font-family: var(--font-family);
+}
+
+.input-group input:focus,
+.input-group textarea:focus,
+.select-wrapper select:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+}
+
+.select-wrapper {
+    position: relative;
+}
+
+.select-wrapper::after {
+    content: "⌄";
+    position: absolute;
+    right: var(--space-md);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--medium-gray);
+    font-size: 18px;
+    pointer-events: none;
+}
+
+.select-wrapper select {
+    appearance: none;
+    width: 100%;
+    cursor: pointer;
+}
+
+/* Urgency Options - Uber Style */
+.urgency-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: var(--space-sm);
+}
+
+.urgency-option {
+    padding: var(--space-md);
+    border: 1px solid var(--border-gray);
+    border-radius: var(--radius-md);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--white);
+}
+
+.urgency-option:hover {
+    border-color: var(--primary-blue);
+    background: var(--hover-blue);
+}
+
+.urgency-option.selected {
+    border-color: var(--primary-blue);
+    background: var(--primary-blue);
+    color: var(--white);
+}
+
+.urgency-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: var(--space-xs);
+    font-size: var(--font-size-sm);
+}
+
+.urgency-desc {
+    font-size: var(--font-size-xs);
+    opacity: 0.9;
+}
+
+.urgency-option.selected .urgency-desc {
+    opacity: 0.95;
+}
+
+/* Location Type Selector - Uber Style */
+.location-type-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+}
+
+.location-option {
+    padding: var(--space-md);
+    border: 1px solid var(--border-gray);
+    border-radius: var(--radius-md);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--white);
+}
+
+.location-option:hover {
+    border-color: var(--primary-blue);
+    background: var(--hover-blue);
+}
+
+.location-option.selected {
+    border-color: var(--primary-blue);
+    background: var(--primary-blue);
+    color: var(--white);
+}
+
+.option-icon {
+    font-size: 18px;
+    display: block;
+    margin-bottom: var(--space-xs);
+}
+
+.option-label {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+}
+
+/* Location Input - No Pin Icon */
+.location-input-container {
+    position: relative;
+}
+
+.location-input {
+    padding: var(--space-md) !important;
+    border: 1px solid var(--border-gray);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
+    width: 100%;
+    transition: all 0.2s ease;
+    background: var(--white);
+    font-family: var(--font-family);
+}
+
+.location-input:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+}
+
+/* Map Styles */
+.map-selection {
+    margin: var(--space-lg) 0;
+}
+
+.map-selection p {
+    color: var(--medium-gray);
+    margin-bottom: var(--space-md);
+    font-size: var(--font-size-sm);
+}
+
+.map-container {
+    height: 250px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border-gray);
+    position: relative;
+}
+
+.interactive-map {
+    width: 100%;
+    height: 100%;
+}
+
+/* Selected Address */
+.selected-address {
+    margin: var(--space-lg) 0;
+    padding: var(--space-md);
+    background: rgba(52, 199, 89, 0.1);
+    border: 1px solid rgba(52, 199, 89, 0.3);
+    border-radius: var(--radius-md);
+}
+
+.selected-address h4 {
+    margin: 0 0 var(--space-xs) 0;
+    color: var(--accent-green);
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+}
+
+.selected-address p {
+    margin: 0;
+    color: var(--black);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+}
+
+/* Distance Info */
+.distance-info {
+    margin: var(--space-lg) 0;
+    padding: var(--space-md);
+    background: rgba(0, 122, 255, 0.1);
+    border: 1px solid rgba(0, 122, 255, 0.3);
+    border-radius: var(--radius-md);
+}
+
+.distance-info h4 {
+    margin: 0 0 var(--space-sm) 0;
+    color: var(--primary-blue);
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+}
+
+.distance-details p {
+    margin: var(--space-xs) 0;
+    color: var(--black);
+    font-size: var(--font-size-md);
+}
+
+.distance-details strong {
+    color: var(--primary-blue);
+}
+
+.distance-error {
+    color: var(--alert-red);
+    font-size: var(--font-size-md);
+}
+
+/* Form Actions - Uber Style Bottom Bar */
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--space-2xl);
+    gap: var(--space-sm);
+    position: sticky;
+    bottom: 0;
+    background: var(--white);
+    padding: var(--space-md) 0;
+    border-top: 1px solid var(--border-gray);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    padding: var(--space-md) var(--space-lg);
+    border: none;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: var(--font-size-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 44px;
+    flex: 1;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: var(--white);
+    color: var(--black);
+    border: 1px solid var(--border-gray);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--light-gray);
+}
+
+.btn-primary {
+    background: var(--primary-blue);
+    color: var(--white);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-blue-dark);
+    transform: translateY(-1px);
+}
+
+/* Spinner */
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Map Fallback */
+.map-fallback {
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--light-gray);
+    border: 1px dashed var(--border-gray);
+    border-radius: var(--radius-md);
+    margin: var(--space-md) 0;
+}
+
+.map-fallback-content {
+    text-align: center;
+    color: var(--medium-gray);
+}
+
+.map-fallback-icon {
+    font-size: 28px;
+    margin-bottom: var(--space-md);
+}
+
+.map-fallback h3 {
+    margin: 0 0 var(--space-xs) 0;
+    color: var(--black);
+    font-weight: 600;
+    font-size: var(--font-size-md);
+}
+
+.map-fallback p {
+    margin: 0;
+    font-size: var(--font-size-sm);
+}
+
+.map-error-detail {
+    font-size: var(--font-size-xs);
+    margin-top: var(--space-xs);
+    color: var(--medium-gray);
+}
+
+/* Maps Loading */
+.maps-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    z-index: 10;
+}
+
+.maps-loading-overlay p {
+    margin-top: var(--space-md);
+    color: var(--medium-gray);
+    font-size: var(--font-size-sm);
+}
+
+.maps-loading-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--light-gray);
+    border-radius: 50%;
+    border-top-color: var(--primary-blue);
+    animation: spin 1s ease-in-out infinite;
+}
+
+/* Responsive Design - Mobile First */
+@media (max-width: 768px) {
+    .guest-request-container {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .request-header {
+        padding: var(--space-lg) var(--space-md) var(--space-md);
+    }
+
+    .request-header h1 {
+        font-size: var(--font-size-lg);
+    }
+
+    .progress-indicator {
+        margin: var(--space-lg) 0 var(--space-md);
+    }
+
+    .step {
+        min-width: 50px;
+    }
+
+    .step-number {
+        width: 24px;
+        height: 24px;
+        font-size: var(--font-size-xs);
+    }
+
+    .step-label {
+        font-size: 10px;
+    }
+
+    .step-connector {
+        max-width: 30px;
+        top: -12px;
+    }
+
+    .request-form {
+        padding: 0 var(--space-md) var(--space-2xl);
+    }
+
+    .form-step h2 {
+        font-size: var(--font-size-md);
+    }
+
+    .form-grid {
+        gap: var(--space-md);
+        margin-bottom: var(--space-lg);
+    }
+
+    .input-group input,
+    .input-group textarea,
+    .select-wrapper select {
+        padding: var(--space-sm);
+        font-size: var(--font-size-md);
+    }
+
+    .location-type-selector,
+    .urgency-options {
+        grid-template-columns: 1fr;
+    }
+
+    .map-container {
+        height: 200px;
+    }
+
+    .form-actions {
+        flex-direction: column;
+        gap: var(--space-xs);
+        padding: var(--space-md) 0;
+    }
+
+    .btn {
+        width: 100%;
+        padding: var(--space-sm) var(--space-md);
+        font-size: var(--font-size-sm);
+        min-height: 40px;
+    }
+}
+
+@media (max-width: 480px) {
+    .request-header h1 {
+        font-size: var(--font-size-md);
+    }
+
+    .subtitle {
+        font-size: var(--font-size-xs);
+    }
+
+    .form-step h2 {
+        font-size: var(--font-size-sm);
+    }
+
+    .step-description {
+        font-size: var(--font-size-xs);
+        margin-bottom: var(--space-lg);
+    }
+
+    .input-group label {
+        font-size: var(--font-size-xs);
+    }
+
+    .location-option,
+    .urgency-option {
+        padding: var(--space-sm);
+    }
+
+    .option-icon {
+        font-size: 16px;
+        margin-bottom: var(--space-xs);
+    }
+
+    .option-label,
+    .urgency-label {
+        font-size: var(--font-size-xs);
+        color: var(--black);
+    }
+
+    .urgency-desc {
+        font-size: 10px;
+        color: rgb(53, 53, 53)
+    }
+
+    .btn {
+        padding: var(--space-xs) var(--space-sm);
+        font-size: var(--font-size-xs);
+        min-height: 36px;
+    }
+}
+
+/* Reduced Motion for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Focus Styles for Accessibility */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+}
+
+/* Safe Area Support for Notched Devices */
+@supports(padding: max(0px)) {
+    .guest-request-container {
+        padding-left: max(var(--space-md), env(safe-area-inset-left));
+        padding-right: max(var(--space-md), env(safe-area-inset-right));
+    }
+
+    .form-actions {
+        padding-bottom: max(var(--space-md), env(safe-area-inset-bottom));
+    }
+}
+
+
+
+.static-field {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--light-gray);
+  font-weight: 600;
+}
+

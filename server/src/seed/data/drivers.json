@@ -1,0 +1,4 @@
+[
+{ "name": "Ade Ola", "phone": "+234800000001", "city": "Lagos", "rating": 4.8, "earningsSplit": 0.7, "available": true },
+{ "name": "Kemi Taiwo", "phone": "+234800000002", "city": "Abuja", "rating": 4.6, "earningsSplit": 0.7, "available": false }
+]

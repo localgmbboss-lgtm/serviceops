@@ -1,0 +1,172 @@
+﻿.vendor-portal {
+    display: block;
+    padding: clamp(16px, 3vw, 24px);
+}
+
+.vp-grid {
+    display: grid;
+    gap: clamp(16px, 3vw, 32px);
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 960px) {
+    .vp-grid {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        align-items: start;
+    }
+}
+
+.vp-details {
+    display: grid;
+    gap: 12px;
+    margin: 0 0 20px;
+}
+
+.vp-details dt {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+}
+
+.vp-details dd {
+    margin: 4px 0 0;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.vp-primary {
+    display: grid;
+    gap: 20px;
+}
+
+.vp-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.vp-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.vp-complete {
+    display: flex;
+}
+
+.vp-complete-form {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: rgba(248, 250, 252, 0.8);
+}
+
+.vp-complete-form label {
+    display: grid;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.vp-complete-form input,
+.vp-complete-form select,
+.vp-complete-form textarea {
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #fff;
+}
+
+.vp-summary {
+    display: grid;
+    gap: 16px;
+}
+
+.vp-summary-card {
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 16px;
+    background: rgba(248, 250, 252, 0.9);
+}
+
+.vp-summary-card .section-title {
+    margin: 0 0 12px;
+    font-size: 1rem;
+}
+
+.vp-summary-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+}
+
+.vp-summary-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.95rem;
+}
+
+.vp-summary-list strong {
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.vp-summary-list span {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.vp-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.vp-pill.status-pending {
+    background: rgba(234, 179, 8, 0.2);
+    color: #92400e;
+}
+
+.vp-pill.status-charged {
+    background: rgba(34, 197, 94, 0.2);
+    color: #166534;
+}
+
+.vp-pill.status-failed {
+    background: rgba(239, 68, 68, 0.2);
+    color: #991b1b;
+}
+
+.vp-pill.status-skipped {
+    background: rgba(148, 163, 184, 0.2);
+    color: #475569;
+}
+
+.warning-text {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.warning-text.small {
+    font-size: 0.85rem;
+}
+
+.vendor-portal .error {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.vendor-portal .small {
+    font-size: 0.85rem;
+}

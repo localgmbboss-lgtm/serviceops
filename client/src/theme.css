@@ -1,0 +1,233 @@
+:root {
+  --color-bg-1: #fdf6f4;
+  --color-bg-2: #f9f1f3;
+  --color-surface: #ffffff;
+  --color-surface-strong: #ffffff;
+  --color-surface-soft: #f5f2f4;
+  --surface-soft: #f5f2f4;
+  --surface-strong: #ffffff;
+  --color-card: #ffffff;
+  --color-glass: rgba(255, 92, 78, 0.08);
+
+  --color-primary: #ff5c4e;
+  --color-primary-dark: #d94a3e;
+  --color-primary-soft: rgba(255, 92, 78, 0.16);
+
+  --color-secondary: #0a7aff;
+  --color-accent: #0a7aff;
+  --color-accent-soft: rgba(10, 122, 255, 0.16);
+
+  --color-success: #0a7aff;
+  --color-success-soft: rgba(10, 122, 255, 0.16);
+  --color-warning: #ffb680;
+  --color-warning-soft: rgba(255, 182, 128, 0.2);
+  --color-danger: #ff5c4e;
+  --color-danger-soft: rgba(255, 92, 78, 0.16);
+
+  --color-text: #1c1c1c;
+  --color-text-muted: #8e8e93;
+  --color-border: #e5e5ea;
+
+  --shadow-soft: 0 30px 60px rgba(28, 28, 28, 0.08);
+  --shadow-card: 0 20px 44px rgba(28, 28, 28, 0.08);
+
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
+  --font-sans: "SF Pro Display", "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(140% 140% at 85% -10%, rgba(255, 92, 78, 0.18) 0%, transparent 65%),
+    radial-gradient(120% 160% at -15% 0%, rgba(255, 182, 128, 0.18) 0%, transparent 60%),
+    linear-gradient(180deg, var(--color-bg-1) 0%, var(--color-bg-2) 100%);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+main,
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.card {
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  backdrop-filter: blur(12px);
+  transition: transform 0.35s cubic-bezier(0.19, 1, 0.22, 1),
+    box-shadow 0.35s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 48px rgba(28, 28, 28, 0.12);
+}
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  min-height: 44px;
+  background: var(--color-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.28s ease, background-color 0.2s ease;
+  box-shadow: 0 14px 30px rgba(255, 92, 78, 0.25);
+  overflow: hidden;
+}
+
+.btn::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.45s ease, height 0.45s ease, opacity 0.45s ease;
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.btn:hover {
+  background: var(--color-primary-dark);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px rgba(217, 74, 62, 0.3);
+}
+
+.btn:hover::after,
+.btn:focus-visible::after {
+  width: 220%;
+  height: 220%;
+  opacity: 0;
+}
+
+.btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.btn:active::after {
+  width: 180%;
+  height: 180%;
+  opacity: 0;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(255, 92, 78, 0.28);
+}
+
+.btn.ghost {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
+  box-shadow: none;
+  border: 1px solid rgba(255, 92, 78, 0.18);
+}
+
+.btn.ghost:hover {
+  background: rgba(255, 92, 78, 0.24);
+}
+
+.btn.sm {
+  padding: 8px 14px;
+  min-height: 38px;
+  font-size: 14px;
+}
+
+.btn.lg {
+  padding: 12px 24px;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 15px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(255, 92, 78, 0.22);
+  background: #ffffff;
+}
+
+label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+::placeholder {
+  color: var(--color-text-muted);
+}
+
+.table,
+.list {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.fade-up {
+  animation: fade-up 0.55s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .card {
+    border-radius: var(--radius-md);
+    padding: 16px;
+  }
+  .btn {
+    width: 100%;
+    min-height: 42px;
+  }
+}

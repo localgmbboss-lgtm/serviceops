@@ -1,0 +1,29 @@
+.minichart {
+    width: 100%;
+    overflow: auto;
+}
+
+.minichart.empty {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.mc-area {
+    fill-opacity: .25;
+}
+
+.mc-private {
+    fill: var(--color-danger);
+}
+
+.mc-public {
+    fill: var(--color-success);
+}
+
+.mc-line {
+    fill: none;
+    stroke: var(--color-text);
+    stroke-width: 1.5;
+}
+
+

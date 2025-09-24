@@ -1,0 +1,27 @@
+.sparkline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sparkline .spark-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.sparkline .spark-label {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.sparkline .spark-last {
+    font-size: 16px;
+}
+
+.sparkline.empty {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+

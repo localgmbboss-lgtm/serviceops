@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+
+  <!-- Mobile & PWA-ish basics -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="ServiceOps – fast, simple roadside job dispatch and bidding." />
+
+  <title>ServiceOps</title>
+
+  <!-- Global styles (must exist at public/styles/global.css) -->
+  <link rel="stylesheet" href="/styles/global.css" />
+
+  <!-- Leaflet styles (for any map components using Leaflet) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Performance hints for Google Maps (optional but nice) -->
+  <link rel="preconnect" href="https://maps.googleapis.com" />
+  <link rel="preconnect" href="https://maps.gstatic.com" crossorigin />
+
+  <!-- Optional favicon / app icons (drop files in /public) -->
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+
+  <!--
+      OPTIONAL: Provide a Google Maps key via window if you’re not using .env.
+      If you already set:
+        - CRA: REACT_APP_GOOGLE_MAPS_KEY in .env
+        - Vite: VITE_GOOGLE_MAPS_KEY in .env
+      …then you can REMOVE this script block.
+    -->
+  <script>
+    window.GOOGLE_MAPS_KEY = window.GOOGLE_MAPS_KEY || ""; // put your key if not using .env
+  </script>
+</head>
+
+<body>
+  <noscript>You need to enable JavaScript to run this app.</noscript>
+  <div id="root"></div>
+  <!-- Your bundler (CRA/Vite) injects the app scripts automatically -->
+</body>
+
+</html>

@@ -1,0 +1,659 @@
+/* AdminDashboard.css — SCOPED to .admindash to prevent bleed */
+
+/* Put design tokens on the root dashboard wrapper, not :root */
+.admindash {
+  --bg: var(--color-bg-1);
+  --card: #ffffff;
+  --text: var(--color-text);
+  --muted: var(--muted);
+  --border: var(--color-border);
+  --brand: var(--color-primary);
+  --brand-600: var(--color-primary);
+
+  --r-sm: 10px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+
+  --title: 28px;
+  --h3: 18px;
+  --body: 14px;
+  --small: 12px;
+
+  --card-min: 260px;
+  --chart-h: 220px;
+
+  padding: var(--s-6);
+  padding-top: calc(var(--s-6) + 56px);
+  background: var(--bg);
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+/* Utility just inside dashboard */
+.admindash .num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: .2px;
+}
+
+/* Header */
+.admindash .page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  margin-bottom: var(--s-5);
+  flex-wrap: wrap
+}
+
+.admindash .page-title {
+  margin: 0;
+  font-size: var(--title);
+  font-weight: 700;
+  color: var(--text)
+}
+
+.admindash .page-sub {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: var(--body)
+}
+
+/* Tabs */
+.admindash .dashboard-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--s-5);
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm)
+}
+
+.admindash .tab {
+  padding: 8px 16px;
+  border-radius: var(--r-sm);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--muted);
+  transition: all .2s;
+  font-size: var(--body);
+  height: 36px
+}
+
+.admindash .tab.active {
+  background: var(--color-bg-1);
+  color: var(--brand);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .06)
+}
+
+.admindash .tab:hover:not(.active) {
+  color: var(--muted)
+}
+
+/* Buttons (scoped) */
+.admindash .btn {
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: var(--r-sm);
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform .2s, box-shadow .2s, background .2s;
+  height: 40px
+}
+
+.admindash .btn:hover {
+  background: var(--brand-600);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .08)
+}
+
+.admindash .btn.ghost {
+  background: #ffffff;
+  color: var(--brand);
+  border-color: var(--brand)
+}
+
+.admindash .btn.ghost:hover {
+  background: var(--surface-soft)
+}
+
+.admindash .btn:disabled {
+  opacity: .65;
+  cursor: default;
+  transform: none;
+  box-shadow: none
+}
+
+.admindash .refresh-btn {
+  background: var(--color-bg-1);
+  color: var(--muted);
+  border-color: var(--border)
+}
+
+.admindash .refresh-btn:hover {
+  background: var(--color-bg-2);
+  color: var(--color-text)
+}
+
+.admindash .refresh-icon {
+  font-size: 16px
+}
+
+.admindash .btn-loader {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid var(--muted);
+  border-radius: 50%;
+  animation: spin 1s linear infinite
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg)
+  }
+}
+
+/* Cards */
+.admindash .card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  margin-bottom: var(--s-4);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .06);
+  transition: transform .2s, box-shadow .2s;
+  display: flex;
+  flex-direction: column;
+
+}
+
+.admindash .card:hover {
+  box-shadow: 0 10px 22px rgba(0, 0, 0, .10);
+  transform: translateY(-2px)
+}
+
+.admindash .card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4)
+}
+
+.admindash .card-head.space {
+  gap: var(--s-4)
+}
+
+.admindash .section-title {
+  margin: 0;
+  font-size: var(--h3);
+  font-weight: 700;
+  color: var(--color-text)
+}
+/* Section spacing so components don’t crowd */
+.admindash section {
+  margin-bottom: 24px;
+}
+.admindash section:last-of-type {
+  margin-bottom: 0;
+}
+/* Nudge typography inside KPI cards only (safe + scoped) */
+.admindash .kpi-card :is(h1,h2,h3,strong) {
+  font-size: 14px;
+  font-weight: 700;
+}
+.admindash .kpi-card .num {
+  font-size: 16px;
+}
+
+
+/* KPI cards — compact height */
+.admindash .kpi-card {
+  flex: 0 0 auto;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  /* ↓ tighten padding and height */
+  padding: 10px 12px;
+  min-height: 64px;
+  line-height: 1.15;
+
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .06);
+  transition: transform .2s, box-shadow .2s;
+  min-width: 200px;
+  max-width: 280px;
+}
+
+.admindash .kpi-card:hover {
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .08);
+  transform: translateY(-1px);
+}
+
+/* keep KPI row tight */
+.admindash .kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  /* smaller gap */
+  align-items: stretch;
+  justify-content: flex-start;
+  margin-bottom: 16px;
+}
+
+/* smaller phones */
+@media (max-width: 480px) {
+  .admindash .kpi-card {
+    min-width: 160px;
+    max-width: 220px;
+    padding: 8px 10px;
+    min-height: 56px;
+  }
+}
+
+
+
+/* Layout sections */
+.admindash .grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-4);
+  align-items: stretch
+}
+
+.admindash .grid2>.card {
+  height: 100%
+}
+
+/* Segment control */
+.admindash .seg {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--color-bg-1);
+  padding: 4px;
+  border-radius: 999px
+}
+
+.admindash .segbtn {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: var(--small);
+  font-weight: 800;
+  color: var(--muted);
+  transition: all .2s;
+  height: 32px
+}
+
+.admindash .segbtn.active {
+  background: #ffffff;
+  color: var(--brand);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .06)
+}
+
+.admindash .segbtn:hover:not(.active) {
+  color: var(--muted)
+}
+
+/* Revenue tiles */
+.admindash .rev-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-3);
+  align-items: stretch;
+  margin-top: var(--s-2)
+}
+
+.admindash .rev-item {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: transform .2s, box-shadow .2s;
+  min-height: 82px
+}
+
+.admindash .rev-item:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .06);
+  transform: translateY(-1px)
+}
+
+.admindash .rev-item strong {
+  font-size: 18px;
+  font-weight: 700
+}
+
+.admindash .rev-item.net.ok {
+  background: var(--color-success-soft);
+  border-color: var(--color-success-soft)
+}
+
+.admindash .rev-item.net.bad {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger-soft)
+}
+
+.admindash .muted {
+  color: var(--muted);
+  font-size: var(--body)
+}
+
+.admindash .small {
+  font-size: var(--small)
+}
+
+.admindash .tip {
+  margin-top: var(--s-3)
+}
+
+/* Charts — CSS controls height; JS sizes canvas to clientHeight */
+.admindash .chart-canvas {
+  width: 100%;
+  height: var(--chart-h);
+  display: block;
+  border-radius: var(--r-md)
+}
+
+/* Legend */
+.admindash .legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: var(--body);
+  margin-top: var(--s-3)
+}
+
+.admindash .dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 4px
+}
+
+.admindash .dot.green {
+  background: var(--color-success)
+}
+
+.admindash .dot.gray {
+  background: var(--muted)
+}
+
+/* Documents */
+.admindash .doc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--s-3)
+}
+
+.admindash .doc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  transition: background .2s, transform .2s, box-shadow .2s;
+  min-height: 72px
+}
+
+.admindash .doc-item:hover {
+  background: var(--color-bg-1);
+  transform: translateX(4px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .06)
+}
+
+.admindash .doc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px
+}
+
+.admindash .doc-title {
+  font-weight: 700;
+  color: var(--color-text)
+}
+
+.admindash .doc-owner {
+  color: var(--muted);
+  font-size: var(--small)
+}
+
+.admindash .doc-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px
+}
+
+.admindash .badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: var(--small);
+  background: var(--color-success-soft);
+  color: var(--color-success)
+}
+
+.admindash .badge.warn {
+  background: var(--color-warning-soft);
+  color: var(--color-warning)
+}
+
+.admindash .badge.ok {
+  background: var(--surface-soft);
+  color: var(--color-success)
+}
+
+.admindash .badge.bad {
+  background: var(--color-danger-soft);
+  color: var(--color-primary-dark)
+}
+
+/* Performers */
+.admindash .perf-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--s-3)
+}
+
+.admindash .perf-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-3);
+  transition: background .2s, transform .2s, box-shadow .2s;
+  min-height: 72px
+}
+
+.admindash .perf-item:hover {
+  background: var(--color-bg-1);
+  transform: translateX(4px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .06)
+}
+
+.admindash .pf-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px
+}
+
+.admindash .pf-main strong {
+  color: var(--color-text)
+}
+
+.admindash .pf-metrics {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap
+}
+
+.admindash .chip {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 800;
+  font-size: var(--small);
+  background: var(--color-bg-1);
+  color: var(--muted)
+}
+
+/* Alerts, badges/links */
+.admindash .alert.error {
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger-soft);
+  color: var(--color-primary-dark);
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  margin-bottom: var(--s-5)
+}
+
+.admindash .online-count {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--small);
+  font-weight: 800
+}
+
+.admindash .view-all {
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 800;
+  transition: color .2s, text-decoration .2s
+}
+
+.admindash .view-all:hover {
+  color: var(--brand-600);
+  text-decoration: underline
+}
+
+/* =================== Responsive =================== */
+
+/* Tablet: 2-up revenue tiles */
+@media (max-width:1200px) {
+  .admindash .rev-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr))
+  }
+}
+
+/* Small tablets */
+@media (max-width:960px) {
+  .admindash .grid2 {
+    grid-template-columns: 1fr
+  }
+}
+
+/* Phones: shrink charts & ensure consistent card heights;
+   keep revenue tiles 2-up so the card doesn't grow too tall. */
+@media (max-width:768px) {
+  .admindash {
+    --card-min: 220px;
+    --chart-h: 160px;
+    padding: var(--s-4);
+    padding-top: calc(var(--s-4) + 64px);
+  }
+
+  .admindash .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-4)
+  }
+
+  .admindash .head-actions {
+    display: flex;
+    gap: var(--s-3);
+    width: 100%
+  }
+
+  .admindash .head-actions .btn {
+    flex: 1;
+    justify-content: center
+  }
+
+  /* KPIs remain flex with small gap; no grid overrides */
+  .admindash .kpis {
+    gap: var(--s-3)
+  }
+
+  .admindash .section-title {
+    font-size: 16px
+  }
+
+  .admindash .rev-item strong {
+    font-size: 16px
+  }
+
+  .admindash .chip {
+    font-size: 11px;
+    padding: 3px 8px
+  }
+}
+
+/* Small phones */
+@media (max-width:540px) {
+  .admindash {
+    --card-min: 200px;
+    --chart-h: 150px;
+    padding: var(--s-4);
+    padding-top: calc(var(--s-4) + 72px);
+  }
+
+  .admindash .page-title {
+    font-size: 24px;
+  }
+
+  .admindash .card {
+    padding: var(--s-4);
+  }
+
+  .admindash .rev-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admindash .perf-item,
+  .admindash .doc-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-2);
+  }
+
+  .admindash .pf-metrics,
+  .admindash .doc-meta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+
+

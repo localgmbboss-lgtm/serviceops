@@ -1,0 +1,134 @@
+:root{
+  --maxw: 1100px;
+
+  /* neutrals */
+  --bg: var(--color-bg-1);
+  --surface: var(--color-card);
+  --text: var(--color-text);
+  --muted: var(--color-text-muted);
+  --line: var(--color-border);
+
+  /* accents */
+  --brand: var(--color-primary);
+  --brand-contrast: var(--color-text);
+  --link: var(--color-primary-dark);
+}
+
+/* ---------- resets & defaults ---------- */
+*,*::before,*::after{ box-sizing:border-box; }
+html,body,#root{ height:100%; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+img,svg,video,canvas,iframe{ display:block; max-width:100%; }
+a{ color:inherit; text-decoration:none; }
+
+/* Let flex/grid children actually shrink instead of overflowing */
+.container, .grid2 > *, .row > *{ min-width:0; }
+
+/* Focus ring */
+:where(a,button,input,select,textarea){ outline-color: rgba(15,98,254,.35); }
+
+/* ---------- layout ---------- */
+.container{
+  max-width:var(--maxw);
+  margin:0 auto;
+  padding:16px 12px;
+}
+
+/* Top bar */
+.topbar{
+  background:var(--surface);
+  border-bottom:1px solid var(--line);
+}
+.topbar .inner{
+  max-width:var(--maxw);
+  margin:0 auto;
+  padding:10px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.brand{ font-size:18px; margin:0; }
+.brand-link{ color:inherit; text-decoration:none; }
+
+/* nav */
+.topbar .nav .nav-link{
+  margin-left:12px;
+  color:var(--text);
+  text-decoration:none;
+  border:1px solid transparent;
+  padding:6px 10px;
+  border-radius:8px;
+}
+.topbar .nav .nav-link:hover{ background: var(--surface-soft); }
+.topbar .nav .nav-link.active{
+  background:var(--brand);
+  color:var(--brand-contrast);
+  border-color:var(--brand);
+}
+
+/* Generic grid helpers */
+.grid{ display:grid; gap:12px; }
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width: 900px){
+  .grid2{ grid-template-columns:1fr; }
+}
+
+/* Simple rows */
+.row{ display:flex; align-items:center; gap:8px; }
+
+/* ---------- tables (base, minimal) ---------- */
+/* Keep this minimal so component-scoped table styles (e.g. JobTable) can override */
+.table{ width:100%; border-collapse:collapse; background:transparent; }
+.table th,.table td{ border:1px solid var(--line); padding:8px; text-align:left; }
+.table th{ background: var(--surface-soft); color:var(--muted); font-weight:600; }
+
+/* ---------- cards & small utilities ---------- */
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.06);
+}
+.muted{ color:var(--muted); }
+
+/* Button-like link */
+.btn-link{
+  display:inline-block;
+  margin-top:8px;
+  padding:8px 12px;
+  border-radius:10px;
+  background: var(--color-primary);
+  color: var(--color-text);
+  border:1px solid var(--color-primary-dark);
+  text-decoration:none;
+}
+
+/* ---------- form controls (gentle, global) ---------- */
+input,select,textarea,button{ font:inherit; color:inherit; }
+input,select,textarea{
+  max-width:100%;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background: var(--surface);
+}
+input:focus,select:focus,textarea:focus{
+  border-color: var(--color-primary-dark);
+  box-shadow:0 0 0 3px rgba(15,98,254,.15);
+  outline:none;
+}
+
+/* Main spacing (kept for clarity) */
+main{ padding:1rem; }
+
+
+
+

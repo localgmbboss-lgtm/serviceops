@@ -1,0 +1,19 @@
+.intake .row.stack {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+}
+
+.intake input,
+.intake select,
+.intake textarea {
+    width: 100%;
+}
+
+@media (max-width: 760px) {
+    .intake .row.stack {
+        grid-template-columns: 1fr;
+    }
+}
+
+

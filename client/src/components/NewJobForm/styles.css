@@ -1,0 +1,79 @@
+.jf.card {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 12px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
+}
+
+.jf-title {
+    margin: 0 0 8px;
+}
+
+.jf-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.jf-grid .full {
+    grid-column: 1 / -1;
+}
+
+.jf label {
+    display: block;
+}
+
+.jf label span {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+}
+
+.jf input,
+.jf select,
+.jf textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.jf textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.jf .jf-error {
+    color: var(--color-primary-dark);
+    margin: 6px 0 0;
+}
+
+.btn {
+    appearance: none;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    background: #ffffff;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: var(--color-primary);
+    color: #ffffff;
+    border-color: var(--color-primary);
+}
+
+.btn-primary:hover {
+    background: var(--color-success);
+}
+
+@media (max-width: 900px) {
+    .jf-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+

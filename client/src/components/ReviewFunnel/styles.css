@@ -1,0 +1,72 @@
+.rf.card {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 12px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
+}
+
+.rf-stars {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.rf-star {
+    font-size: 22px;
+    line-height: 1;
+    background: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.rf-star.on {
+    background: var(--color-warning);
+    color: var(--color-text);
+    border-color: var(--color-warning);
+}
+
+.rf-score {
+    margin-left: 6px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.rf-field span {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+}
+
+.rf-field textarea {
+    width: 100%;
+    min-height: 90px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    resize: vertical;
+}
+
+.rf-error {
+    color: var(--color-primary-dark);
+}
+
+.rf-submit {
+    margin-top: 8px;
+    background: var(--color-primary);
+    color: #ffffff;
+    border: 1px solid var(--color-primary);
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.rf-thanks {
+    margin: 0;
+}
+
+

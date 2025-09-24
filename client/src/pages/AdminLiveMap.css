@@ -1,0 +1,12 @@
+.admin-map .map-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.admin-map .map-controls .row {
+    gap: 8px;
+}
+
+

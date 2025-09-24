@@ -1,0 +1,73 @@
+@media print {
+    @page {
+        margin: 12mm;
+    }
+}
+
+.print-report {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    padding: 16px;
+    color: var(--color-text);
+}
+
+.print-report h1 {
+    margin: 0 0 4px;
+}
+
+.print-report .sub {
+    color: var(--muted);
+    margin-bottom: 12px;
+}
+
+.print-report .grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.print-report .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.print-report .block {
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.print-report .lbl {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.print-report .val {
+    font-weight: 800;
+    font-size: 20px;
+}
+
+.print-report table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.print-report th,
+.print-report td {
+    border: 1px solid var(--color-border);
+    padding: 6px 8px;
+}
+
+.print-report .num {
+    text-align: right;
+}
+
+.print-report footer {
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+

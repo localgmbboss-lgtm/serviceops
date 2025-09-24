@@ -1,0 +1,29 @@
+.docs .row.stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.docs .row.stack>* {
+    min-width: 0;
+}
+
+.docs .row.stack input,
+.docs .row.stack select {
+    flex: 1 1 180px;
+}
+
+.docs .row.stack button {
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    background: var(--color-primary);
+    color: #ffffff;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.error {
+    color: var(--color-primary-dark);
+}
+
+

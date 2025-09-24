@@ -1,0 +1,42 @@
+# Node dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Build output
+client/build/
+server/build/
+server/dist/
+
+# Environment files
+.env
+*.env
+client/.env
+client/.env.*
+server/.env
+server/.env.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Coverage & reports
+coverage/
+client/coverage/
+server/coverage/
+
+# OS and editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+client/tmp*
+server/tmp*

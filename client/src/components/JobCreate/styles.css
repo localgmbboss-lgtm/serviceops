@@ -1,0 +1,106 @@
+.jobcreate {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 12px;
+    background: #ffffff;
+    margin-bottom: 12px;
+}
+
+.jobcreate h3 {
+    margin: 0 0 8px;
+}
+
+.jobcreate .row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.jobcreate .row.end {
+    justify-content: flex-end;
+}
+
+.jobcreate label {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 6px;
+    min-width: 0;
+}
+
+.jobcreate input,
+.jobcreate textarea {
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 8px;
+    width: 100%;
+}
+
+.alert.error {
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger-soft);
+    color: var(--color-primary-dark);
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.btn {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--color-primary);
+    background: var(--color-primary);
+    color: #ffffff;
+}
+
+
+.jobcreate-mode {
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 12px;
+    margin: 12px 0;
+}
+
+.jobcreate-mode legend {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.jobcreate-mode-options {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.jobcreate-mode-option {
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.jobcreate-mode-option.active {
+    border-color: var(--color-primary);
+    background: rgba(70, 113, 255, 0.12);
+    color: var(--color-primary-dark);
+}
+
+.jobcreate-mode-option:hover {
+    border-color: var(--color-primary);
+}
+
+.jobcreate-mode-hint {
+    font-size: 0.85rem;
+    color: #666;
+    margin: 0;
+}
+
+.jobcreate-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: #666;
+}

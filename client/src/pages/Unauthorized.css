@@ -1,0 +1,39 @@
+/* src/pages/Unauthorized.css */
+.unauthorized-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+    padding: 2rem;
+}
+
+.unauthorized-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    width: 100%;
+}
+
+.unauthorized-card h1 {
+    color: var(--color-primary-dark);
+    margin-bottom: 1rem;
+}
+
+.unauthorized-card p {
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+}
+
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    font-size: 1.2rem;
+    color: var(--muted);
+}
+
+

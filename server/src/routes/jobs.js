@@ -1,0 +1,418 @@
+﻿// server/src/routes/jobs.js
+import { Router } from "express";
+import crypto from "crypto";
+import mongoose from "mongoose";
+import { completeJobWithPayment } from "../lib/jobCompletion.js";
+import Job from "../models/Jobs.js";
+import Vendor from "../models/Vendor.js"; // Changed from Driver to Vendor
+import { checkVendorCompliance } from "../lib/compliance.js"; // Changed from Driver to Vendor
+import Customer from "../models/Customer.js";
+import { notifySMS } from "../lib/notifier.js";
+const router = Router();
+
+
+
+
+export const STATUSES = [
+  "Unassigned",
+  "Assigned",
+  "OnTheWay",
+  "Arrived",
+  "Completed",
+];
+
+const ALLOWED_NEXT = {
+  Unassigned: ["Assigned"],
+  Assigned: ["OnTheWay", "Arrived", "Completed", "Unassigned"],
+  OnTheWay: ["Arrived", "Completed"],
+  Arrived: ["Completed"],
+  Completed: [],
+};
+
+const baseClient =
+  process.env.CLIENT_ORIGIN ||
+  process.env.CLIENT_URL ||
+  "http://localhost:3000";
+
+const makeToken = () => crypto.randomBytes(16).toString("hex");
+
+const PAYMENT_METHODS = new Set([
+  "cash",
+  "card",
+  "zelle",
+  "venmo",
+  "bank_transfer",
+  "other",
+]);
+
+// Build link payload (only includes vendor/customer links if tokens exist)
+const linkFor = (job) => ({
+  statusUrl: `${baseClient}/status/${job._id}`,
+  ...(job.vendorToken
+    ? { vendorLink: `${baseClient}/vendor/${job.vendorToken}` }
+    : {}),
+  ...(job.customerToken
+    ? { customerLink: `${baseClient}/choose/${job.customerToken}` }
+    : {}),
+});
+
+const assertId = (id) => {
+  if (!mongoose.isValidObjectId(id)) {
+    const err = new Error("Invalid id");
+    err.status = 400;
+    throw err;
+  }
+};
+
+// ---------- LIST (optional filters: ?status=...&q=...) ----------
+router.get("/", async (req, res, next) => {
+  try {
+    const { status, q } = req.query || {};
+    const find = {};
+    if (status && STATUSES.includes(status)) find.status = status;
+
+    if (q && String(q).trim()) {
+      const s = String(q).trim();
+      find.$or = [
+        { serviceType: new RegExp(s, "i") },
+        { pickupAddress: new RegExp(s, "i") },
+        { dropoffAddress: new RegExp(s, "i") },
+        { notes: new RegExp(s, "i") },
+      ];
+    }
+
+    const items = await Job.find(find).sort({ created: -1 }).lean();
+    res.json(items);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------- CREATE ----------
+router.post("/", async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    if (!body.customerId)
+      return res.status(400).json({ message: "customerId required" });
+    if (!body.pickupAddress)
+      return res.status(400).json({ message: "pickupAddress required" });
+
+    const job = await Job.create({
+      customerId: body.customerId,
+      pickupAddress: body.pickupAddress.trim(),
+      dropoffAddress: body.dropoffAddress?.trim() || undefined,
+      serviceType: body.serviceType?.trim() || "",
+      quotedPrice: Number(body.quotedPrice) || 0,
+      notes: body.notes || "",
+      bidMode: body.bidMode === "fixed" ? "fixed" : "open",
+      status: "Unassigned",
+      priority: body.priority === "urgent" ? "urgent" : "normal",
+    });
+
+    res.status(201).json(job);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/guest", async (req, res, next) => {
+  try {
+    const body = req.body || {};
+
+    if (!body?.name || !body?.phone || !body?.email) {
+      return res
+        .status(400)
+        .json({ message: "name, phone and email are required" });
+    }
+    if (!body?.address) {
+      return res.status(400).json({ message: "Pickup address is required" });
+    }
+
+    const cust = await Customer.findOneAndUpdate(
+      {
+        $or: [
+          { email: body.email.trim().toLowerCase() },
+          { phone: body.phone.trim() },
+        ],
+      },
+      {
+        $setOnInsert: {
+          name: body.name.trim(),
+          email: body.email.trim().toLowerCase(),
+          phone: body.phone.trim(),
+          isGuest: true,
+        },
+      },
+      { new: true, upsert: true }
+    );
+
+    const details = [];
+    if (body.description) details.push(`Problem: ${body.description}`);
+    if (body.vehicleMake || body.vehicleModel || body.vehicleColor) {
+      const v = [body.vehicleColor, body.vehicleMake, body.vehicleModel]
+        .filter(Boolean)
+        .join(" ");
+      details.push(`Vehicle: ${v}`);
+    }
+    if (body.distanceInfo?.distance && body.distanceInfo?.duration) {
+      details.push(
+        `Route: ${body.distanceInfo.distance} ~${body.distanceInfo.duration}`
+      );
+    }
+
+    const job = await Job.create({
+      customerId: cust._id,
+      guestRequest: true,
+      pickupAddress: String(body.address).trim(),
+      dropoffAddress: body.destination
+        ? String(body.destination).trim()
+        : undefined,
+      serviceType: body.serviceType || "",
+      notes: details.join("\n"),
+      bidMode: "open",
+      status: "Unassigned",
+      biddingOpen: true,
+      priority:
+        body.urgency === "emergency" || body.urgency === "urgent"
+          ? "urgent"
+          : "normal",
+      pickupLat: body.coordinates?.lat,
+      pickupLng: body.coordinates?.lng,
+    });
+
+    job.vendorToken = job.vendorToken || makeToken();
+    job.customerToken = job.customerToken || makeToken();
+    await job.save();
+
+    const trackUrl = `${baseClient}/track/guest/${job.customerToken}`;
+    res.status(201).json({
+      ok: true,
+      jobId: job._id,
+      jobToken: job.customerToken,
+      trackUrl,
+      links: linkFor(job),
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------- GUEST STATUS (read-only by token) ----------
+router.get("/guest/:token", async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    
+    // Validate token format
+    if (!token || typeof token !== "string" || token.length < 8) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid token format" 
+      });
+    }
+
+    // Find the job by customer token and populate vendor info
+    const job = await Job.findOne({ customerToken: token })
+      .populate("vendorId", "name phone city lat lng lastSeenAt")
+      .lean();
+    
+    if (!job) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Job not found or token invalid" 
+      });
+    }
+
+    // Format the response
+    const response = {
+      success: true,
+      job: {
+        _id: job._id,
+        status: job.status,
+        serviceType: job.serviceType,
+        pickupAddress: job.pickupAddress,
+        dropoffAddress: job.dropoffAddress || "",
+        quotedPrice: job.quotedPrice || 0,
+        created: job.createdAt || job.created,
+        completed: job.completed || null,
+        biddingOpen: !!job.biddingOpen,
+        bidMode: job.bidMode || "open",
+        notes: job.notes || "",
+        priority: job.priority || "normal"
+      },
+      vendor: job.vendorId ? {
+        _id: job.vendorId._id,
+        name: job.vendorId.name,
+        city: job.vendorId.city,
+        phone: job.vendorId.phone,
+        lat: job.vendorId.lat,
+        lng: job.vendorId.lng,
+        lastSeenAt: job.vendorId.lastSeenAt
+      } : null,
+      links: {
+        trackUrl: `${baseClient}/track/guest/${job.customerToken}`,
+        statusUrl: `${baseClient}/status/${job._id}`,
+        ...(job.vendorToken ? { vendorLink: `${baseClient}/vendor/${job.vendorToken}` } : {}),
+        ...(job.customerToken ? { customerLink: `${baseClient}/choose/${job.customerToken}` } : {})
+      }
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error("Error fetching guest job status:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Internal server error" 
+    });
+  }
+});
+
+router.post("/:id/complete", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    assertId(id);
+
+    const { amount, method, note, autoCharge } = req.body || {};
+    const rawAmount = Number(amount);
+    if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+      return res.status(400).json({ message: "amount must be greater than 0" });
+    }
+
+    const paymentMethod = typeof method === "string" && method.trim()
+      ? method.trim().toLowerCase()
+      : null;
+    if (paymentMethod && !PAYMENT_METHODS.has(paymentMethod)) {
+      return res.status(400).json({ message: "Unsupported payment method" });
+    }
+
+    const job = await Job.findById(id);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    const { summary, job: updatedJob, charge } = await completeJobWithPayment(job, {
+      amount: rawAmount,
+      method: paymentMethod,
+      note,
+      actor: "admin",
+      autoCharge: typeof autoCharge === "boolean" ? autoCharge : undefined,
+    });
+
+    res.json({
+      ok: true,
+      job: updatedJob.toObject(),
+      summary,
+      charge,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+router.get("/:id/links", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    assertId(id);
+    const job = await Job.findById(id).lean();
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    const links = linkFor(job);
+    if (!job.vendorToken && !job.customerToken) {
+      return res
+        .status(409)
+        .json({ message: "Links not available. Open bidding first." });
+    }
+
+    res.json(links);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/:id/open-bidding", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    assertId(id);
+    const job = await Job.findById(id);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    job.vendorToken = job.vendorToken || makeToken();
+    job.customerToken = job.customerToken || makeToken();
+    job.biddingOpen = true;
+
+    await job.save();
+
+    res.json(linkFor(job));
+  } catch (e) {
+    next(e);
+  }
+});
+
+
+// ---------- GET JOB BY ID (for authenticated users) ----------
+router.get("/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid job ID" 
+      });
+    }
+
+    const job = await Job.findById(id)
+      .populate("vendorId", "name phone city lat lng lastSeenAt")
+      .populate("customerId", "name email phone")
+      .lean();
+
+    if (!job) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Job not found" 
+      });
+    }
+
+    res.json({
+      success: true,
+      job: {
+        _id: job._id,
+        status: job.status,
+        serviceType: job.serviceType,
+        pickupAddress: job.pickupAddress,
+        dropoffAddress: job.dropoffAddress || "",
+        quotedPrice: job.quotedPrice || 0,
+        created: job.createdAt || job.created,
+        completed: job.completed || null,
+        biddingOpen: !!job.biddingOpen,
+        bidMode: job.bidMode || "open",
+        notes: job.notes || "",
+        priority: job.priority || "normal",
+        customer: job.customerId ? {
+          _id: job.customerId._id,
+          name: job.customerId.name,
+          email: job.customerId.email,
+          phone: job.customerId.phone
+        } : null
+      },
+      vendor: job.vendorId ? {
+        _id: job.vendorId._id,
+        name: job.vendorId.name,
+        city: job.vendorId.city,
+        phone: job.vendorId.phone,
+        lat: job.vendorId.lat,
+        lng: job.vendorId.lng,
+        lastSeenAt: job.vendorId.lastSeenAt
+      } : null
+    });
+  } catch (error) {
+    console.error("Error fetching job details:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Internal server error" 
+    });
+  }
+});
+
+export default router;
+
+
+
+
+
