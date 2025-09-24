@@ -30,7 +30,7 @@ function formatAbbr(num, { currency = false, decimals = 1 } = {}) {
   for (const u of units) {
     if (a >= u.v) {
       const q = a / u.v;
-      const d = q >= 10 ? 0 : decimals; // fewer decimals for larger values
+      const d = q >= 10 ? 0 : decimals; 
       out = `${toFixedTrim(q, d)}${u.s}`;
       break;
     }
