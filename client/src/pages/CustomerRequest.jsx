@@ -48,15 +48,19 @@ export default function CustomerRequest() {
       data.coordinates &&
       typeof data.coordinates.lat === "number" &&
       typeof data.coordinates.lng === "number";
+    const selectedType = data.locationType || "manual";
 
     if (!trimmedAddress) {
       throw new Error("Please enter your pickup address.");
     }
 
-    if (!hasCoordinates && data.locationType !== "manual") {
-      throw new Error("Please set your vehicle location on the map.");
+    if (!hasCoordinates && selectedType === "current") {
+      throw new Error(
+        "We couldn't read your GPS location. Enter the address manually or try again with location access."
+      );
     }
 
+    const effectiveType = hasCoordinates ? selectedType : "manual";
     const coords = hasCoordinates ? data.coordinates : null;
 
     return {
@@ -71,8 +75,8 @@ export default function CustomerRequest() {
       pickupAddress: trimmedAddress,
       pickupLat: coords?.lat,
       pickupLng: coords?.lng,
-      shareLive: data.locationType === "current",
-      vehiclePinned: data.locationType !== "map",
+      shareLive: effectiveType === "current",
+      vehiclePinned: effectiveType !== "map",
       vehicle: {
         make: data.vehicleMake,
         model: data.vehicleModel,
@@ -86,6 +90,7 @@ export default function CustomerRequest() {
       etaSeconds: data.distanceInfo?.seconds,
     };
   };
+
 
   const submitCustomerRequest = async (payload) => {
     const { data } = await api.post("/api/public/jobs", payload);

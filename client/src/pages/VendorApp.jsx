@@ -96,6 +96,8 @@ function suggestedPrice(job) {
   return Math.max(40, rounded);
 }
 
+const GEO_PROMPT_STORAGE_KEY = "va.geoPrompt.dismissed";
+
 export default function VendorApp() {
   const [me, setMe] = useState(null);
   const [openJobs, setOpenJobs] = useState([]);
@@ -117,6 +119,14 @@ export default function VendorApp() {
   const openJobsInitializedRef = useRef(false);
   const assignedSnapshotRef = useRef(new Map());
   const assignedInitializedRef = useRef(false);
+  const [geoPromptDismissed, setGeoPromptDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem(GEO_PROMPT_STORAGE_KEY) === "1";
+    } catch (error) {
+      return false;
+    }
+  });
   const [activeTab, setActiveTab] = useState("open");
   const [openPage, setOpenPage] = useState(0);
   const [assignedPage, setAssignedPage] = useState(0);
@@ -361,6 +371,21 @@ export default function VendorApp() {
 
   const hasGeo =
     toFiniteNumber(me?.lat) !== null && toFiniteNumber(me?.lng) !== null;
+  const showGeoPrompt = !hasGeo && !geoPromptDismissed;
+
+  useEffect(() => {
+    if (!hasGeo) {
+      return;
+    }
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(GEO_PROMPT_STORAGE_KEY);
+      } catch (error) {}
+    }
+    if (geoPromptDismissed) {
+      setGeoPromptDismissed(false);
+    }
+  }, [hasGeo, geoPromptDismissed]);
 
   const toggleJobExpansion = (jobId) => {
     setExpandedJobId((current) => (current === jobId ? null : jobId));
@@ -370,6 +395,15 @@ export default function VendorApp() {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       toggleJobExpansion(jobId);
+    }
+  };
+
+  const dismissGeoPrompt = () => {
+    setGeoPromptDismissed(true);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(GEO_PROMPT_STORAGE_KEY, "1");
+      } catch (error) {}
     }
   };
 
@@ -453,10 +487,19 @@ export default function VendorApp() {
             Stay ahead of incoming requests with real-time bidding, distance
             insights, and quick actions.
           </p>
-          {!hasGeo && (
-            <div className="va-alert info">
-              Add your location in the vendor profile to unlock distance-based
-              estimates.
+          {showGeoPrompt && (
+            <div className="va-alert info va-alert--dismissible" role="status">
+              <div className="va-alert__body">
+                Add your location in the vendor profile to unlock distance-based
+                estimates.
+              </div>
+              <button
+                type="button"
+                className="va-alert__dismiss"
+                onClick={dismissGeoPrompt}
+              >
+                Cancel
+              </button>
             </div>
           )}
         </div>
@@ -953,27 +996,3 @@ export default function VendorApp() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
