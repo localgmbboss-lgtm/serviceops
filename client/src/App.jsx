@@ -67,6 +67,7 @@ function Topbar() {
   }, [isAdmin, isVendor, isDriver, isCustomer]);
 
   const handleNavigation = (path) => {
+    setMenuOpen(false);
     navigate(path);
   };
 
@@ -75,168 +76,188 @@ function Topbar() {
     return loc.pathname.startsWith(path) && path !== "/admin";
   };
 
+  const guestLinks = [
+    { to: "/guest/request", label: "Request service" },
+    { to: "/customer/login", label: "Customer login" },
+    { to: "/vendor/login", label: "Vendor login" },
+    { to: "/admin/login", label: "Admin login" },
+  ];
+
   return (
     <header className="topbar">
       <div className="inner">
         <div className="brand-hub">
           <h1 className="brand">
-          <Link to="/" className="brand-link">
-            ServiceOps
-          </Link>
+            <Link to="/" className="brand-link">
+              ServiceOps
+            </Link>
           </h1>
           <span className="brand-split" aria-hidden="true" />
           <span className="brand-tagline">Roadside orchestration, reimagined</span>
           {user && roleLabel ? (
-          <span className="brand-chip">{roleLabel} workspace</span>
+            <span className="brand-chip">{roleLabel + " workspace"}</span>
           ) : null}
         </div>
 
-        {user ? (
-          <>
-          <button
-            type="button"
-            className={`topbar-menu-toggle${menuOpen ? " is-active" : ""}`}
-            aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-            aria-expanded={menuOpen}
-            aria-controls="mainnav"
-            onClick={() => setMenuOpen((prev) => !prev)}
-          >
-            <span />
-            <span />
-            <span />
-          </button>
-          <nav
-            id="mainnav"
-            className={`nav${menuOpen ? " nav--open" : ""}`}
-            aria-label="Primary"
-          >
-            {isAdmin && (
-              <>
-                <button
-                  className={isActivePath("/admin") ? "nav-link active" : "nav-link"}
-                  onClick={() => handleNavigation("/admin")}
-                >
-                  Dashboard
-                </button>
-                <button
-                  className={isActivePath("/jobs") ? "nav-link active" : "nav-link"}
-                  onClick={() => handleNavigation("/jobs")}
-                >
-                  Jobs
-                </button>
-                <button
-                  className={isActivePath("/reports") ? "nav-link active" : "nav-link"}
-                  onClick={() => handleNavigation("/reports")}
-                >
-                  Reports
-                </button>
-                <button
-                  className={
-                    isActivePath("/admin/vendors") ? "nav-link active" : "nav-link"
-                  }
-                  onClick={() => handleNavigation("/admin/vendors")}
-                >
-                  Vendors
-                </button>
-                <button
-                  className={
-                    isActivePath("/admin/drivers") ? "nav-link active" : "nav-link"
-                  }
-                  onClick={() => handleNavigation("/admin/drivers")}
-                >
-                  Drivers
-                </button>
-                <button
-                  className={
-                    isActivePath("/admin/documents") ? "nav-link active" : "nav-link"
-                  }
-                  onClick={() => handleNavigation("/admin/documents")}
-                >
-                  Docs
-                </button>
-                <button
-                  className={isActivePath("/admin/map") ? "nav-link active" : "nav-link"}
-                  onClick={() => handleNavigation("/admin/map")}
-                >
-                  Live Map
-                </button>
-                <button
-                  className={
-                    isActivePath("/admin/settings") ? "nav-link active" : "nav-link"
-                  }
-                  onClick={() => handleNavigation("/admin/settings")}
-                >
-                  Settings
-                </button>
-                <button
-                  className={
-                    isActivePath("/financials") ? "nav-link active" : "nav-link"
-                  }
-                  onClick={() => handleNavigation("/financials")}
-                >
-                  Financials
-                </button>
-              </>
-            )}
+        <button
+          type="button"
+          className={"topbar-menu-toggle" + (menuOpen ? " is-active" : "")}
+          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={menuOpen}
+          aria-controls="mainnav"
+          onClick={() => setMenuOpen((prev) => !prev)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <nav
+          id="mainnav"
+          className={"nav" + (menuOpen ? " nav--open" : "")}
+          aria-label="Primary"
+        >
+          {user ? (
+            <>
+              {isAdmin && (
+                <>
+                  <button
+                    className={isActivePath("/admin") ? "nav-link active" : "nav-link"}
+                    onClick={() => handleNavigation("/admin")}
+                  >
+                    Dashboard
+                  </button>
+                  <button
+                    className={isActivePath("/jobs") ? "nav-link active" : "nav-link"}
+                    onClick={() => handleNavigation("/jobs")}
+                  >
+                    Jobs
+                  </button>
+                  <button
+                    className={isActivePath("/reports") ? "nav-link active" : "nav-link"}
+                    onClick={() => handleNavigation("/reports")}
+                  >
+                    Reports
+                  </button>
+                  <button
+                    className={
+                      isActivePath("/admin/vendors") ? "nav-link active" : "nav-link"
+                    }
+                    onClick={() => handleNavigation("/admin/vendors")}
+                  >
+                    Vendors
+                  </button>
+                  <button
+                    className={
+                      isActivePath("/admin/drivers") ? "nav-link active" : "nav-link"
+                    }
+                    onClick={() => handleNavigation("/admin/drivers")}
+                  >
+                    Drivers
+                  </button>
+                  <button
+                    className={
+                      isActivePath("/admin/documents") ? "nav-link active" : "nav-link"
+                    }
+                    onClick={() => handleNavigation("/admin/documents")}
+                  >
+                    Docs
+                  </button>
+                  <button
+                    className={isActivePath("/admin/map") ? "nav-link active" : "nav-link"}
+                    onClick={() => handleNavigation("/admin/map")}
+                  >
+                    Live Map
+                  </button>
+                  <button
+                    className={
+                      isActivePath("/admin/settings") ? "nav-link active" : "nav-link"
+                    }
+                    onClick={() => handleNavigation("/admin/settings")}
+                  >
+                    Settings
+                  </button>
+                  <button
+                    className={
+                      isActivePath("/financials") ? "nav-link active" : "nav-link"
+                    }
+                    onClick={() => handleNavigation("/financials")}
+                  >
+                    Financials
+                  </button>
+                </>
+              )}
 
-            {isVendor && (
-              <button
-                className={
-                  isActivePath("/vendor/app") ? "nav-link active" : "nav-link"
-                }
-                onClick={() => handleNavigation("/vendor/app")}
-              >
-                Vendor Dashboard
-              </button>
-            )}
-
-            {isDriver && (
-              <button
-                className={isActivePath("/driver") ? "nav-link active" : "nav-link"}
-                onClick={() => handleNavigation("/driver")}
-              >
-                My Jobs
-              </button>
-            )}
-
-            {isCustomer && (
-              <>
+              {isVendor && (
                 <button
                   className={
-                    isActivePath("/customer/home") ? "nav-link active" : "nav-link"
+                    isActivePath("/vendor/app") ? "nav-link active" : "nav-link"
                   }
-                  onClick={() => handleNavigation("/customer/home")}
+                  onClick={() => handleNavigation("/vendor/app")}
                 >
-                  My Dashboard
+                  Vendor Dashboard
                 </button>
-                <button
-                  className={
-                    isActivePath("/request") ? "nav-link active" : "nav-link"
-                  }
-                  onClick={() => handleNavigation("/request")}
-                >
-                  New Request
-                </button>
-              </>
-            )}
+              )}
 
-            <div className="nav-user-section">
-              <span className="nav-user-info">
-                {user?.name ? `Hello, ${user.name}` : "Signed in"}
-              </span>
-              <button
-                className="nav-link nav-logout"
-                onClick={() => {
-                  logout();
-                  handleNavigation("/");
-                }}
-              >
-                Logout
-              </button>
-            </div>
-          </nav>
-          </>
-        ) : null}
+              {isDriver && (
+                <button
+                  className={isActivePath("/driver") ? "nav-link active" : "nav-link"}
+                  onClick={() => handleNavigation("/driver")}
+                >
+                  My Jobs
+                </button>
+              )}
+
+              {isCustomer && (
+                <>
+                  <button
+                    className={
+                      isActivePath("/customer/home") ? "nav-link active" : "nav-link"
+                    }
+                    onClick={() => handleNavigation("/customer/home")}
+                  >
+                    My Dashboard
+                  </button>
+                  <button
+                    className={
+                      isActivePath("/request") ? "nav-link active" : "nav-link"
+                    }
+                    onClick={() => handleNavigation("/request")}
+                  >
+                    New Request
+                  </button>
+                </>
+              )}
+
+              <div className="nav-user-section">
+                <span className="nav-user-info">
+                  {user?.name ? "Hello, " + user.name : "Signed in"}
+                </span>
+                <button
+                  className="nav-link nav-logout"
+                  onClick={() => {
+                    logout();
+                    handleNavigation("/");
+                  }}
+                >
+                  Logout
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {guestLinks.map((item) => (
+                <Link
+                  key={item.to}
+                  className="nav-link"
+                  to={item.to}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </>
+          )}
+        </nav>
       </div>
     </header>
   );

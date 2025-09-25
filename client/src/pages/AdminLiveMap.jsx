@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
+import LiveMap from "../components/LiveMap";
+import { GOOGLE_MAPS_KEY } from "../config/env.js";
 import "./AdminLiveMap.css";
 
 export default function AdminLiveMap() {
@@ -60,6 +62,8 @@ export default function AdminLiveMap() {
     [drivers]
   );
 
+  const hasGoogle = Boolean(GOOGLE_MAPS_KEY);
+
   const filteredDrivers = useMemo(
     () =>
       drivers.filter((driver) => {
@@ -102,14 +106,25 @@ export default function AdminLiveMap() {
       </div>
 
       <div className="card">
-        <GMap
-          drivers={filteredDrivers}
-          showRoute={false}
-          zoom={11}
-          destination={filteredDrivers[0]?.location || null}
-        />
+        {hasGoogle ? (
+          <GMap
+            drivers={filteredDrivers}
+            showRoute={false}
+            zoom={11}
+            destination={filteredDrivers[0]?.location || null}
+          />
+        ) : (
+          <>
+            <LiveMap drivers={filteredDrivers} autoFit center={[6.5244, 3.3792]} />
+            <p className="muted tiny">
+              Add your Google Maps API key to enable satellite view and routing.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
 }
+
+
 

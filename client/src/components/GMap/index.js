@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { loadGoogleMaps } from "../../lib/loadGoogleMaps";
+import { GOOGLE_MAPS_KEY } from "../../config/env.js";
 import "./styles.css";
 
 /**
@@ -17,7 +18,6 @@ export default function GMap({
   showRoute = false,
   zoom = 12,
 }) {
-  const apiKey = process.env.REACT_APP_GOOGLE_MAPS_KEY;
   const mapEl = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -36,15 +36,21 @@ export default function GMap({
 
   // Load Maps and its libraries once
   useEffect(() => {
+    if (!GOOGLE_MAPS_KEY) {
+      setErr("Missing Google Maps API key");
+      return;
+    }
+
     let alive = true;
     (async () => {
       try {
-        const g = await loadGoogleMaps(apiKey);
-        // ensure the "maps" library is ready (v=weekly supports importLibrary)
+        const g = await loadGoogleMaps();
+        if (!alive) return;
+
         if (g?.maps?.importLibrary) {
           await g.maps.importLibrary("maps");
         }
-        if (!alive) return;
+
         setReady(true);
       } catch (e) {
         if (!alive) return;
@@ -52,10 +58,11 @@ export default function GMap({
         setErr(e.message || "Failed to load Google Maps");
       }
     })();
+
     return () => {
       alive = false;
     };
-  }, [apiKey]);
+  }, []);
 
   // Init the map once
   useEffect(() => {
@@ -75,7 +82,6 @@ export default function GMap({
     });
     mapRef.current = map;
 
-    // directions (for optional route)
     if (g.maps.DirectionsService) {
       dirServiceRef.current = new g.maps.DirectionsService();
       dirRendererRef.current = new g.maps.DirectionsRenderer({
@@ -91,17 +97,15 @@ export default function GMap({
     const map = mapRef.current;
     if (!ready || !map || !g?.maps) return;
 
-    // clear old markers
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
     const bounds = new g.maps.LatLngBounds();
     let hasAny = false;
 
-    // driver markers
     drivers.forEach((d) => {
       if (!Number.isFinite(d.lat) || !Number.isFinite(d.lng)) return;
-      const m = new g.maps.Marker({
+      const marker = new g.maps.Marker({
         position: { lat: d.lat, lng: d.lng },
         map,
         title: d.name || "Driver",
@@ -114,12 +118,11 @@ export default function GMap({
           strokeWeight: 2,
         },
       });
-      markersRef.current.push(m);
-      bounds.extend(m.getPosition());
+      markersRef.current.push(marker);
+      bounds.extend(marker.getPosition());
       hasAny = true;
     });
 
-    // destination marker
     let destLatLng = null;
     if (
       destination &&
@@ -130,7 +133,7 @@ export default function GMap({
       destLatLng = destination;
     }
     if (destLatLng) {
-      const dm = new g.maps.Marker({
+      const destMarker = new g.maps.Marker({
         position: destLatLng,
         map,
         title: "Destination",
@@ -143,12 +146,11 @@ export default function GMap({
           strokeWeight: 2,
         },
       });
-      markersRef.current.push(dm);
-      bounds.extend(dm.getPosition());
+      markersRef.current.push(destMarker);
+      bounds.extend(destMarker.getPosition());
       hasAny = true;
     }
 
-    // fit or fallback
     if (hasAny) {
       map.fitBounds(bounds, 80);
       if (map.getZoom() > 17) map.setZoom(17);
@@ -173,7 +175,7 @@ export default function GMap({
 
     const req = {
       origin,
-      destination, // lng/lat object or address string
+      destination,
       travelMode: g.maps.TravelMode.DRIVING,
     };
 
@@ -194,3 +196,6 @@ export default function GMap({
     </div>
   );
 }
+
+
+

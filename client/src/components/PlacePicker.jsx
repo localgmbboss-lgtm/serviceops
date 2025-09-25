@@ -1,20 +1,14 @@
 // client/src/components/PlacePicker.jsx
 import { useEffect, useRef, useState } from "react";
+import { GOOGLE_MAPS_KEY } from "../config/env.js";
 
 // ————— helpers —————
 function getMapsKey() {
-  const vite =
-    (typeof import.meta !== "undefined" &&
-      import.meta.env &&
-      import.meta.env.VITE_GOOGLE_MAPS_KEY) ||
-    "";
-  const cra =
-    (typeof process !== "undefined" &&
-      process.env &&
-      process.env.REACT_APP_GOOGLE_MAPS_KEY) ||
-    "";
-  const win = (typeof window !== "undefined" && window.GOOGLE_MAPS_KEY) || "";
-  return vite || cra || win || "";
+  if (GOOGLE_MAPS_KEY) return GOOGLE_MAPS_KEY;
+  if (typeof window !== "undefined") {
+    return window.GOOGLE_MAPS_KEY || "";
+  }
+  return "";
 }
 
 // Load Google Maps <script> (once) if a key exists
@@ -319,3 +313,4 @@ export default function PlacePicker({
     </div>
   );
 }
+
