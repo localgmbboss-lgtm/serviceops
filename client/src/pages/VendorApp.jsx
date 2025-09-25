@@ -117,6 +117,7 @@ export default function VendorApp() {
   const openJobsInitializedRef = useRef(false);
   const assignedSnapshotRef = useRef(new Map());
   const assignedInitializedRef = useRef(false);
+  const [activeTab, setActiveTab] = useState("open");
   const [openPage, setOpenPage] = useState(0);
   const [assignedPage, setAssignedPage] = useState(0);
   const [expandedJobId, setExpandedJobId] = useState(null);
@@ -303,6 +304,15 @@ export default function VendorApp() {
   }, [assignedPageCount]);
 
   useEffect(() => {
+    setExpandedJobId(null);
+    if (activeTab === "open") {
+      setAssignedPage(0);
+    } else {
+      setOpenPage(0);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
     if (!expandedJobId) {
       return;
     }
@@ -483,8 +493,35 @@ export default function VendorApp() {
         ))}
       </section>
 
-      <section className="va-grid">
-        <div className="va-panel card">
+      <section className="va-workflows">
+        <div className="va-tabs" role="tablist" aria-label="Job views">
+          <button
+            type="button"
+            role="tab"
+            id="va-tab-open-btn"
+            aria-controls="va-tab-open"
+            aria-selected={activeTab === "open"}
+            tabIndex={activeTab === "open" ? 0 : -1}
+            className={"va-tab" + (activeTab === "open" ? " is-active" : "")}
+            onClick={() => setActiveTab("open")}
+          >
+            Open jobs ({openJobs.length})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="va-tab-assigned-btn"
+            aria-controls="va-tab-assigned"
+            aria-selected={activeTab === "assigned"}
+            tabIndex={activeTab === "assigned" ? 0 : -1}
+            className={"va-tab" + (activeTab === "assigned" ? " is-active" : "")}
+            onClick={() => setActiveTab("assigned")}
+          >
+            Assigned ({assigned.length})
+          </button>
+        </div>
+        <div className="va-tabpanels">
+        <div className="va-panel card" role="tabpanel" id="va-tab-open" aria-labelledby="va-tab-open-btn" hidden={activeTab !== "open"}>
           <div className="va-panel__head">
             <div>
               <h2>Open jobs</h2>
@@ -644,7 +681,7 @@ export default function VendorApp() {
           )}
         </div>
 
-        <div className="va-panel card">
+        <div className="va-panel card" role="tabpanel" id="va-tab-assigned" aria-labelledby="va-tab-assigned-btn" hidden={activeTab !== "assigned"}>
           <div className="va-panel__head">
             <div>
               <h2>Assigned / In progress</h2>
@@ -807,6 +844,7 @@ export default function VendorApp() {
             </>
           )}
         </div>
+        </div>
       </section>
 
       {bidSheet?.job && (
@@ -915,6 +953,14 @@ export default function VendorApp() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
 
 
 

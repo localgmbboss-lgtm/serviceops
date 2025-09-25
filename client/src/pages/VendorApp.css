@@ -226,6 +226,55 @@
 }
 
 
+.va-workflows {
+  display: grid;
+  gap: 18px;
+}
+
+.va-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.va-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.va-tab:hover {
+  transform: translateY(-1px);
+}
+
+.va-tab.is-active {
+  background: var(--color-card);
+  color: var(--color-text);
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.14);
+}
+
+.va-tab:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.va-tabpanels {
+  display: grid;
+  gap: 18px;
+}
+
+
 .va-list {
   list-style: none;
   margin: 0;
@@ -317,15 +366,17 @@
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: rgba(15, 23, 42, 0.5);
 }
+
 
 .va-detail__value {
   font-size: 13px;
   line-height: 1.4;
-  color: var(--color-text);
+  color: #0f172a;
   word-break: break-word;
 }
+
 
 
 
@@ -338,29 +389,69 @@
 .va-job__header {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
   align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
+.va-job__header .va-chip-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.va-job__header .va-chip {
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.va-job__header .va-chip.va-chip--guest {
+  background: rgba(255, 107, 136, 0.2);
+  color: #9f1d3c;
+  border-color: rgba(255, 107, 136, 0.26);
+}
+
+.va-job__header .va-chip.va-chip--heavy {
+  background: rgba(255, 209, 102, 0.24);
+  color: #7a4c00;
+  border-color: rgba(255, 209, 102, 0.32);
+}
+
+.va-job__header .va-chip.va-chip--success {
+  background: rgba(84, 224, 166, 0.22);
+  color: #056a48;
+  border-color: rgba(84, 224, 166, 0.3);
+}
+
+
 
 .va-job__title {
   font-weight: 700;
-  font-size: 18px;
+  font-size: 17px;
+  color: #0f172a;
 }
+
 
 .va-job__address {
   margin: 0;
-  color: var(--color-text);
-  font-size: 15px;
-  line-height: 1.5;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.45;
 }
+
 
 .va-job__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--color-text-muted);
+  gap: 10px;
+  font-size: 12px;
+  color: #111827;
 }
+
 
 .va-job__cta {
   display: inline-flex;
@@ -519,6 +610,9 @@
 }
 
 @media (max-width: 720px) {
+  .va-workflows {
+    gap: 14px;
+  }
   .va-hero {
     padding: 18px;
     gap: 14px;
@@ -530,20 +624,34 @@
     font-size: 12px;
   }
   .va-stats {
-    gap: 14px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: nowrap;
   }
   .va-stat {
+    flex: 1 1 0;
+    min-width: 0;
     padding: 16px;
   }
   .va-stat__value {
     font-size: 24px;
   }
-  .va-job__cta {
-    flex-direction: column;
-    align-items: stretch;
+  .va-stat__label {
+    font-size: 12px;
   }
-  .va-job__cta .btn {
+  .va-stat__hint {
+    font-size: 11px;
+  }
+  .va-tabs {
     width: 100%;
+    justify-content: space-between;
+  }
+  .va-tab {
+    flex: 1 1 0;
+    text-align: center;
+  }
+  .va-job__title {
+    font-size: 16px;
   }
 }
 
@@ -565,17 +673,36 @@
   .va-panel__hint {
     font-size: 11px;
   }
-  .va-stats {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  .va-hero {
+    padding: 16px;
     gap: 12px;
   }
+  .va-hero__main h1 {
+    font-size: 20px;
+  }
+  .va-subtitle {
+    font-size: 11px;
+  }
+  .va-stats {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
   .va-stat {
+    flex: 1 1 calc(33.333% - 10px);
+    min-width: 120px;
     padding: 14px;
   }
   .va-stat__value {
-    font-size: 24px;
+    font-size: 22px;
   }
   .va-stat__hint {
+    font-size: 11px;
+  }
+  .va-tabs {
+    padding: 3px;
+    gap: 4px;
+  }
+  .va-tab {
     font-size: 12px;
   }
   .va-job {
@@ -583,7 +710,7 @@
     gap: 10px;
   }
   .va-job__title {
-    font-size: 15px;
+    font-size: 14px;
   }
   .va-job__address {
     font-size: 13px;
@@ -592,71 +719,76 @@
     font-size: 11px;
     gap: 6px;
   }
-  .va-chip {
-    padding: 5px 9px;
-    font-size: 11px;
-  }
-  .va-detail__label {
+  .va-job__header .va-chip {
     font-size: 10px;
-  }
-  .va-detail__value {
-    font-size: 12px;
+    padding: 4px 8px;
   }
 }
 
 @media (max-width: 480px) {
   .va-hero {
-    padding: 14px;
-    gap: 12px;
-  }
-  .va-hero__main h1 {
-    font-size: 22px;
-  }
-  .va-subtitle {
-    font-size: 12px;
-  }
-  .va-stats {
+    padding: 12px;
     gap: 10px;
   }
-  .va-stat {
-    padding: 12px;
+  .va-hero__main h1 {
+    font-size: 18px;
   }
-  .va-stat__value {
-    font-size: 20px;
+  .va-subtitle {
+    font-size: 10px;
   }
-  .va-job {
-    padding: 10px;
+  .va-hero__meta {
     gap: 8px;
   }
+  .va-chip {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .va-stats {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .va-stat {
+    flex: 1 1 calc(33.333% - 6px);
+    min-width: 0;
+    padding: 10px;
+  }
+  .va-stat__value {
+    font-size: 18px;
+  }
+  .va-stat__label {
+    font-size: 10px;
+  }
+  .va-stat__hint {
+    font-size: 9px;
+  }
+  .va-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .va-tab {
+    flex: 1 1 calc(50% - 6px);
+    font-size: 10px;
+  }
+  .va-job {
+    padding: 8px;
+    gap: 6px;
+  }
   .va-job__title {
-    font-size: 13px;
+    font-size: 12px;
   }
   .va-job__address {
-    font-size: 12px;
+    font-size: 11px;
   }
   .va-job__meta {
-    font-size: 10px;
-  }
-  .va-chip {
-    padding: 4px 8px;
-    font-size: 10px;
+    font-size: 9px;
+    gap: 4px;
   }
   .va-job__cta .btn {
-    font-size: 12px;
-    min-height: 30px;
+    font-size: 11px;
+    min-height: 28px;
+    padding: 6px 10px;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 
