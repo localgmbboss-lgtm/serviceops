@@ -1,12 +1,13 @@
-// Works in CRA (process.env) and Vite (import.meta.env). Also allows a window fallback.
+﻿// Works in CRA (process.env) and Vite (import.meta.env). Also allows a window fallback.
 const viteEnv = (typeof import.meta !== "undefined" && import.meta.env) || {};
 const craEnv = (typeof process !== "undefined" && process.env) || {};
 const winEnv = typeof window !== "undefined" ? window : {};
+const windowEnvObj = (typeof window !== "undefined" && window.__ENV__) || {};
 
 const windowApiUrl =
   winEnv.API_URL ||
   winEnv.__API_URL__ ||
-  (winEnv.__ENV__ && winEnv.__ENV__.API_URL);
+  windowEnvObj.API_URL;
 
 const runtimeApiUrl =
   viteEnv.VITE_API_URL ||
@@ -28,5 +29,14 @@ export const API_BASE_URL =
 export const GOOGLE_MAPS_KEY =
   viteEnv.VITE_GOOGLE_MAPS_KEY ||
   craEnv.REACT_APP_GOOGLE_MAPS_KEY ||
-  winEnv.GOOGLE_MAPS_KEY || // optional <script> fallback
+  windowEnvObj.GOOGLE_MAPS_KEY ||
+  winEnv.GOOGLE_MAPS_KEY ||
   "";
+
+if (typeof window !== "undefined") {
+  window.__ENV__ = {
+    ...(window.__ENV__ || {}),
+    API_URL: API_BASE_URL,
+    GOOGLE_MAPS_KEY,
+  };
+}
