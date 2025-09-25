@@ -1,4 +1,4 @@
-﻿// Works in CRA (process.env) and Vite (import.meta.env). Also allows a window fallback.
+// Works in CRA (process.env) and Vite (import.meta.env). Also allows a window fallback.
 const viteEnv = (typeof import.meta !== "undefined" && import.meta.env) || {};
 const craEnv = (typeof process !== "undefined" && process.env) || {};
 const winEnv = typeof window !== "undefined" ? window : {};

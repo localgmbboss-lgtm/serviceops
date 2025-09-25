@@ -9,6 +9,7 @@ import {
 
 // Import AuthProvider and ProtectedRoute
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { NotificationsProvider, useNotifications } from "./contexts/NotificationsContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Import pages
@@ -45,6 +46,7 @@ import GuestRequest from "./pages/GuestRequest";
 import GuestJobTracker from "./pages/GuestJobTracker";
 // Optional self-serve intake
 import CustomerIntake from "./pages/CustomerIntake";
+import NotificationsCenter from "./pages/NotificationsCenter";
 
 import "./App.css";
 
@@ -52,11 +54,59 @@ function Topbar() {
   const loc = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAdmin, isVendor, isDriver, isCustomer } = useAuth();
+  const { unreadCount, markAllRead } = useNotifications();
   const [menuOpen, setMenuOpen] = React.useState(false);
 
-  React.useEffect(() => {
+  const closeMenu = React.useCallback(() => {
     setMenuOpen(false);
-  }, [loc.pathname, user]);
+  }, []);
+
+  React.useEffect(() => {
+    closeMenu();
+  }, [loc.pathname, user, closeMenu]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleResize = () => {
+      if (window.innerWidth > 900) {
+        closeMenu();
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [closeMenu]);
+
+  React.useEffect(() => {
+    if (!menuOpen || typeof document === "undefined") {
+      return;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [menuOpen]);
+
+  React.useEffect(() => {
+    if (!menuOpen || typeof window === "undefined") {
+      return;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        closeMenu();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuOpen, closeMenu]);
 
   const roleLabel = React.useMemo(() => {
     if (isAdmin) return "Admin";
@@ -66,8 +116,29 @@ function Topbar() {
     return "";
   }, [isAdmin, isVendor, isDriver, isCustomer]);
 
+  const homePath = React.useMemo(() => {
+    if (isAdmin) return "/admin";
+    if (isVendor) return "/vendor/app";
+    if (isDriver) return "/driver";
+    if (isCustomer) return "/customer/home";
+    return "/";
+  }, [isAdmin, isVendor, isDriver, isCustomer]);
+
+  const brandTitle = user
+    ? (roleLabel ? `${roleLabel} workspace` : "Workspace")
+    : "ServiceOps";
+  const topbarClassName = user ? "topbar topbar--authed" : "topbar";
+  const notificationsLabel = unreadCount > 0
+    ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+    : "Notifications";
+  const handleNotificationsClick = () => {
+    closeMenu();
+    markAllRead();
+    navigate("/notifications");
+  };
+
   const handleNavigation = (path) => {
-    setMenuOpen(false);
+    closeMenu();
     navigate(path);
   };
 
@@ -84,20 +155,37 @@ function Topbar() {
   ];
 
   return (
-    <header className="topbar">
+    <header className={topbarClassName}>
       <div className="inner">
         <div className="brand-hub">
           <h1 className="brand">
-            <Link to="/" className="brand-link">
-              ServiceOps
+            <Link to={homePath} className="brand-link" onClick={closeMenu}>
+              {brandTitle}
             </Link>
           </h1>
-          <span className="brand-split" aria-hidden="true" />
-          <span className="brand-tagline">Roadside orchestration, reimagined</span>
-          {user && roleLabel ? (
-            <span className="brand-chip">{roleLabel + " workspace"}</span>
+          {!user ? (
+            <>
+              <span className="brand-split" aria-hidden="true" />
+              <span className="brand-tagline">Roadside orchestration, reimagined</span>
+            </>
           ) : null}
         </div>
+
+        {user ? (
+          <button
+            type="button"
+            className={"topbar-notify" + (unreadCount > 0 ? " has-unread" : "")}
+            onClick={handleNotificationsClick}
+            aria-label={notificationsLabel}
+          >
+            <span className="topbar-notify__icon" aria-hidden="true" />
+            {unreadCount > 0 ? (
+              <span className="topbar-notify__badge">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            ) : null}
+          </button>
+        ) : null}
 
         <button
           type="button"
@@ -250,7 +338,7 @@ function Topbar() {
                   key={item.to}
                   className="nav-link"
                   to={item.to}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={closeMenu}
                 >
                   {item.label}
                 </Link>
@@ -259,6 +347,11 @@ function Topbar() {
           )}
         </nav>
       </div>
+      <div
+        className={"nav-backdrop" + (menuOpen ? " nav-backdrop--visible" : "")}
+        onClick={closeMenu}
+        aria-hidden="true"
+      />
     </header>
   );
 }
@@ -266,9 +359,10 @@ function Topbar() {
 export default function App() {
   return (
     <AuthProvider>
-      <ScrollToTop />
-      <Topbar />
-      <main className="container">
+      <NotificationsProvider>
+        <ScrollToTop />
+        <Topbar />
+        <main className="container">
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<Landing />} />
@@ -290,6 +384,7 @@ export default function App() {
             element={<VendorPortal />}
           />
           <Route path="/new/:token" element={<CustomerIntake />} />
+          <Route path="/notifications" element={<NotificationsCenter />} />
 
           <Route path="/unauthorized" element={<Unauthorized />} />
           {/* Admin routes */}
@@ -420,6 +515,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
+      </NotificationsProvider>
     </AuthProvider>
   );
 }

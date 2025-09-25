@@ -43,9 +43,22 @@ export default function CustomerRequest() {
     : "You're signed in. We'll keep this tied to your account.";
 
   const transformCustomerPayload = (data) => {
-    if (!data.address?.trim() || !data.coordinates) {
+    const trimmedAddress = data.address?.trim();
+    const hasCoordinates =
+      data.coordinates &&
+      typeof data.coordinates.lat === "number" &&
+      typeof data.coordinates.lng === "number";
+
+    if (!trimmedAddress) {
+      throw new Error("Please enter your pickup address.");
+    }
+
+    if (!hasCoordinates && data.locationType !== "manual") {
       throw new Error("Please set your vehicle location on the map.");
     }
+
+    const coords = hasCoordinates ? data.coordinates : null;
+
     return {
       name: data.name.trim(),
       phone: data.phone.trim(),
@@ -55,9 +68,9 @@ export default function CustomerRequest() {
       urgency: data.urgency,
       heavyDuty: /heavy/i.test(data.serviceType),
       dropoffAddress: data.destination || undefined,
-      pickupAddress: data.address,
-      pickupLat: data.coordinates.lat,
-      pickupLng: data.coordinates.lng,
+      pickupAddress: trimmedAddress,
+      pickupLat: coords?.lat,
+      pickupLng: coords?.lng,
       shareLive: data.locationType === "current",
       vehiclePinned: data.locationType !== "map",
       vehicle: {

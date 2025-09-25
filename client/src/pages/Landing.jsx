@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import "./Landing.css";
 
 export default function Landing() {
+  console.log('maps key', process.env.REACT_APP_GOOGLE_MAPS_KEY);
   return (
     <div className="landing">
       {/* Hero */}
@@ -135,3 +136,4 @@ export default function Landing() {
     </div>
   );
 }
+
