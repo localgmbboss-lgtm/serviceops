@@ -1,4 +1,4 @@
-﻿// client/src/lib/vendorApi.js
+// client/src/lib/vendorApi.js
 import axios from "axios";
 import { API_BASE_URL } from "../config/env.js";
 

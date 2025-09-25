@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { copyText } from "../utils/clipboard";
 import GMap from "../components/GMap";
+import LiveMap from "../components/LiveMap";
+import { GOOGLE_MAPS_KEY } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
 import "./CustomerDashboard.css";
 
@@ -43,6 +45,8 @@ export default function CustomerDashboard() {
     return () => clearInterval(timer);
   }, [load]);
 
+  const hasGoogle = Boolean(GOOGLE_MAPS_KEY);
+
   const { customer, job, driver } = state;
 
   const driverInitials = driver?.name
@@ -81,6 +85,13 @@ export default function CustomerDashboard() {
   const pickupText = job?.pickupAddress || "Pending confirmation";
   const dropoffText = job?.dropoffAddress || "To be decided";
   const etaText = job?.estimatedDuration || "Calculating";
+
+  const hasDropoffCoords =
+    Number.isFinite(job?.dropoffLat) && Number.isFinite(job?.dropoffLng);
+  const gmapDestination = hasDropoffCoords
+    ? { lat: job.dropoffLat, lng: job.dropoffLng }
+    : job?.pickupAddress || null;
+  const fallbackDestination = hasDropoffCoords ? gmapDestination : null;
 
   const copyStatusLink = async () => {
     if (!job?._id) return;
@@ -264,16 +275,26 @@ export default function CustomerDashboard() {
               <span className="custdash-chip">Updated every few seconds</span>
             </div>
             <div className="custdash-map__canvas">
-              <GMap
-                drivers={driver ? [driver] : []}
-                destination={
-                  job?.dropoffLat && job?.dropoffLng
-                    ? { lat: job.dropoffLat, lng: job.dropoffLng }
-                    : job?.pickupAddress || null
-                }
-                showRoute={Boolean(driver)}
-                zoom={13}
-              />
+              {hasGoogle ? (
+                <GMap
+                  drivers={driver ? [driver] : []}
+                  destination={gmapDestination}
+                  showRoute={hasDropoffCoords}
+                  zoom={13}
+                />
+              ) : (
+                <>
+                  <LiveMap
+                    drivers={driver ? [driver] : []}
+                    autoFit
+                    center={[6.5244, 3.3792]}
+                    destination={fallbackDestination}
+                  />
+                  <p className="muted tiny">
+                    Live route view requires a Google Maps API key. Showing driver position only.
+                  </p>
+                </>
+              )}
             </div>
           </section>
 

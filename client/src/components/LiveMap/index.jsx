@@ -17,11 +17,13 @@ export default function LiveMap({
   zoom = 11,
   autoFit = true,
   staleMs = 60_000,
+  destination = null,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null); // parent layer for markers
   const markersRef = useRef(new Map()); // key -> { marker, ring }
+  const destinationRef = useRef(null);
 
   // Fix default marker icons (CRA/Webpack)
   useEffect(() => {
@@ -139,11 +141,38 @@ export default function LiveMap({
       }
     }
 
+    // Destination marker (optional)
+    const destLat = Number(destination?.lat);
+    const destLng = Number(destination?.lng);
+    const hasDestination =
+      destination && Number.isFinite(destLat) && Number.isFinite(destLng);
+
+    if (hasDestination) {
+      if (!destinationRef.current) {
+        destinationRef.current = L.circleMarker([destLat, destLng], {
+          radius: 7,
+          color: "#f59e0b",
+          fillColor: "#f59e0b",
+          fillOpacity: 0.9,
+          weight: 2,
+        }).addTo(layer);
+      } else {
+        destinationRef.current.setLatLng([destLat, destLng]);
+      }
+      destinationRef.current.bindPopup("Destination");
+    } else if (destinationRef.current) {
+      destinationRef.current.remove();
+      destinationRef.current = null;
+    }
+
     // Fit bounds if requested
     if (autoFit) {
       const pts = [...markersRef.current.values()].map((e) =>
         e.marker.getLatLng()
       );
+      if (hasDestination && destinationRef.current) {
+        pts.push(destinationRef.current.getLatLng());
+      }
       if (pts.length === 1) {
         map.setView(pts[0], 14, { animate: true });
       } else if (pts.length > 1) {
@@ -153,7 +182,7 @@ export default function LiveMap({
         map.setView(center, zoom);
       }
     }
-  }, [drivers, autoFit, staleMs, center, zoom]);
+  }, [drivers, autoFit, staleMs, center, zoom, destination]);
 
   return (
     <div className="lm-wrap">
@@ -187,3 +216,7 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+
+
+

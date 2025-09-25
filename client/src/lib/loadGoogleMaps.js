@@ -1,4 +1,4 @@
-﻿// src/lib/loadGoogleMaps.js
+// src/lib/loadGoogleMaps.js
 import { GOOGLE_MAPS_KEY } from "../config/env.js";
 
 let loadingPromise = null;

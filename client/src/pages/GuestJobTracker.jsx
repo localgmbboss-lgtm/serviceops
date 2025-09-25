@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
+import LiveMap from "../components/LiveMap";
+import { GOOGLE_MAPS_KEY } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
 import "./GuestJobTracker.css";
 
@@ -19,6 +21,8 @@ export default function GuestJobTracker() {
   const [error, setError] = useState("");
   const [selecting, setSelecting] = useState("");
   const timerRef = useRef(null);
+
+  const hasGoogle = Boolean(GOOGLE_MAPS_KEY);
 
   const fetchData = async () => {
     if (!jobToken) return;
@@ -102,8 +106,14 @@ export default function GuestJobTracker() {
     }
     return job?.pickupAddress || null;
   }, [job]);
+  const fallbackDestination =
+    Number.isFinite(job?.dropoffLat) && Number.isFinite(job?.dropoffLng)
+      ? { lat: job.dropoffLat, lng: job.dropoffLng }
+      : null;
 
-  if (loading) {
+
+
+if (loading) {
     return (
       <div className="guestdash guestdash--state">
         <div className="guestdash-state-card">
@@ -198,12 +208,26 @@ export default function GuestJobTracker() {
       {driverMarkers.length > 0 && (
         <div className="card guestdash-card">
           <h3>Live driver map</h3>
-          <GMap
-            drivers={driverMarkers}
-            destination={destination}
-            showRoute={!!destination}
-            zoom={13}
-          />
+          {hasGoogle ? (
+            <GMap
+              drivers={driverMarkers}
+              destination={destination}
+              showRoute={!!destination}
+              zoom={13}
+            />
+          ) : (
+            <>
+              <LiveMap
+                drivers={driverMarkers}
+                autoFit
+                center={[6.5244, 3.3792]}
+                destination={fallbackDestination}
+              />
+              <p className="muted tiny">
+                Add a Google Maps key for routing. Showing driver position only.
+              </p>
+            </>
+          )}
           <p className="muted tiny">
             Last updated: {vendor?.lastSeenAt ? new Date(vendor.lastSeenAt).toLocaleString() : "unknown"}
           </p>
