@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
-import { GOOGLE_MAPS_KEY } from "../config/env.js";
+import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
 import "./GuestJobTracker.css";
 
@@ -22,7 +22,7 @@ export default function GuestJobTracker() {
   const [selecting, setSelecting] = useState("");
   const timerRef = useRef(null);
 
-  const hasGoogle = Boolean(GOOGLE_MAPS_KEY);
+  const hasGoogle = Boolean(getGoogleMapsKey());
 
   const fetchData = async () => {
     if (!jobToken) return;
@@ -295,6 +295,7 @@ if (loading) {
     </div>
   );
 }
+
 
 
 

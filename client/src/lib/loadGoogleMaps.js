@@ -1,5 +1,5 @@
-// src/lib/loadGoogleMaps.js
-import { GOOGLE_MAPS_KEY } from "../config/env.js";
+﻿// src/lib/loadGoogleMaps.js
+import { getGoogleMapsKey } from "../config/env.js";
 
 let loadingPromise = null;
 let requestedLibraries = new Set(["places", "geometry"]);
@@ -18,7 +18,7 @@ export function loadGoogleMaps(options = {}) {
 
   if (loadingPromise) return loadingPromise;
 
-  const key = GOOGLE_MAPS_KEY;
+  const key = getGoogleMapsKey();
   if (!key) {
     return Promise.reject(
       new Error("Missing Google Maps API key (GOOGLE_MAPS_KEY) in environment")

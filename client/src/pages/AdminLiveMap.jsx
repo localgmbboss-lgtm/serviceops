@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
-import { GOOGLE_MAPS_KEY } from "../config/env.js";
+import { getGoogleMapsKey } from "../config/env.js";
 import "./AdminLiveMap.css";
 
 export default function AdminLiveMap() {
@@ -62,7 +62,7 @@ export default function AdminLiveMap() {
     [drivers]
   );
 
-  const hasGoogle = Boolean(GOOGLE_MAPS_KEY);
+  const hasGoogle = Boolean(getGoogleMapsKey());
 
   const filteredDrivers = useMemo(
     () =>
@@ -125,6 +125,7 @@ export default function AdminLiveMap() {
     </div>
   );
 }
+
 
 
 

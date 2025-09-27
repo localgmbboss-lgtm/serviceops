@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { vendorApi } from "../lib/vendorApi";
 import { useNotifications } from "../contexts/NotificationsContext";
+import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
 import "./VendorApp.css";
 
 const KM_TO_MI = 0.621371;
@@ -459,6 +460,8 @@ export default function VendorApp() {
     }
   };
 
+  const lastSyncLabel = lastUpdated ? timeAgo(lastUpdated) : "not yet";
+
   const statCards = [
     {
       label: "Open for bids",
@@ -479,50 +482,17 @@ export default function VendorApp() {
 
   return (
     <div className="vendor-app fade-up">
-      <header className="va-hero card">
-        <div className="va-hero__main">
-          <p className="va-overline">Welcome back</p>
-          <h1>{me?.name ? me.name : "Your vendor dashboard"}</h1>
-          <p className="va-subtitle">
-            Stay ahead of incoming requests with real-time bidding, distance
-            insights, and quick actions.
-          </p>
-          {showGeoPrompt && (
-            <div className="va-alert info va-alert--dismissible" role="status">
-              <div className="va-alert__body">
-                Add your location in the vendor profile to unlock distance-based
-                estimates.
-              </div>
-              <button
-                type="button"
-                className="va-alert__dismiss"
-                onClick={dismissGeoPrompt}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="va-hero__meta">
-          <div className="va-chip">Last sync {lastUpdated ? timeAgo(lastUpdated) : "not yet"}</div>
-          <label className="va-toggle">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-            />
-            Auto refresh
-          </label>
-          <label className="va-toggle">
-            <input
-              type="checkbox"
-              checked={cityFilter}
-              onChange={(e) => setCityFilter(e.target.checked)}
-            />
-            City filter
-          </label>
-        </div>
-      </header>
+      <VendorHeroHeader
+        vendorName={me?.name}
+        lastSyncLabel={lastSyncLabel}
+        showGeoPrompt={showGeoPrompt}
+        onDismissGeoPrompt={dismissGeoPrompt}
+        autoRefresh={autoRefresh}
+        onToggleAutoRefresh={setAutoRefresh}
+        cityFilter={cityFilter}
+        onToggleCityFilter={setCityFilter}
+      />
+
 
       {err && <div className="va-alert error card">{err}</div>}
 

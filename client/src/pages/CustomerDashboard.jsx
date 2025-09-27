@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { copyText } from "../utils/clipboard";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
-import { GOOGLE_MAPS_KEY } from "../config/env.js";
+import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
+import { LuCar, LuFlag, LuMapPin, LuSearch, LuTruck, LuUserCheck } from "react-icons/lu";
 import "./CustomerDashboard.css";
 
 const STAGES = ["Unassigned", "Assigned", "OnTheWay", "Arrived", "Completed"];
@@ -16,6 +17,14 @@ const statusMessage = {
   OnTheWay: "Your driver is on the way to you.",
   Arrived: "Driver has arrived at the pickup point.",
   Completed: "Trip completed - hope everything went smoothly!",
+};
+
+const stageMeta = {
+  Unassigned: { title: "Finding your specialist", icon: LuSearch },
+  Assigned: { title: "Operator confirmed", icon: LuUserCheck },
+  OnTheWay: { title: "Driver en route", icon: LuCar },
+  Arrived: { title: "Driver on-site", icon: LuMapPin },
+  Completed: { title: "Service wrapped", icon: LuFlag },
 };
 
 export default function CustomerDashboard() {
@@ -45,7 +54,9 @@ export default function CustomerDashboard() {
     return () => clearInterval(timer);
   }, [load]);
 
-  const hasGoogle = Boolean(GOOGLE_MAPS_KEY);
+  const mapsKey = getGoogleMapsKey();
+
+  const hasGoogle = Boolean(mapsKey);
 
   const { customer, job, driver } = state;
 
@@ -68,22 +79,15 @@ export default function CustomerDashboard() {
 
   const currentStage = job?.status || "Unassigned";
   const activeIndex = Math.max(STAGES.indexOf(currentStage), 0);
-  const progress = (activeIndex / (STAGES.length - 1)) * 100;
-
-  const timeline = useMemo(
-    () =>
-      STAGES.map((stage, index) => ({
-        label: stage,
-        state:
-          index < activeIndex ? "done" : index === activeIndex ? "active" : "upcoming",
-      })),
-    [activeIndex]
-  );
+  const roadShare = STAGES.length > 1 ? activeIndex / (STAGES.length - 1) : 0;
+  const vehicleLeft = `${6 + roadShare * 88}%`;
+  const nextIndex = Math.min(activeIndex + 1, STAGES.length - 1);
+  const nextStage = STAGES[nextIndex];
+  const isFinalStage = nextIndex === activeIndex;
+  const nextCopy = isFinalStage ? "Done" : stageMeta[nextStage]?.title || nextStage;
+  const currentTitle = stageMeta[currentStage]?.title || currentStage;
 
   const jobNumber = job?._id ? `#${job._id.slice(-6).toUpperCase()}` : "Pending";
-  const serviceLabel = job?.serviceType || "Roadside assistance";
-  const pickupText = job?.pickupAddress || "Pending confirmation";
-  const dropoffText = job?.dropoffAddress || "To be decided";
   const etaText = job?.estimatedDuration || "Calculating";
 
   const hasDropoffCoords =
@@ -194,66 +198,7 @@ export default function CustomerDashboard() {
             </div>
           </header>
 
-          <div className="custdash-hero__content">
-            <div className="custdash-flow">
-              <div className="custdash-flow__rail">
-                <div
-                  className="custdash-flow__progress"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <ol className="custdash-flow__steps">
-                {timeline.map((item, index) => (
-                  <li
-                    key={item.label}
-                    className={`custdash-flow__step ${item.state}`}
-                  >
-                    <span className="step-dot">{index + 1}</span>
-                    <span className="step-label">{item.label}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <div className="custdash-hero__summary">
-              <div className="custdash-leg">
-                <span className="leg-label">Pickup</span>
-                <p>{pickupText}</p>
-              </div>
-              <div className="custdash-leg">
-                <span className="leg-label">Drop-off</span>
-                <p>{dropoffText}</p>
-              </div>
-              <div className="custdash-leg">
-                <span className="leg-label">Service</span>
-                <p>{serviceLabel}</p>
-              </div>
-              <div className="custdash-leg">
-                <span className="leg-label">ETA</span>
-                <p>{etaText}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="custdash-hero__insights">
-            <div className="custdash-insight">
-              <span className="insight-label">Current stage</span>
-              <strong>{currentStage}</strong>
-              <span className="insight-caption">{statusMessage[currentStage]}</span>
-            </div>
-            <div className="custdash-insight">
-              <span className="insight-label">Driver</span>
-              <strong>{driver?.name || "Pending assignment"}</strong>
-              <span className="insight-caption">{driverSubtitle}</span>
-            </div>
-            <div className="custdash-insight">
-              <span className="insight-label">Service type</span>
-              <strong>{serviceLabel}</strong>
-              <span className="insight-caption">Request {jobNumber}</span>
-            </div>
-          </div>
-
-          <div className="custdash-hero__cta">
+          <div className="custdash-hero__content">\r\n            <div className="custdash-tracker" role="region" aria-label="Job progress">\r\n              <span className="custdash-pill custdash-pill--current">{currentTitle}</span>\r\n              <div className="custdash-mini-road" aria-hidden="true">\r\n                <div className="custdash-mini-road__lane">\r\n                  <div className="custdash-mini-road__stripes" />\r\n                  <div className="custdash-mini-road__vehicle" style={{ left: vehicleLeft }}>\r\n                    <LuTruck />\r\n                  </div>\r\n                </div>\r\n              </div>\r\n              <span className="custdash-pill custdash-pill--next">{isFinalStage ? "Completed" : nextCopy}</span>\r\n            </div>\r\n          </div>\r\n\r\n          <div className="custdash-hero__cta">
             <button className="btn primary" onClick={shareStatus}>
               Share live status
             </button>
@@ -417,4 +362,8 @@ export default function CustomerDashboard() {
     </div>
   );
 }
+
+
+
+
 

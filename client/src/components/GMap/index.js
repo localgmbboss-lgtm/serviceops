@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { loadGoogleMaps } from "../../lib/loadGoogleMaps";
-import { GOOGLE_MAPS_KEY } from "../../config/env.js";
+import { getGoogleMapsKey } from "../../config/env.js";
 import "./styles.css";
 
 /**
@@ -36,7 +36,8 @@ export default function GMap({
 
   // Load Maps and its libraries once
   useEffect(() => {
-    if (!GOOGLE_MAPS_KEY) {
+    const key = getGoogleMapsKey();
+    if (!key) {
       setErr("Missing Google Maps API key");
       return;
     }
@@ -76,9 +77,19 @@ export default function GMap({
     const map = new g.maps.Map(mapEl.current, {
       center,
       zoom,
-      mapTypeControl: false,
+      mapTypeId: g.maps.MapTypeId.ROADMAP,
+      mapTypeControl: true,
+      mapTypeControlOptions: {
+        style: g.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+        position: g.maps.ControlPosition.TOP_RIGHT,
+        mapTypeIds: [
+          g.maps.MapTypeId.ROADMAP,
+          g.maps.MapTypeId.SATELLITE,
+          g.maps.MapTypeId.HYBRID,
+        ],
+      },
+      fullscreenControl: true,
       streetViewControl: false,
-      fullscreenControl: false,
     });
     mapRef.current = map;
 
@@ -86,6 +97,11 @@ export default function GMap({
       dirServiceRef.current = new g.maps.DirectionsService();
       dirRendererRef.current = new g.maps.DirectionsRenderer({
         suppressMarkers: true,
+        polylineOptions: {
+          strokeColor: "#0ea5e9",
+          strokeOpacity: 0.85,
+          strokeWeight: 5,
+        },
       });
       dirRendererRef.current.setMap(map);
     }
@@ -196,6 +212,3 @@ export default function GMap({
     </div>
   );
 }
-
-
-
