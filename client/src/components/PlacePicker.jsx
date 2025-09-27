@@ -1,14 +1,10 @@
-// client/src/components/PlacePicker.jsx
+﻿// client/src/components/PlacePicker.jsx
 import { useEffect, useRef, useState } from "react";
-import { GOOGLE_MAPS_KEY } from "../config/env.js";
+import { getGoogleMapsKey } from "../config/env.js";
 
-// ————— helpers —————
+// ----- helpers -----
 function getMapsKey() {
-  if (GOOGLE_MAPS_KEY) return GOOGLE_MAPS_KEY;
-  if (typeof window !== "undefined") {
-    return window.GOOGLE_MAPS_KEY || "";
-  }
-  return "";
+  return getGoogleMapsKey() || "";
 }
 
 // Load Google Maps <script> (once) if a key exists
@@ -19,12 +15,12 @@ function useGooglePlaces() {
     if (ready) return;
 
     const key = getMapsKey();
-    if (!key) return; // no key → no script, we’ll degrade to manual
+    if (!key) return; // no key -> no script; degrade gracefully
 
     // already added?
     const existing = document.querySelector('script[data-gmaps="1"]');
     if (existing) {
-      // if the script has already loaded, we’ll mark ready shortly
+      // if the script has already loaded, mark ready once it fires
       if (window.google?.maps?.places) setReady(true);
       existing.addEventListener("load", () =>
         setReady(!!window.google?.maps?.places)
@@ -90,7 +86,7 @@ export default function PlacePicker({
       // eslint-disable-next-line no-undef
       window.google?.maps?.event?.clearInstanceListeners(ac);
     };
-    // We intentionally skip onChange/value in deps to not rebind on each keystroke
+    // We intentionally skip onChange/value in deps to avoid rebinds
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, ready]);
 
@@ -127,66 +123,32 @@ export default function PlacePicker({
       setMarker({ lat: value.lat, lng: value.lng });
     }
 
-    const clickListener = map.addListener("click", (e) => {
-      const lat = e.latLng.lat();
-      const lng = e.latLng.lng();
+    // eslint-disable-next-line no-undef
+    map.addListener("click", (event) => {
+      const lat = event?.latLng?.lat?.();
+      const lng = event?.latLng?.lng?.();
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       setMarker({ lat, lng });
-      onChange?.({
-        ...value,
-        lat,
-        lng,
-        address: value.address || "Pinned location",
-      });
+      onChange?.({ ...value, lat, lng });
     });
+  }, [mode, ready, value, onChange]);
 
-    // Try centering on current position (nice-to-have)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) =>
-          map.setCenter({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          }),
-        () => {}
-      );
-    }
-
-    return () => {
-      // eslint-disable-next-line no-undef
-      window.google?.maps?.event?.removeListener(clickListener);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, ready]);
-
-  // Use exact GPS
-  const useGps = async () => {
-    if (!("geolocation" in navigator)) {
-      setErr("Geolocation not available on this device");
+  const useGps = () => {
+    if (!navigator.geolocation) {
+      setErr("Geolocation is not supported by this browser");
       return;
     }
+
     setBusy(true);
-    setErr("");
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+      (position) => {
+        const next = {
+          ...value,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
 
-        const next = { ...value, lat, lng };
-
-        // reverse geocode if Google is available
-        if (window.google?.maps && ready) {
-          try {
-            // eslint-disable-next-line no-undef
-            const geocoder = new window.google.maps.Geocoder();
-            const { results } = await geocoder.geocode({
-              location: { lat, lng },
-            });
-            next.address =
-              results?.[0]?.formatted_address || "My current location";
-          } catch {
-            next.address = "My current location";
-          }
-        } else {
+        if (!value.address) {
           next.address = "My current location";
         }
 
@@ -313,4 +275,3 @@ export default function PlacePicker({
     </div>
   );
 }
-

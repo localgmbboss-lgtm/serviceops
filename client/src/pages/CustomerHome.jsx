@@ -1,7 +1,8 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
+import { useNotifications } from "../contexts/NotificationsContext";
 import "./CustomerHome.css";
 
 export default function CustomerHome() {
@@ -12,6 +13,11 @@ export default function CustomerHome() {
   const [activeTab, setActiveTab] = useState("active");
   const nav = useNavigate();
   const { logout } = useAuth();
+  const { publish } = useNotifications();
+  const jobsSnapshotRef = useRef(new Map());
+  const jobsInitializedRef = useRef(false);
+  const bidSnapshotRef = useRef(new Map());
+  const bidsInitializedRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -53,6 +59,139 @@ export default function CustomerHome() {
       clearInterval(t);
     };
   }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(jobs)) {
+      jobsSnapshotRef.current = new Map();
+      return;
+    }
+
+    const previous = jobsSnapshotRef.current;
+    const next = new Map();
+    const isInitial = !jobsInitializedRef.current;
+
+    jobs.forEach((job) => {
+      if (!job?._id) {
+        return;
+      }
+      next.set(job._id, job);
+      const prevJob = previous.get(job._id);
+
+      if (!prevJob) {
+        if (!isInitial) {
+          publish({
+            title: job.serviceType ? `${job.serviceType} request logged` : "New service request",
+            body: "We received your request and will keep you posted as providers respond.",
+            severity: "info",
+            meta: {
+              role: "customer",
+              jobId: job._id,
+              kind: "job",
+              status: job.status || "Unassigned",
+              route: `/status/${job._id}`,
+            },
+            dedupeKey: `customer:job:${job._id}:created`,
+            createdAt: job.createdAt || job.created || new Date().toISOString(),
+          });
+        }
+        return;
+      }
+
+      if (prevJob.status !== job.status && job.status) {
+        publish({
+          title: `Your request is now ${job.status}`,
+          body: job.serviceType
+            ? `${job.serviceType} is marked as ${job.status}.`
+            : `Status updated to ${job.status}.`,
+          severity: job.status === "Completed" ? "success" : "info",
+          meta: {
+            role: "customer",
+            jobId: job._id,
+            kind: "status",
+            status: job.status,
+            route: `/status/${job._id}`,
+          },
+          dedupeKey: `customer:job:${job._id}:status:${job.status}`,
+          createdAt: job.updatedAt || job.completedAt || new Date().toISOString(),
+        });
+      }
+    });
+
+    jobsSnapshotRef.current = next;
+    if (!jobsInitializedRef.current && Array.isArray(jobs) && jobs.length > 0) {
+      jobsInitializedRef.current = true;
+    }
+  }, [jobs, publish]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const activeJobs = (jobs || []).filter(
+      (job) => job?.biddingOpen && job.customerToken && job._id
+    );
+
+    if (activeJobs.length === 0) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const limited = activeJobs.slice(0, 5);
+
+    const fetchBids = async () => {
+      for (const job of limited) {
+        try {
+          const res = await api.get(`/api/bids/list/${job.customerToken}`);
+          if (cancelled) {
+            return;
+          }
+          const bids = Array.isArray(res.data?.bids) ? res.data.bids : [];
+          const prev = bidSnapshotRef.current.get(job._id) || { ids: [] };
+          const prevIds = new Set(prev.ids || []);
+          const newBids = bids.filter((b) => !prevIds.has(String(b?._id)));
+
+          if (bidsInitializedRef.current && newBids.length > 0) {
+            newBids.forEach((bid) => {
+              publish({
+                title: "New bid received",
+                body: `${bid.vendorName || "A vendor"} offered \${
+                  Number.isFinite(bid.price) ? Number(bid.price).toFixed(0) : "--"
+                } with an ETA of ${bid.etaMinutes || "--"} minutes.`,
+                severity: "info",
+                meta: {
+                  role: "customer",
+                  jobId: job._id,
+                  kind: "bid",
+                  customerToken: job.customerToken,
+                  status: job.status || "Unassigned",
+                  route: job.customerToken
+                    ? `/choose/${job.customerToken}`
+                    : `/status/${job._id}`,
+                },
+                dedupeKey: `customer:job:${job._id}:bid:${bid._id}`,
+                createdAt: bid.createdAt || new Date().toISOString(),
+              });
+            });
+          }
+
+          bidSnapshotRef.current.set(job._id, {
+            ids: bids.map((b) => String(b?._id)),
+            count: bids.length,
+          });
+        } catch (e) {
+          // Ignore bid polling errors
+        }
+      }
+      if (!cancelled && !bidsInitializedRef.current) {
+        bidsInitializedRef.current = true;
+      }
+    };
+
+    fetchBids();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [jobs, publish]);
 
   const grouped = useMemo(() => {
     const byStatus = { Active: [], Completed: [] };

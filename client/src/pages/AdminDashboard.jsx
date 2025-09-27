@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import KPIBlock from "../components/KPIBlock";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
-import { GOOGLE_MAPS_KEY } from "../config/env.js";
+import { getGoogleMapsKey } from "../config/env.js";
 import "./AdminDashboard.css";
 
 // Trim trailing zeros in decimals
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const hasGoogle = Boolean(GOOGLE_MAPS_KEY);
+  const hasGoogle = Boolean(getGoogleMapsKey());
 
   async function load() {
     try {
@@ -490,4 +490,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 

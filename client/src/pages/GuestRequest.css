@@ -1,18 +1,18 @@
 /* src/pages/GuestRequest.css - Uber Style */
 :root {
     /* Uber Color Palette */
-    --white: #ffffffFFF;
-    --black: var(--color-text)000;
-    --dark-gray: var(--color-text);
-    --primary-blue: var(--color-primary);
-    --primary-blue-dark: var(--color-primary);
-    --accent-green: var(--color-success);
-    --alert-red: var(--color-danger);
-    --medium-gray: var(--muted);
-    --light-gray: var(--surface-soft);
-    --dark-blue: var(--color-text);
-    --border-gray: var(--surface-soft);
-    --hover-blue: var(--surface-soft);
+    --white: #ffffff;
+    --black: #0f172a;
+    --dark-gray: #1f2937;
+    --primary-blue: var(--color-primary, #2563eb);
+    --primary-blue-dark: var(--color-primary-dark, #1d4ed8);
+    --accent-green: var(--color-success, #10b981);
+    --alert-red: var(--color-danger, #ef4444);
+    --medium-gray: rgba(15, 23, 42, 0.72);
+    --light-gray: rgba(15, 23, 42, 0.08);
+    --dark-blue: #1e293b;
+    --border-gray: rgba(15, 23, 42, 0.12);
+    --hover-blue: rgba(37, 99, 235, 0.1);
 
     /* Typography */
     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -39,9 +39,9 @@
     --radius-xl: 16px;
 
     /* Shadows */
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+    --shadow-md: 0 4px 10px rgba(15, 23, 42, 0.12);
+    --shadow-lg: 0 18px 36px rgba(15, 23, 42, 0.16);
 }
 
 /* Base Styles */
@@ -100,6 +100,10 @@ body {
     justify-content: center;
     margin: var(--space-xl) 0 var(--space-lg);
     position: relative;
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-lg);
+    background: rgba(15, 23, 42, 0.04);
+    border: 1px solid var(--border-gray);
 }
 
 .step {
@@ -115,8 +119,8 @@ body {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: var(--light-gray);
-    color: var(--medium-gray);
+    background: rgba(15, 23, 42, 0.1);
+    color: rgba(15, 23, 42, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -124,18 +128,19 @@ body {
     font-size: var(--font-size-sm);
     margin-bottom: var(--space-xs);
     transition: all 0.3s ease;
-    border: 2px solid transparent;
+    border: 2px solid rgba(15, 23, 42, 0.12);
 }
 
 .step.active .step-number {
     background: var(--primary-blue);
     color: var(--white);
-    border-color: var(--primary-blue);
+    border-color: var(--primary-blue-dark);
+    box-shadow: var(--shadow-sm);
 }
 
 .step-label {
     font-size: var(--font-size-xs);
-    color: var(--medium-gray);
+    color: rgba(15, 23, 42, 0.64);
     font-weight: 500;
     text-align: center;
 }
@@ -147,7 +152,7 @@ body {
 
 .step-connector {
     height: 2px;
-    background: var(--light-gray);
+    background: rgba(15, 23, 42, 0.12);
     flex: 1;
     max-width: 40px;
     margin: 0 var(--space-xs);
@@ -307,9 +312,13 @@ body {
 /* Location Type Selector - Uber Style */
 .location-type-selector {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-sm);
     margin-bottom: var(--space-lg);
+    background: rgba(15, 23, 42, 0.04);
+    padding: var(--space-sm);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-gray);
 }
 
 .location-option {
@@ -319,29 +328,35 @@ body {
     text-align: center;
     cursor: pointer;
     transition: all 0.2s ease;
-    background: var(--white);
+    background: #ffffff;
+    color: var(--black);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .location-option:hover {
     border-color: var(--primary-blue);
-    background: var(--hover-blue);
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--black);
 }
 
 .location-option.selected {
     border-color: var(--primary-blue);
     background: var(--primary-blue);
     color: var(--white);
+    box-shadow: 0 10px 24px -12px rgba(37, 99, 235, 0.7);
 }
 
 .option-icon {
     font-size: 18px;
     display: block;
     margin-bottom: var(--space-xs);
+    color: currentColor;
 }
 
 .option-label {
     font-weight: 600;
     font-size: var(--font-size-sm);
+    color: currentColor;
 }
 
 /* Location Input - No Pin Icon */
@@ -365,6 +380,13 @@ body {
     border-color: var(--primary-blue);
     box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
 }
+
+.maps-fallback-notice {
+    margin-top: var(--space-xs);
+    font-size: var(--font-size-xs);
+    color: rgba(15, 23, 42, 0.7);
+}
+
 
 /* Map Styles */
 .map-selection {

@@ -43,9 +43,26 @@ export default function CustomerRequest() {
     : "You're signed in. We'll keep this tied to your account.";
 
   const transformCustomerPayload = (data) => {
-    if (!data.address?.trim() || !data.coordinates) {
-      throw new Error("Please set your vehicle location on the map.");
+    const trimmedAddress = data.address?.trim();
+    const hasCoordinates =
+      data.coordinates &&
+      typeof data.coordinates.lat === "number" &&
+      typeof data.coordinates.lng === "number";
+    const selectedType = data.locationType || "manual";
+
+    if (!trimmedAddress) {
+      throw new Error("Please enter your pickup address.");
     }
+
+    if (!hasCoordinates && selectedType === "current") {
+      throw new Error(
+        "We couldn't read your GPS location. Enter the address manually or try again with location access."
+      );
+    }
+
+    const effectiveType = hasCoordinates ? selectedType : "manual";
+    const coords = hasCoordinates ? data.coordinates : null;
+
     return {
       name: data.name.trim(),
       phone: data.phone.trim(),
@@ -55,11 +72,11 @@ export default function CustomerRequest() {
       urgency: data.urgency,
       heavyDuty: /heavy/i.test(data.serviceType),
       dropoffAddress: data.destination || undefined,
-      pickupAddress: data.address,
-      pickupLat: data.coordinates.lat,
-      pickupLng: data.coordinates.lng,
-      shareLive: data.locationType === "current",
-      vehiclePinned: data.locationType !== "map",
+      pickupAddress: trimmedAddress,
+      pickupLat: coords?.lat,
+      pickupLng: coords?.lng,
+      shareLive: effectiveType === "current",
+      vehiclePinned: effectiveType !== "map",
       vehicle: {
         make: data.vehicleMake,
         model: data.vehicleModel,
@@ -73,6 +90,7 @@ export default function CustomerRequest() {
       etaSeconds: data.distanceInfo?.seconds,
     };
   };
+
 
   const submitCustomerRequest = async (payload) => {
     const { data } = await api.post("/api/public/jobs", payload);
