@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { vendorApi } from "../lib/vendorApi";
 import { useNotifications } from "../contexts/NotificationsContext";
 import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
+import GMap from "../components/GMap";
 import "./VendorApp.css";
 
 const KM_TO_MI = 0.621371;
@@ -40,6 +41,27 @@ const derivePickupCoordinates = (job) => {
     toFiniteNumber(job?.pickup?.lng) ??
     toFiniteNumber(job?.coordinates?.lng) ??
     toFiniteNumber(job?.vehicleLocation?.lng);
+  return lat !== null && lng !== null ? { lat, lng } : null;
+};
+
+
+const deriveDropoffCoordinates = (job) => {
+  const lat =
+    toFiniteNumber(job?.dropoffLat) ??
+    toFiniteNumber(job?.dropoff?.lat) ??
+    toFiniteNumber(job?.dropoffLocation?.lat) ??
+    toFiniteNumber(job?.destination?.lat);
+  const lng =
+    toFiniteNumber(job?.dropoffLng) ??
+    toFiniteNumber(job?.dropoff?.lng) ??
+    toFiniteNumber(job?.dropoffLocation?.lng) ??
+    toFiniteNumber(job?.destination?.lng);
+  return lat !== null && lng !== null ? { lat, lng } : null;
+};
+
+const deriveVendorCoordinates = (vendor) => {
+  const lat = toFiniteNumber(vendor?.lat ?? vendor?.location?.lat);
+  const lng = toFiniteNumber(vendor?.lng ?? vendor?.location?.lng);
   return lat !== null && lng !== null ? { lat, lng } : null;
 };
 
@@ -128,6 +150,7 @@ export default function VendorApp() {
       return false;
     }
   });
+  const vendorCoordinates = useMemo(() => deriveVendorCoordinates(me), [me]);
   const [activeTab, setActiveTab] = useState("open");
   const [openPage, setOpenPage] = useState(0);
   const [assignedPage, setAssignedPage] = useState(0);
@@ -750,6 +773,28 @@ export default function VendorApp() {
                   ]
                     .filter(Boolean)
                     .join(" / ");
+                  const travelMinutes = estimateTravelMinutes(job.distanceKm);
+                  const pickupCoords = derivePickupCoordinates(job);
+                  const dropoffCoords = deriveDropoffCoordinates(job);
+                  const routeLandmarks = dropoffCoords
+                    ? [
+                        {
+                          key: `${job._id}-dropoff`,
+                          label: "Dropoff",
+                          position: dropoffCoords,
+                          color: "#2563eb",
+                          textColor: "#ffffff",
+                        },
+                      ]
+                    : [];
+                  const hasRoute = Boolean(vendorCoordinates && pickupCoords);
+                  const routeFallbackCopy = !vendorCoordinates
+                    ? "Add your base location in your vendor profile to unlock turn-by-turn directions."
+                    : "Waiting on the customer to share a precise pickup coordinate.";
+                  const mapsLink = pickupCoords
+                    ? `https://www.google.com/maps/dir/?api=1${vendorCoordinates ? `&origin=${vendorCoordinates.lat},${vendorCoordinates.lng}` : ""}&destination=${pickupCoords.lat},${pickupCoords.lng}`
+                    : null;
+                  const vendorAvatar = me?.photoUrl || me?.avatarUrl || me?.logoUrl || null;
                   const detailRows = [
                     contactName ? { label: "Contact", value: contactName } : null,
                     contactPhone ? { label: "Phone", value: String(contactPhone).trim() } : null,
@@ -789,7 +834,59 @@ export default function VendorApp() {
                             ))}
                           </div>
                         ) : null}
-                      </div>
+                        {expanded ? (
+                          hasRoute ? (
+                            <div className="va-job__map">
+                              <GMap
+                                key={`vendor-route-${job._id}`}
+                                drivers={[
+                                  {
+                                    lat: vendorCoordinates.lat,
+                                    lng: vendorCoordinates.lng,
+                                    label: "YOU",
+                                    color: "#0f172a",
+                                    textColor: "#ffffff",
+                                    avatarUrl: vendorAvatar,
+                                  },
+                                ]}
+                                destination={{
+                                  position: pickupCoords,
+                                  role: "customer",
+                                  title: job.pickupAddress || "Pickup location",
+                                  label: "Pickup",
+                                  color: "#f97316",
+                                  textColor: "#0f172a",
+                                }}
+                                landmarks={routeLandmarks}
+                                showRoute
+                              />
+                              <div className="va-job__map-meta">
+                                <span>
+                                  {travelMinutes
+                                    ? `Approx drive ${travelMinutes} min`
+                                    : "Route preview from your saved base location"}
+                                </span>
+                                {mapsLink && (
+                                  <a
+                                    href={mapsLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="va-job__map-link"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                    }}
+                                  >
+                                    Open in Google Maps
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="va-job__map-placeholder">
+                              {routeFallbackCopy}
+                            </div>
+                          )
+                        ) : null}`r`n                      </div>
                       <div className="va-job__cta va-job__cta--stack">
                         {job.status === "Assigned" && (
                           <button

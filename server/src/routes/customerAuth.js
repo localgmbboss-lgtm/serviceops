@@ -1,4 +1,4 @@
-﻿// server/routes/customerAuth.js
+// server/routes/customerAuth.js
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -41,9 +41,26 @@ const normalizeEmail = (s = "") => String(s).trim().toLowerCase();
 const normalizePhone = (s = "") => {
   const t = String(s).trim();
   if (!t) return "";
-  return t.startsWith("+")
-    ? "+" + t.slice(1).replace(/\D+/g, "")
-    : t.replace(/\D+/g, "");
+  if (t.startsWith("+")) {
+    return "+" + t.slice(1).replace(/\D+/g, "");
+  }
+  return t.replace(/\D+/g, "");
+};
+
+const toE164 = (normalized) => {
+  if (!normalized) return "";
+  if (normalized.startsWith("+")) return normalized;
+
+  if (normalized.length === 10) {
+    // Assume US/Canada when no country code is supplied
+    return `+1${normalized}`;
+  }
+
+  if (normalized.length === 11 && normalized.startsWith("1")) {
+    return `+${normalized}`;
+  }
+
+  return `+${normalized}`;
 };
 
 const authenticate = async (req) => {
@@ -115,7 +132,12 @@ router.post("/otp/request", async (req, res, next) => {
     await customer.save();
 
     const msg = `ServiceOps login code: ${code}. It expires in ${OTP_EXP_MINUTES} minutes.`;
-    await notifySMS(normalizedPhone.startsWith("+") ? normalizedPhone : `+${normalizedPhone}`, msg);
+    const smsTarget = toE164(normalizedPhone);
+    if (!smsTarget) {
+      return res.status(400).json({ message: "Enter a valid phone number" });
+    }
+
+    await notifySMS(smsTarget, msg);
 
     return res.json({ ok: true, message: "OTP sent" });
   } catch (e) {
