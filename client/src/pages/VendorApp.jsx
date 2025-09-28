@@ -9,6 +9,26 @@ import "./VendorApp.css";
 
 const KM_TO_MI = 0.621371;
 const AVERAGE_SPEED_MPH = 34; // blended city/highway assumption
+const currencyFormatterCache = new Map();
+const formatCurrency = (value, currency = "USD") => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  const key = currency || "USD";
+  if (!currencyFormatterCache.has(key)) {
+    try {
+      currencyFormatterCache.set(
+        key,
+        new Intl.NumberFormat("en-US", { style: "currency", currency: key })
+      );
+    } catch (err) {
+      currencyFormatterCache.set(
+        key,
+        new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
+      );
+    }
+  }
+  return currencyFormatterCache.get(key).format(num);
+};
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const num = typeof value === "number" ? value : Number(value);
@@ -119,6 +139,23 @@ function suggestedPrice(job) {
   return Math.max(40, rounded);
 }
 
+function normalizeMultiline(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .trim();
+}
+
+function extractNote(job) {
+  const raw =
+    job?.description ||
+    job?.notes ||
+    job?.customerNote ||
+    job?.jobNotes ||
+    job?.internalNotes;
+  return normalizeMultiline(raw);
+}
 const GEO_PROMPT_STORAGE_KEY = "va.geoPrompt.dismissed";
 
 export default function VendorApp() {
@@ -1063,3 +1100,5 @@ export default function VendorApp() {
     </div>
   );
 }
+
+

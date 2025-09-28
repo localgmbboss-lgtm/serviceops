@@ -184,6 +184,7 @@ router.get("/assigned", requireVendorAuth, async (req, res, next) => {
     heavyDuty: !!j.heavyDuty,
     quotedPrice: Number.isFinite(j.quotedPrice) ? j.quotedPrice : 0,
     bidMode: j.bidMode || "open",
+    status: j.status || "Unassigned",
     created: j.created,
     guestRequest: !!j.guestRequest,
     canBid: false,
@@ -225,3 +226,4 @@ router.patch(
 );
 
 export default router;
+
