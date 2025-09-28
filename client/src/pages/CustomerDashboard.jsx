@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { copyText } from "../utils/clipboard";
+import { deriveCustomerCoordinates, deriveDriverCoordinates, deriveDropoffCoordinates } from "../utils/geo";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
@@ -90,13 +91,94 @@ export default function CustomerDashboard() {
   const jobNumber = job?._id ? `#${job._id.slice(-6).toUpperCase()}` : "Pending";
   const etaText = job?.estimatedDuration || "Calculating";
 
-  const hasDropoffCoords =
-    Number.isFinite(job?.dropoffLat) && Number.isFinite(job?.dropoffLng);
-  const gmapDestination = hasDropoffCoords
-    ? { lat: job.dropoffLat, lng: job.dropoffLng }
-    : job?.pickupAddress || null;
-  const fallbackDestination = hasDropoffCoords ? gmapDestination : null;
+  const pickupAddress =
+    job?.pickupAddress ||
+    job?.pickup?.address ||
+    job?.pickupLocation?.address ||
+    job?.customerLocation?.address ||
+    job?.customer?.address ||
+    null;
+  const dropoffAddress =
+    job?.dropoffAddress ||
+    job?.dropoff?.address ||
+    job?.dropoffLocation?.address ||
+    job?.destinationAddress ||
+    (typeof job?.destination === "string" ? job.destination : null);
 
+  const customerCoordinates = useMemo(() => deriveCustomerCoordinates(job), [job]);
+  const dropoffCoordinates = useMemo(() => deriveDropoffCoordinates(job), [job]);
+
+  const routeDestination = useMemo(() => {
+    if (customerCoordinates) {
+      return {
+        position: customerCoordinates,
+        label: "YOU",
+        role: "customer",
+        title: pickupAddress || "Your pickup location",
+        color: "#f97316",
+        textColor: "#0f172a",
+        avatarUrl: (customer?.avatarUrl || customer?.photoUrl || customer?.photo || customer?.image) ?? null,
+      };
+    }
+    if (dropoffCoordinates) {
+      return {
+        position: dropoffCoordinates,
+        label: "DEST",
+        role: "dropoff",
+        title: dropoffAddress || "Destination",
+        color: "#0ea5e9",
+        textColor: "#ffffff",
+      };
+    }
+    return null;
+  }, [customerCoordinates, dropoffCoordinates, pickupAddress, dropoffAddress]);
+
+  const mapLandmarks = useMemo(() => {
+    if (!dropoffCoordinates || !customerCoordinates) return [];
+    return [
+      {
+        key: "dropoff",
+        position: dropoffCoordinates,
+        label: "DROP",
+        title: dropoffAddress || "Drop-off",
+        color: "#0ea5e9",
+        textColor: "#ffffff",
+      },
+    ];
+  }, [customerCoordinates, dropoffCoordinates, dropoffAddress]);
+
+  const driverMarkers = useMemo(() => {
+    if (!driver) return [];
+    const coords = deriveDriverCoordinates(driver);
+    if (!coords) return [];
+    return [
+      {
+        ...driver,
+        lat: coords.lat,
+        lng: coords.lng,
+        label: driver?.label || "DRV",
+        avatarUrl: driver?.avatarUrl || driver?.photoUrl || driver?.photo || driver?.image || null,
+        title: driver?.name ? `${driver.name}` : "Driver",
+        color: "#2563eb",
+        textColor: "#ffffff",
+      },
+    ];
+  }, [driver]);
+
+  const fallbackDestination = customerCoordinates || dropoffCoordinates || null;
+
+  const mapCenter = useMemo(() => {
+    if (routeDestination?.position) return routeDestination.position;
+    if (driverMarkers.length > 0) {
+      const primary = driverMarkers[0];
+      if (Number.isFinite(primary.lat) && Number.isFinite(primary.lng)) {
+        return { lat: primary.lat, lng: primary.lng };
+      }
+    }
+    return fallbackDestination || null;
+  }, [driverMarkers, routeDestination, fallbackDestination]);
+
+  const canShowRoute = driverMarkers.length > 0 && Boolean(routeDestination?.position);
   const copyStatusLink = async () => {
     if (!job?._id) return;
     const url = `${window.location.origin}/status/${job._id}`;
@@ -198,7 +280,22 @@ export default function CustomerDashboard() {
             </div>
           </header>
 
-          <div className="custdash-hero__content">\r\n            <div className="custdash-tracker" role="region" aria-label="Job progress">\r\n              <span className="custdash-pill custdash-pill--current">{currentTitle}</span>\r\n              <div className="custdash-mini-road" aria-hidden="true">\r\n                <div className="custdash-mini-road__lane">\r\n                  <div className="custdash-mini-road__stripes" />\r\n                  <div className="custdash-mini-road__vehicle" style={{ left: vehicleLeft }}>\r\n                    <LuTruck />\r\n                  </div>\r\n                </div>\r\n              </div>\r\n              <span className="custdash-pill custdash-pill--next">{isFinalStage ? "Completed" : nextCopy}</span>\r\n            </div>\r\n          </div>\r\n\r\n          <div className="custdash-hero__cta">
+          <div className="custdash-hero__content">
+            <div className="custdash-tracker" role="region" aria-label="Job progress">
+              <span className="custdash-pill custdash-pill--current">{currentTitle}</span>
+              <div className="custdash-mini-road" aria-hidden="true">
+                <div className="custdash-mini-road__lane">
+                  <div className="custdash-mini-road__stripes" />
+                  <div className="custdash-mini-road__vehicle" style={{ left: vehicleLeft }}>
+                    <LuTruck />
+                  </div>
+                </div>
+              </div>
+              <span className="custdash-pill custdash-pill--next">{isFinalStage ? "Completed" : nextCopy}</span>
+            </div>
+          </div>
+
+          <div className="custdash-hero__cta">
             <button className="btn primary" onClick={shareStatus}>
               Share live status
             </button>
@@ -222,17 +319,19 @@ export default function CustomerDashboard() {
             <div className="custdash-map__canvas">
               {hasGoogle ? (
                 <GMap
-                  drivers={driver ? [driver] : []}
-                  destination={gmapDestination}
-                  showRoute={hasDropoffCoords}
+                  drivers={driverMarkers}
+                  destination={routeDestination}
+                  landmarks={mapLandmarks}
+                  showRoute={canShowRoute}
+                  center={mapCenter || undefined}
                   zoom={13}
                 />
               ) : (
                 <>
                   <LiveMap
-                    drivers={driver ? [driver] : []}
+                    drivers={driverMarkers}
                     autoFit
-                    center={[6.5244, 3.3792]}
+                    center={mapCenter ? [mapCenter.lat, mapCenter.lng] : [6.5244, 3.3792]}
                     destination={fallbackDestination}
                   />
                   <p className="muted tiny">
@@ -324,8 +423,10 @@ export default function CustomerDashboard() {
                 <span className="custdash-action__icon" aria-hidden="true">
                   {tile.icon}
                 </span>
-                <span className="custdash-action__label">{tile.label}</span>
-                <span className="custdash-action__caption">{tile.caption}</span>
+                <span className="custdash-action__text">
+                  <span className="custdash-action__label">{tile.label}</span>
+                  <span className="custdash-action__caption">{tile.caption}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -362,6 +463,11 @@ export default function CustomerDashboard() {
     </div>
   );
 }
+
+
+
+
+
 
 
 

@@ -1,8 +1,10 @@
 // src/pages/GuestRequest.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { loadGoogleMaps } from "../lib/loadGoogleMaps";
+import { LuMapPin, LuNavigation } from "react-icons/lu";
 import "./GuestRequest.css";
 
 const SERVICE_SUGGESTIONS = [
@@ -18,6 +20,74 @@ const SERVICE_SUGGESTIONS = [
 ];
 
 /* global google */
+
+const normalizePhoneValue = (input = "") => {
+  const t = String(input).trim();
+  if (!t) return "";
+  return t.startsWith("+")
+    ? "+" + t.slice(1).replace(/\D+/g, "")
+    : t.replace(/\D+/g, "");
+};
+
+const PROFILE_KEYS = [
+  "name",
+  "phone",
+  "email",
+  "address",
+  "vehicleMake",
+  "vehicleModel",
+  "vehicleColor",
+];
+
+const LOCATION_METHOD_OPTIONS = [
+  {
+    value: "current",
+    label: "Use current location",
+    helper: "Auto-detect from phone",
+    icon: LuNavigation,
+  },
+  {
+    value: "manual",
+    label: "Enter address manually",
+    helper: "Type address yourself",
+    icon: LuMapPin,
+  },
+];
+
+const LocationMethodPrompt = ({ value, onChange }) => {
+  return (
+    <div className="pickup-method-card">
+      <div className="pickup-method-card__header">
+        <h3>Where should we meet you?</h3>
+        <p>Pick how you'd like to set the pickup spot.</p>
+      </div>
+      <div className="pickup-method-card__options">
+        {LOCATION_METHOD_OPTIONS.map((option) => {
+          const Icon = option.icon;
+          const isActive = option.value === value;
+
+          return (
+            <button
+              type="button"
+              key={option.value}
+              className={`pickup-method-card__option ${isActive ? "is-active" : ""}`}
+              onClick={() => onChange(option.value)}
+            >
+              <span className="pickup-method-card__icon" aria-hidden="true">
+                <Icon />
+              </span>
+              <div className="pickup-method-card__text">
+                <span className="pickup-method-card__label">{option.label}</span>
+                <span className="pickup-method-card__helper">{option.helper}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 
 const DEFAULT_GUEST_FORM = {
   name: "",
@@ -125,187 +195,6 @@ const GoogleMapsAutocomplete = ({
   );
 };
 
-// ---------- Interactive Map (Uber-style) ----------
-const InteractiveMap = ({ onLocationSelect, initialLocation }) => {
-  const mapRef = useRef(null);
-  const mapInstRef = useRef(null);
-  const markerRef = useRef(null);
-  const geocoderRef = useRef(null);
-  const [mapsLoaded, setMapsLoaded] = useState(false);
-  const [useFallback, setUseFallback] = useState(false);
-
-  useEffect(() => {
-    let disposed = false;
-
-    (async () => {
-      try {
-        await loadGoogleMaps({ libraries: ["places", "geometry"] });
-        if (disposed) return;
-        setMapsLoaded(true);
-
-        if (!mapRef.current) return;
-
-        const center = initialLocation || { lat: 40.7128, lng: -74.006 };
-        mapInstRef.current = new google.maps.Map(mapRef.current, {
-          center,
-          zoom: 14,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false,
-          zoomControl: true,
-          zoomControlOptions: {
-            position: google.maps.ControlPosition.RIGHT_CENTER,
-          },
-          styles: [
-            {
-              featureType: "all",
-              elementType: "labels",
-              stylers: [{ visibility: "on" }],
-            },
-            {
-              featureType: "administrative",
-              elementType: "labels",
-              stylers: [{ visibility: "off" }],
-            },
-          ],
-        });
-
-        geocoderRef.current = new google.maps.Geocoder();
-
-        markerRef.current = new google.maps.Marker({
-          map: mapInstRef.current,
-          position: center,
-          draggable: true,
-          title: "Vehicle Location",
-          animation: google.maps.Animation.DROP,
-          icon: {
-            url: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDNy41ODYgMiA0IDUuNTg2IDQgMTBDNCAxNC40MTQgNy41ODYgMTggMTIgMThDMTYuNDE0IDE4IDIwIDE0LjQxNCAyMCAxMEMyMCA1LjU4NiAxNi40MTQgMiAxMiAyWk0xMiAxMkMxMC44OTcgMTIgMTAgMTEuMTAzIDEwIDEwQzEwIDguODk3IDEwLjg5NyA4IDEyIDhDMTMuMTAzIDggMTQgOC44OTcgMTQgMTBDMTQgMTEuMTAzIDEzLjEwMyAxMiAxMiAxMloiIGZpbGw9IiMwMDdBRkYiLz4KPC9zdmc+",
-            scaledSize: new google.maps.Size(32, 32),
-            anchor: new google.maps.Point(16, 32),
-          },
-        });
-
-        // Info window to show address
-        const infoWindow = new google.maps.InfoWindow();
-
-        const updateLocation = (position) => {
-          if (!geocoderRef.current) return;
-
-          geocoderRef.current.geocode(
-            { location: position },
-            (results, status) => {
-              if (status === "OK" && results?.[0]) {
-                const fullAddress = results[0].formatted_address;
-                onLocationSelect(position, fullAddress);
-
-                // Show address in info window
-                infoWindow.setContent(`
-                  <div style="padding: 8px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-                    <strong>Selected Location:</strong><br>
-                    ${fullAddress}
-                  </div>
-                `);
-                infoWindow.open(mapInstRef.current, markerRef.current);
-              } else {
-                const latLngAddress = `${position.lat().toFixed(6)}, ${position
-                  .lng()
-                  .toFixed(6)}`;
-                onLocationSelect(position, latLngAddress);
-              }
-            }
-          );
-        };
-
-        mapInstRef.current.addListener("click", (e) => {
-          const pos = e.latLng;
-          markerRef.current.setPosition(pos);
-          updateLocation(pos);
-        });
-
-        markerRef.current.addListener("dragend", () => {
-          const pos = markerRef.current.getPosition();
-          updateLocation(pos);
-        });
-
-        // Initialize with current position if available
-        if (initialLocation) {
-          const pos = new google.maps.LatLng(
-            initialLocation.lat,
-            initialLocation.lng
-          );
-          updateLocation(pos);
-        }
-      } catch {
-        if (!disposed) setUseFallback(true);
-      }
-    })();
-
-    return () => {
-      disposed = true;
-      if (mapInstRef.current && google?.maps?.event?.clearInstanceListeners) {
-        google.maps.event.clearInstanceListeners(mapInstRef.current);
-      }
-      mapInstRef.current = null;
-      markerRef.current = null;
-    };
-  }, [onLocationSelect, initialLocation]);
-
-  if (useFallback) {
-    return (
-      <div className="map-fallback">
-        <div className="map-fallback-content">
-          <div className="map-fallback-icon">[map]</div>
-          <h3>Map Not Available</h3>
-          <p>Please use the address inputs or Current Location instead.</p>
-          <p className="map-error-detail">Check your Google Maps API key.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="map-container">
-      <div ref={mapRef} className="interactive-map" />
-      {!mapsLoaded && (
-        <div className="maps-loading-overlay">
-          <div className="maps-loading-spinner" />
-          <p>Loading map...</p>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ---------- Location Type Selector ----------
-const LocationTypeSelector = ({ selectedType, onTypeChange }) => {
-  const options = useMemo(
-    () => [
-      { id: "current", label: "Current Location", icon: "[GPS]" },
-      { id: "map", label: "Select on Map", icon: "[Map]" },
-      { id: "manual", label: "Enter Address", icon: "[Manual]" },
-    ],
-    []
-  );
-
-  return (
-    <div className="location-type-selector">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          className={`location-option ${
-            selectedType === o.id ? "selected" : ""
-          }`}
-          onClick={() => onTypeChange(o.id)}
-        >
-          <span className="option-icon">{o.icon}</span>
-          <span className="option-label">{o.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-};
-
 // ---------- Distance Calculator ----------
 const DistanceCalculator = ({ origin, destination, onDistanceCalculated }) => {
   const [distance, setDistance] = useState(null);
@@ -399,10 +288,18 @@ export default function GuestRequest({
   onSuccess,
   requireEmail = true,
 } = {}) {
+  const navigate = useNavigate();
+  const { user, token, isCustomer, login } = useAuth();
   const [formData, setFormData] = useState(() => ({
     ...DEFAULT_GUEST_FORM,
     ...initialValues,
   }));
+
+  useEffect(() => {
+    if (formData.locationType === "map") {
+      setFormData((prev) => ({ ...prev, locationType: "manual" }));
+    }
+  }, [formData.locationType]);
   const initialAppliedRef = useRef(false);
   useEffect(() => {
     if (!initialValues || initialAppliedRef.current) return;
@@ -413,10 +310,32 @@ export default function GuestRequest({
     setFormData((prev) => ({ ...prev, ...initialValues }));
     initialAppliedRef.current = true;
   }, [initialValues]);
-
+  useEffect(() => {
+    if (!isCustomer || !user?.savedProfile) return;
+    const profile = user.savedProfile;
+    setFormData((prev) => {
+      const hasUserInput = PROFILE_KEYS.some(
+        (key) => (prev[key] || "").trim()
+      );
+      if (hasUserInput) return prev;
+      return {
+        ...prev,
+        name: profile.name || prev.name,
+        email: profile.email || prev.email,
+        phone: profile.phone || prev.phone,
+        address: profile.address || prev.address,
+        vehicleMake: profile.vehicleMake || prev.vehicleMake,
+        vehicleModel: profile.vehicleModel || prev.vehicleModel,
+        vehicleColor: profile.vehicleColor || prev.vehicleColor,
+      };
+    });
+  }, [isCustomer, user?.savedProfile]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const navigate = useNavigate();
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [pendingResult, setPendingResult] = useState(null);
+  const pendingSnapshot = pendingResult?.snapshot || {};
   const defaultTransformRequest = (data) => ({
     ...data,
     name: data.name.trim(),
@@ -440,6 +359,38 @@ export default function GuestRequest({
       return;
     }
     navigate("/");
+  };
+
+  const buildProfileSnapshot = (data) => ({
+    name: (data.name || "").trim(),
+    email: (data.email || "").trim(),
+    phone: normalizePhoneValue(data.phone),
+    phoneDisplay: (data.phone || "").trim(),
+    address: (data.address || "").trim(),
+    vehicleMake: (data.vehicleMake || "").trim(),
+    vehicleModel: (data.vehicleModel || "").trim(),
+    vehicleColor: (data.vehicleColor || "").trim(),
+  });
+
+  const navigateAfterSubmit = (result) => {
+    if (onSuccess) {
+      onSuccess(result, { navigate, formData });
+    } else {
+      defaultOnSuccess(result);
+    }
+  };
+
+  const shouldPromptToSave = (snapshot) => {
+    if (!isCustomer || !token) return false;
+    if (!snapshot.phone || !snapshot.name) return false;
+    const hasVehicle =
+      snapshot.vehicleMake && snapshot.vehicleModel && snapshot.vehicleColor;
+    if (!hasVehicle) return false;
+    const saved = user?.savedProfile || {};
+    if (!saved || !Object.keys(saved).length) return true;
+    return PROFILE_KEYS.some(
+      (key) => (snapshot[key] || "") !== (saved[key] || "")
+    );
   };
 
   const handleChange = (e) => {
@@ -554,10 +505,12 @@ export default function GuestRequest({
       const payload = transformer(formData);
       const submitFn = submitRequest || defaultSubmitRequest;
       const result = await submitFn(payload);
-      if (onSuccess) {
-        onSuccess(result, { navigate, formData });
+      const snapshot = buildProfileSnapshot(formData);
+      if (shouldPromptToSave(snapshot)) {
+        setPendingResult({ result, snapshot });
+        setShowSavePrompt(true);
       } else {
-        defaultOnSuccess(result);
+        navigateAfterSubmit(result);
       }
     } catch (err) {
       console.error(err);
@@ -571,7 +524,51 @@ export default function GuestRequest({
 
   };
 
+  const handleSaveProfile = async () => {
+    if (!pendingResult) return;
+    setProfileBusy(true);
+    try {
+      const { snapshot, result } = pendingResult;
+      const payload = {
+        name: snapshot.name,
+        email: snapshot.email,
+        phone: snapshot.phone,
+        address: snapshot.address,
+        vehicleMake: snapshot.vehicleMake,
+        vehicleModel: snapshot.vehicleModel,
+        vehicleColor: snapshot.vehicleColor,
+      };
+      const { data } = await api.put("/api/customer/auth/profile", payload);
+      if (data?.customer) {
+        const updated = {
+          ...(user || {}),
+          ...data.customer,
+          role: user?.role || "customer",
+        };
+        login(updated, token);
+      }
+      setShowSavePrompt(false);
+      setPendingResult(null);
+      navigateAfterSubmit(result);
+    } catch (error) {
+      alert(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Unable to save your info right now"
+      );
+    } finally {
+      setProfileBusy(false);
+    }
+  };
 
+  const handleSkipSave = () => {
+    if (pendingResult) {
+      const { result } = pendingResult;
+      setPendingResult(null);
+      navigateAfterSubmit(result);
+    }
+    setShowSavePrompt(false);
+  };
   const nextStep = () => setCurrentStep((s) => s + 1);
   const prevStep = () => setCurrentStep((s) => s - 1);
 
@@ -778,105 +775,125 @@ export default function GuestRequest({
               Where is your vehicle and what are its details?
             </p>
 
-            <LocationTypeSelector
-              selectedType={formData.locationType}
-              onTypeChange={handleLocationTypeChange}
-            />
+            <div className="location-stage">
+              <section className="location-card location-card--method">
+                <LocationMethodPrompt
+                  value={formData.locationType}
+                  onChange={handleLocationTypeChange}
+                />
+              </section>
 
-            {formData.locationType === "manual" && (
-              <div className="input-group full-width">
-                <label>Vehicle Location (Pickup Address) *</label>
+              <section className="location-card location-card--pickup">
+                <div className="location-card__header">
+                  <span className="location-card__eyebrow">Pickup</span>
+                  <h3 className="location-card__title">Where's the vehicle?</h3>
+                </div>
+                {formData.locationType === "current" ? (
+                  <div className="pickup-current">
+                    <p className="pickup-current__status">
+                      {formData.address
+                        ? formData.address
+                        : "Tap the button below and we'll use your phone to detect the vehicle's location."}
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-dark"
+                      onClick={getCurrentLocation}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? "Detecting..." : "Use current location"}
+                    </button>
+                    <button
+                      type="button"
+                      className="pickup-current__manual"
+                      onClick={() => handleLocationTypeChange("manual")}
+                    >
+                      Enter address manually
+                    </button>
+                  </div>
+                ) : (
+                  <GoogleMapsAutocomplete
+                    onPlaceSelected={(place) => handlePlaceSelected(place, false)}
+                    placeholder="Enter your vehicle's full address..."
+                    value={formData.address}
+                    onChange={(e) =>
+                      setFormData((p) => ({ ...p, address: e.target.value }))
+                    }
+                  />
+                )}
+                {formData.address && (
+                  <div className="pickup-confirmation">
+                    <span className="pickup-confirmation__label">Selected pickup</span>
+                    <p>{formData.address}</p>
+                  </div>
+                )}
+              </section>
+
+              <section className="location-card location-card--destination">
+                <div className="location-card__header">
+                  <span className="location-card__eyebrow">Destination</span>
+                  <h3 className="location-card__title">Where should we take it?</h3>
+                </div>
                 <GoogleMapsAutocomplete
-                  onPlaceSelected={(place) => handlePlaceSelected(place, false)}
-                  placeholder="Enter your vehicle's full address..."
-                  value={formData.address}
+                  onPlaceSelected={(place) => handlePlaceSelected(place, true)}
+                  placeholder="Drop-off or preferred shop (optional)"
+                  value={formData.destination}
                   onChange={(e) =>
-                    setFormData((p) => ({ ...p, address: e.target.value }))
+                    setFormData((p) => ({ ...p, destination: e.target.value }))
                   }
+                  isDestination
                 />
-              </div>
-            )}
+                {formData.address && formData.destination && (
+                  <DistanceCalculator
+                    origin={formData.address}
+                    destination={formData.destination}
+                    onDistanceCalculated={handleDistanceCalculated}
+                  />
+                )}
+              </section>
 
-            {formData.locationType === "map" && (
-              <div className="map-selection">
-                <p>
-                  Click on the map to set your vehicle location. The full
-                  address will be automatically detected.
-                </p>
-                <InteractiveMap
-                  onLocationSelect={handleMapLocationSelect}
-                  initialLocation={formData.coordinates}
-                />
-              </div>
-            )}
-
-            <div className="form-grid">
-              <div className="input-group">
-                <label htmlFor="vehicleMake">Vehicle Make *</label>
-                <input
-                  id="vehicleMake"
-                  name="vehicleMake"
-                  value={formData.vehicleMake}
-                  onChange={handleChange}
-                  required
-                  placeholder="Toyota, Ford, etc."
-                />
-              </div>
-
-              <div className="input-group">
-                <label htmlFor="vehicleModel">Vehicle Model *</label>
-                <input
-                  id="vehicleModel"
-                  name="vehicleModel"
-                  value={formData.vehicleModel}
-                  onChange={handleChange}
-                  required
-                  placeholder="Camry, F-150, etc."
-                />
-              </div>
-
-              <div className="input-group">
-                <label htmlFor="vehicleColor">Vehicle Color *</label>
-                <input
-                  id="vehicleColor"
-                  name="vehicleColor"
-                  value={formData.vehicleColor}
-                  onChange={handleChange}
-                  required
-                  placeholder="Red, Blue, Black, etc."
-                />
-              </div>
+              <section className="location-card location-card--vehicle">
+                <div className="location-card__header">
+                  <span className="location-card__eyebrow">Vehicle details</span>
+                  <h3 className="location-card__title">Help the operator spot it</h3>
+                </div>
+                <div className="vehicle-form-grid">
+                  <div className="vehicle-field">
+                    <label htmlFor="vehicleMake">Vehicle Make *</label>
+                    <input
+                      id="vehicleMake"
+                      name="vehicleMake"
+                      value={formData.vehicleMake}
+                      onChange={handleChange}
+                      required
+                      placeholder="Toyota, Ford, etc."
+                    />
+                  </div>
+                  <div className="vehicle-field">
+                    <label htmlFor="vehicleModel">Vehicle Model *</label>
+                    <input
+                      id="vehicleModel"
+                      name="vehicleModel"
+                      value={formData.vehicleModel}
+                      onChange={handleChange}
+                      required
+                      placeholder="Camry, F-150, etc."
+                    />
+                  </div>
+                  <div className="vehicle-field">
+                    <label htmlFor="vehicleColor">Vehicle Color *</label>
+                    <input
+                      id="vehicleColor"
+                      name="vehicleColor"
+                      value={formData.vehicleColor}
+                      onChange={handleChange}
+                      required
+                      placeholder="Black, Silver, etc."
+                    />
+                  </div>
+                </div>
+              </section>
             </div>
-
-            <div className="input-group full-width">
-              <label htmlFor="destination">
-                Destination Address (Optional)
-              </label>
-              <GoogleMapsAutocomplete
-                onPlaceSelected={(place) => handlePlaceSelected(place, true)}
-                placeholder="Where should the vehicle be taken? (optional)"
-                value={formData.destination}
-                onChange={(e) =>
-                  setFormData((p) => ({ ...p, destination: e.target.value }))
-                }
-                isDestination
-              />
-            </div>
-
-            {formData.address && formData.destination && (
-              <DistanceCalculator
-                origin={formData.address}
-                destination={formData.destination}
-                onDistanceCalculated={handleDistanceCalculated}
-              />
-            )}
-
-            {formData.address && (
-              <div className="selected-address">
-                <h4>Selected Pickup Address:</h4>
-                <p>{formData.address}</p>
-              </div>
-            )}
 
             <div className="form-actions">
               <button
@@ -911,16 +928,75 @@ export default function GuestRequest({
           </div>
         )}
       </form>
+      {showSavePrompt && pendingResult && (
+        <div className="save-profile-overlay" role="dialog" aria-modal="true">
+          <div className="save-profile-modal">
+            <h3>Save these details for next time?</h3>
+            <p className="muted small">
+              We can pre-fill your next request with the same contact and vehicle info.
+            </p>
+            <ul className="save-profile-list">
+              {pendingSnapshot.name && (
+                <li>
+                  <span className="label">Name</span>
+                  <span>{pendingSnapshot.name}</span>
+                </li>
+              )}
+              {(pendingSnapshot.phoneDisplay || pendingSnapshot.phone) && (
+                <li>
+                  <span className="label">Phone</span>
+                  <span>{pendingSnapshot.phoneDisplay || pendingSnapshot.phone}</span>
+                </li>
+              )}
+              {pendingSnapshot.email && (
+                <li>
+                  <span className="label">Email</span>
+                  <span>{pendingSnapshot.email}</span>
+                </li>
+              )}
+              {pendingSnapshot.address && (
+                <li>
+                  <span className="label">Address</span>
+                  <span>{pendingSnapshot.address}</span>
+                </li>
+              )}
+              {(pendingSnapshot.vehicleMake ||
+                pendingSnapshot.vehicleModel ||
+                pendingSnapshot.vehicleColor) && (
+                <li>
+                  <span className="label">Vehicle</span>
+                  <span>
+                    {[pendingSnapshot.vehicleMake, pendingSnapshot.vehicleModel, pendingSnapshot.vehicleColor]
+                      .filter(Boolean)
+                      .join(" ")}
+                  </span>
+                </li>
+              )}
+            </ul>
+            <div className="save-profile-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleSkipSave}
+                disabled={profileBusy}
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveProfile}
+                disabled={profileBusy}
+              >
+                {profileBusy ? "Saving..." : "Save info"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-
-
-
-
-
-
 
 
 

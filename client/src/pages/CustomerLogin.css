@@ -225,14 +225,18 @@
 .customer-login-form {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-}
+    gap: 1.6rem;
+  }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-}
+    gap: 0.6rem;
+    padding: 1rem 1.25rem;
+    background: rgba(148, 163, 184, 0.08);
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+  }
 
 .form-label {
     font-size: 0.9rem;
@@ -253,14 +257,20 @@
     font-size: 0.8rem;
 }
 
-.form-input {
-    padding: 0.875rem 1rem;
-    border: 2px solid var(--color-border);
-    border-radius: 12px;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    background: white;
+.form-group label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--foreground, #0f172a);
 }
+
+.form-input {
+    padding: 1rem 1.15rem;
+    border: 2px solid var(--color-border);
+    border-radius: 14px;
+    font-size: 1rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    background: #ffffff;
+  }
 
 .form-input:focus {
     outline: none;
@@ -275,33 +285,32 @@
 
 /* Button */
 .customer-login-btn {
-    margin-top: 0.5rem;
-    padding: 1rem 2rem;
-    background: linear-gradient(135deg, var(--color-danger), var(--color-danger));
-    color: white;
+    margin-top: 0.25rem;
+    background: linear-gradient(135deg, var(--color-danger), var(--color-primary));
+    color: #ffffff;
     border: none;
-    border-radius: 12px;
+    padding: 0.95rem 1.5rem;
+    border-radius: 16px;
+    font-weight: 700;
     font-size: 1rem;
-    font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  }
 
 .customer-login-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(236, 72, 153, 0.3);
-}
+    transform: translateY(-1px);
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+  }
 
 .customer-login-btn:active:not(:disabled) {
     transform: translateY(0);
 }
 
 .customer-login-btn:disabled {
-    opacity: 0.7;
+    opacity: 0.65;
     cursor: not-allowed;
-}
+    box-shadow: none;
+  }
 
 .customer-login-btn.loading {
     color: transparent;
@@ -506,3 +515,167 @@
 
 
 
+.customer-login-method-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.customer-login-method-toggle .toggle-btn,
+.customer-login-toggle-row button {
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--line, rgba(148, 163, 184, 0.35));
+    background: var(--surface-soft);
+    font-weight: 600;
+    color: var(--foreground, #0f172a);
+    transition: var(--transition, all 0.2s ease);
+}
+
+.customer-login-method-toggle .toggle-btn.active,
+.customer-login-toggle-row button.active {
+    background: var(--color-primary-soft, rgba(37, 99, 235, 0.12));
+    color: var(--color-primary, #2563eb);
+    border-color: rgba(37, 99, 235, 0.4);
+}
+
+.customer-login-method-toggle .toggle-btn:focus-visible,
+.customer-login-toggle-row button:focus-visible {
+    outline: 2px solid var(--color-primary, #2563eb);
+    outline-offset: 2px;
+}
+
+.customer-login-toggle-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.customer-login-toggle-row.secondary {
+    margin-top: -0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.customer-login-otp-step {
+    display: grid;
+    gap: 0.5rem;
+    text-align: center;
+}
+
+.customer-login-otp-grid {
+    display: flex;
+    justify-content: center;
+    margin: 0.75rem 0;
+}
+
+.customer-login-otp-grid input {
+    width: 220px;
+    padding: 0.9rem 1rem;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    font-size: 1.6rem;
+    letter-spacing: 0.5rem;
+    text-align: center;
+    font-weight: 700;
+    background: rgba(148, 163, 184, 0.08);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.customer-login-otp-grid input:focus {
+    outline: none;
+    border-color: var(--color-primary, #2563eb);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+}
+
+.link-button {
+    border: none;
+    background: none;
+    color: var(--color-primary, #2563eb);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+}
+
+.link-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.customer-login-alert.info {
+    background: rgba(37, 99, 235, 0.12);
+    border-color: rgba(37, 99, 235, 0.3);
+    color: var(--color-primary, #2563eb);
+}
+
+.customer-login-alert .alert-icon {
+    font-weight: 700;
+    margin-right: 0.5rem;
+}
+
+.customer-login-footer {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.customer-login-footer .tiny {
+    font-size: 0.75rem;
+}
+.customer-login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem 1.2rem;
+  background: rgba(148, 163, 184, 0.08);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.customer-login-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--foreground, #0f172a);
+}
+
+.customer-login-field input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  padding: 0.95rem 1.15rem;
+  font-size: 1rem;
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.customer-login-field input:focus {
+  outline: none;
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+  transform: translateY(-1px);
+}
+
+.customer-login-submit {
+  margin-top: 0.75rem;
+  background: linear-gradient(135deg, var(--color-danger), var(--color-primary));
+  color: #ffffff;
+  border: none;
+  padding: 1rem 1.5rem;
+  border-radius: 18px;
+  font-weight: 700;
+  font-size: 1rem;
+  width: 100%;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.customer-login-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.18);
+}
+
+.customer-login-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}

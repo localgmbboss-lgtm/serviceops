@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
+import { deriveCustomerCoordinates, deriveDropoffCoordinates, deriveDriverCoordinates } from "../utils/geo";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
@@ -85,32 +86,94 @@ export default function GuestJobTracker() {
     }
   };
 
-  const driverMarkers = useMemo(() => {
-    if (!vendor) return [];
-    const lat = Number(vendor.lat);
-    const lng = Number(vendor.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+  const pickupAddress =
+    job?.pickupAddress ||
+    job?.pickup?.address ||
+    job?.pickupLocation?.address ||
+    job?.customerLocation?.address ||
+    job?.customer?.address ||
+    null;
+  const dropoffAddress =
+    job?.dropoffAddress ||
+    job?.dropoff?.address ||
+    job?.dropoffLocation?.address ||
+    job?.destinationAddress ||
+    (typeof job?.destination === "string" ? job.destination : null);
+
+  const customerCoordinates = useMemo(() => deriveCustomerCoordinates(job), [job]);
+  const dropoffCoordinates = useMemo(() => deriveDropoffCoordinates(job), [job]);
+
+  const routeDestination = useMemo(() => {
+    if (customerCoordinates) {
+      return {
+        position: customerCoordinates,
+        label: "CUST",
+        role: "customer",
+        title: pickupAddress || "Pickup location",
+        color: "#f97316",
+        textColor: "#0f172a",
+        avatarUrl: (job?.customer?.avatarUrl || job?.customer?.photoUrl || job?.customer?.photo || job?.customer?.image) ?? null,
+      };
+    }
+    if (dropoffCoordinates) {
+      return {
+        position: dropoffCoordinates,
+        label: "DEST",
+        role: "dropoff",
+        title: dropoffAddress || "Destination",
+        color: "#0ea5e9",
+        textColor: "#ffffff",
+      };
+    }
+    return null;
+  }, [customerCoordinates, dropoffCoordinates, pickupAddress, dropoffAddress]);
+
+  const mapLandmarks = useMemo(() => {
+    if (!dropoffCoordinates || !customerCoordinates) return [];
     return [
       {
-        name: vendor.name || "Vendor",
-        lat,
-        lng,
-        lastSeenAt: vendor.lastSeenAt,
+        key: "dropoff",
+        position: dropoffCoordinates,
+        label: "DROP",
+        title: dropoffAddress || "Drop-off",
+        color: "#0ea5e9",
+        textColor: "#ffffff",
+      },
+    ];
+  }, [customerCoordinates, dropoffCoordinates, dropoffAddress]);
+
+  const driverMarkers = useMemo(() => {
+    if (!vendor) return [];
+    const coords = deriveDriverCoordinates(vendor);
+    if (!coords) return [];
+    return [
+      {
+        ...vendor,
+        lat: coords.lat,
+        lng: coords.lng,
+        label: "DRV",
+        avatarUrl: vendor?.avatarUrl || vendor?.photoUrl || vendor?.photo || vendor?.image || null,
+        title: vendor.name ? `${vendor.name}` : "Driver",
+        color: "#2563eb",
+        textColor: "#ffffff",
       },
     ];
   }, [vendor]);
 
-  const destination = useMemo(() => {
-    if (Number.isFinite(job?.dropoffLat) && Number.isFinite(job?.dropoffLng)) {
-      return { lat: job.dropoffLat, lng: job.dropoffLng };
-    }
-    return job?.pickupAddress || null;
-  }, [job]);
-  const fallbackDestination =
-    Number.isFinite(job?.dropoffLat) && Number.isFinite(job?.dropoffLng)
-      ? { lat: job.dropoffLat, lng: job.dropoffLng }
-      : null;
+  const fallbackDestination = customerCoordinates || dropoffCoordinates || null;
 
+  const mapCenter = useMemo(() => {
+    if (routeDestination?.position) return routeDestination.position;
+    if (driverMarkers.length > 0) {
+      const primary = driverMarkers[0];
+      if (Number.isFinite(primary.lat) && Number.isFinite(primary.lng)) {
+        return { lat: primary.lat, lng: primary.lng };
+      }
+    }
+    return fallbackDestination || null;
+  }, [driverMarkers, routeDestination, fallbackDestination]);
+
+  const canShowRoute = driverMarkers.length > 0 && Boolean(routeDestination?.position);
 
 
 if (loading) {
@@ -211,8 +274,10 @@ if (loading) {
           {hasGoogle ? (
             <GMap
               drivers={driverMarkers}
-              destination={destination}
-              showRoute={!!destination}
+              destination={routeDestination}
+              landmarks={mapLandmarks}
+              showRoute={canShowRoute}
+              center={mapCenter || undefined}
               zoom={13}
             />
           ) : (
@@ -220,7 +285,7 @@ if (loading) {
               <LiveMap
                 drivers={driverMarkers}
                 autoFit
-                center={[6.5244, 3.3792]}
+                center={mapCenter ? [mapCenter.lat, mapCenter.lng] : [6.5244, 3.3792]}
                 destination={fallbackDestination}
               />
               <p className="muted tiny">
@@ -295,6 +360,10 @@ if (loading) {
     </div>
   );
 }
+
+
+
+
 
 
 

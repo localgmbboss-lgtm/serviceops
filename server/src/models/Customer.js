@@ -1,10 +1,32 @@
-// server/src/models/Customer.js
+﻿// server/src/models/Customer.js
 import mongoose from "mongoose";
+
+const SavedProfileSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true },
+    email: { type: String, trim: true, lowercase: true },
+    phone: { type: String, trim: true },
+    address: { type: String, trim: true },
+    vehicleMake: { type: String, trim: true },
+    vehicleModel: { type: String, trim: true },
+    vehicleColor: { type: String, trim: true },
+    vehiclePlate: { type: String, trim: true },
+    notes: { type: String, trim: true },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
 
 const CustomerSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    phone: { type: String, trim: true, index: true },
+    name: { type: String, trim: true },
+    phone: {
+      type: String,
+      trim: true,
+      index: true,
+      unique: true,
+      sparse: true,
+    },
     email: {
       type: String,
       trim: true,
@@ -12,10 +34,10 @@ const CustomerSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
-    passHash: { type: String }, // optional (guest customers won't have it)
-    isGuest: { type: Boolean, default: false }, // Flag to identify guest customers
-    guestToken: { type: String, sparse: true }, // Unique token for guest customers
-    lastServiceRequest: { type: Date }, // Track last service request
+    passHash: { type: String },
+    isGuest: { type: Boolean, default: false },
+    guestToken: { type: String, sparse: true },
+    lastServiceRequest: { type: Date },
     serviceHistory: [
       {
         date: { type: Date, default: Date.now },
@@ -27,11 +49,23 @@ const CustomerSchema = new mongoose.Schema(
         vehicleColor: String,
       },
     ],
+    savedProfile: { type: SavedProfileSchema, default: undefined },
+    otpCodeHash: { type: String },
+    otpExpiresAt: { type: Date },
+    otpAttemptCount: { type: Number, default: 0 },
+    otpLastSentAt: { type: Date },
+    lastLoginAt: { type: Date },
   },
   { timestamps: true }
 );
 
-// Index for guest token lookup
 CustomerSchema.index({ guestToken: 1 });
+
+CustomerSchema.pre("save", function setDefaults(next) {
+  if (!this.name && this.savedProfile?.name) {
+    this.name = this.savedProfile.name;
+  }
+  next();
+});
 
 export default mongoose.model("Customer", CustomerSchema);
