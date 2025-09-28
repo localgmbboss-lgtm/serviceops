@@ -1,8 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { copyText } from "../../utils/clipboard";
+import { APP_BASE_URL } from "../../config/env";
 import "./styles.css";
 
+const currencyFormatterCache = new Map();
+const formatCurrency = (value, currency = "USD") => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "N/A";
+  const code = currency || "USD";
+  if (!currencyFormatterCache.has(code)) {
+    try {
+      currencyFormatterCache.set(
+        code,
+        new Intl.NumberFormat(undefined, { style: "currency", currency: code })
+      );
+    } catch (error) {
+      currencyFormatterCache.set(
+        code,
+        new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" })
+      );
+    }
+  }
+  return currencyFormatterCache.get(code).format(amount);
+};
 export default function JobTable({
   jobs,
   vendors = [],
@@ -117,9 +138,18 @@ export default function JobTable({
   };
 
   const copyStatusLink = async (jobId) => {
-    const link = `${window.location.origin}/status/${jobId}`;
-    const ok = await copyText(link);
-    if (!ok) alert("Could not copy link. Long-press or select to copy.");
+    try {
+      const { data } = await api.get(`/api/jobs/${jobId}/links`);
+      const link = data.statusUrl || `${APP_BASE_URL}/status/${jobId}`;
+      const ok = await copyText(link);
+      if (!ok) throw new Error();
+    } catch (error) {
+      const fallback = `${APP_BASE_URL}/status/${jobId}`;
+      const ok = await copyText(fallback);
+      if (!ok) {
+        alert("Could not copy link. Long-press or select to copy.");
+      }
+    }
   };
 
   const copyVendorLink = async (jobId) => {
@@ -226,7 +256,7 @@ export default function JobTable({
                           setExpandedRow(isExpanded ? null : job._id);
                         }}
                       >
-                        {isExpanded ? "â€”" : "+"}
+                        {isExpanded ? "-" : "+"}
                       </button>
                     </td>
                     <td>
@@ -241,7 +271,9 @@ export default function JobTable({
                           <div className="jobtable-service-sub">{job.serviceType}</div>
                         )}
                         {job.bidMode === "fixed" && Number.isFinite(Number(job.quotedPrice)) && (
-                          <div className="jobtable-price">â‚¦{Number(job.quotedPrice).toFixed(2)}</div>
+                          <div className="jobtable-price">
+                            {formatCurrency(job.finalPrice ?? job.quotedPrice, job.currency || "USD")}
+                          </div>
                         )}
                       </div>
                     </td>
@@ -252,7 +284,7 @@ export default function JobTable({
                     </td>
                     <td className="jobtable-dropoff">
                       <div className="jobtable-address" title={job.dropoffAddress}>
-                        {job.dropoffAddress || "â€”"}
+                        {job.dropoffAddress || "-"}
                       </div>
                     </td>
                     <td className="jobtable-status">
@@ -270,7 +302,7 @@ export default function JobTable({
                             <div className="jobtable-vendor-name">{vendor.name}</div>
                             <div className="jobtable-vendor-details">
                               {vendor.phone}
-                              {vendor.city ? ` Â· ${vendor.city}` : ""}
+                              {vendor.city ? ` - ${vendor.city}` : ""}
                             </div>
                             <button
                               className="jobtable-btn jobtable-btn-link"
@@ -299,7 +331,7 @@ export default function JobTable({
                             <div className="jobtable-dropdown-header">
                               <input
                                 className="jobtable-dropdown-search"
-                                placeholder="Search vendorâ€¦"
+                                placeholder="Search vendor..."
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
                                 autoFocus
@@ -327,7 +359,7 @@ export default function JobTable({
                                     >
                                       <span className="jobtable-dropdown-item-name">{candidate.name}</span>
                                       <span className="jobtable-dropdown-item-details">
-                                        {candidate.city ? `${candidate.city} Â· ` : ""}
+                                        {candidate.city ? `${candidate.city} - ` : ""}
                                         {candidate.phone || ""}
                                       </span>
                                     </button>
@@ -432,16 +464,19 @@ export default function JobTable({
                                 <strong>Service Type:</strong> {job.serviceType || "N/A"}
                               </div>
                               <div>
-                                <strong>Quoted Price:</strong> {job.bidMode === "fixed" ? `${Number(job.quotedPrice || 0).toFixed(2)}` : "â€”"}
+                                <strong>Quoted Price:</strong>{" "}
+                                {job.bidMode === "fixed"
+                                  ? formatCurrency(
+                                      job.finalPrice ?? job.quotedPrice,
+                                      job.currency || "USD"
+                                    )
+                                  : "Set by winning bid"}
                               </div>
                               <div>
-                                <strong>Mode:</strong> {job.bidMode === "fixed" ? "Fixed price (ETA only)" : "Bid only"}
+                                <strong>Status:</strong> {job.status || "Unassigned"}
                               </div>
                               <div>
-                                <strong>Status:</strong> {job.status}
-                              </div>
-                              <div>
-                                <strong>Priority:</strong> {job.priority || "Normal"}
+                                <strong>Priority:</strong> {job.priority === "urgent" ? "Urgent" : "Normal"}
                               </div>
                             </div>
                           </div>
@@ -536,6 +571,23 @@ export default function JobTable({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

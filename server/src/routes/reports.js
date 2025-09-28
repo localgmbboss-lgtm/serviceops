@@ -91,7 +91,7 @@ router.get("/range", async (req, res, next) => {
 
     const byCity = {};
     for (const j of jobs) {
-      const k = j.driverCity || "—";
+      const k = j.driverCity || "-";
       byCity[k] = (byCity[k] || 0) + 1;
     }
 
@@ -128,7 +128,7 @@ router.get("/range", async (req, res, next) => {
       },
     ]);
 
-    // Satisfaction split (5★ vs private (<5))
+    // Satisfaction split (5* vs private (<5))
     const fb = await Feedback.find(
       { createdAt: { $gte: from, $lte: to } },
       { rating: 1 }
@@ -205,7 +205,7 @@ router.get("/dashboard", async (_req, res, next) => {
         $project: {
           _id: 0,
           day: "$_id.day",
-          city: { $ifNull: ["$_id.city", "—"] },
+          city: { $ifNull: ["$_id.city", "-"] },
           count: 1,
         },
       },

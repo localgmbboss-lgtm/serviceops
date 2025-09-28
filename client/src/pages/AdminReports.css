@@ -60,7 +60,7 @@
 
 .reports-page .btn.primary {
     background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-    color: #ffffff;
+    color: #111111;
     border: none;
     box-shadow: 0 14px 28px rgba(15, 98, 254, 0.2);
 }
@@ -295,7 +295,7 @@
 
 .reports-page .pager-btn:hover:not(:disabled) {
     background: var(--color-primary);
-    color: #ffffff;
+    color: #111111;
     transform: translateY(-1px);
 }
 
@@ -327,3 +327,4 @@
         justify-content: flex-start;
     }
 }
+

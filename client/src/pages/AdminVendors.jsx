@@ -334,7 +334,7 @@ export default function AdminVendors() {
                     <dt>Docs</dt>
                     <dd>
                       {docs.approved || 0}/{docs.total || 0}
-                      {(docs.expired || 0) > 0 ? ` · exp ${docs.expired}` : ""}
+                      {(docs.expired || 0) > 0 ? ` - exp ${docs.expired}` : ""}
                     </dd>
                   </div>
                   <div>
@@ -416,3 +416,4 @@ export default function AdminVendors() {
     </div>
   );
 }
+

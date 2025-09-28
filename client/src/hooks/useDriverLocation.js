@@ -98,12 +98,12 @@ export default function useDriverLocation({
           lastLatRef.current = lat;
           lastLngRef.current = lng;
         } catch (e) {
-          // swallow; we’ll try again next tick
+          // swallow; we'll try again next tick
         }
       }
     }
 
-    // tick immediately once (don’t wait full interval)
+    // tick immediately once (don't wait full interval)
     push();
 
     timerRef.current = setInterval(push, Math.max(3000, pushMs));

@@ -261,7 +261,7 @@ router.patch("/:id", async (req, res, next) => {
   }
 });
 
-router.post("/guest"', async (req, res, next) => {
+router.post("/guest", async (req, res, next) => {
   try {
     const body = req.body || {};
 
@@ -557,6 +557,7 @@ router.get("/:id", async (req, res, next) => {
 });
 
 export default router;
+
 
 
 

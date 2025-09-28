@@ -7,7 +7,7 @@ import "./Landing.css";
 const DEFAULT_LOCATION_LABEL = "ServiceOps coverage area";
 
 export default function Landing() {
-  const [locationLabel, setLocationLabel] = useState("Locating…");
+  const [locationLabel, setLocationLabel] = useState("Locating...");
   const [hasGeoError, setHasGeoError] = useState(false);
 
   useEffect(() => {
@@ -126,7 +126,7 @@ export default function Landing() {
           <div className="hero-form" role="group" aria-label="Ride request">
             <label className="hero-field">
               <span className="hero-field__icon" aria-hidden="true">
-                •
+                *
               </span>
               <input
                 type="text"
@@ -154,7 +154,7 @@ export default function Landing() {
             </label>
             <label className="hero-field">
               <span className="hero-field__icon hero-field__icon--destination" aria-hidden="true">
-                ¦
+                |
               </span>
               <input
                 type="text"
@@ -273,3 +273,4 @@ export default function Landing() {
     </div>
   );
 }
+

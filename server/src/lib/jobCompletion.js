@@ -1,4 +1,4 @@
-﻿import { getCommissionSettings, evaluateCommission } from "./commission.js";
+import { getCommissionSettings, evaluateCommission } from "./commission.js";
 import { chargeVendorCommission } from "./billing.js";
 
 const sanitizeNote = (note) => {

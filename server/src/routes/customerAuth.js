@@ -145,6 +145,37 @@ router.post("/otp/request", async (req, res, next) => {
   }
 });
 
+// ---------- PHONE LOGIN (no OTP/password) ----------
+router.post("/phone-login", async (req, res, next) => {
+  try {
+    const phone = normalizePhone(req.body?.phone);
+    const name = req.body?.name ? String(req.body.name).trim() : "";
+    if (!phone) {
+      return res.status(400).json({ message: "Enter a valid phone number" });
+    }
+
+    let customer = await Customer.findOne({ phone }).exec();
+    if (!customer) {
+      customer = await Customer.create({
+        phone,
+        name: name || undefined,
+        isGuest: false,
+      });
+    } else if (name && !customer.name) {
+      customer.name = name;
+    }
+
+    customer.lastLoginAt = new Date();
+    await customer.save();
+
+    return res.json({
+      token: sign(customer),
+      customer: serializeCustomer(customer),
+    });
+  } catch (e) {
+    next(e);
+  }
+});
 // ---------- OTP VERIFY ----------
 router.post("/otp/verify", async (req, res, next) => {
   try {
@@ -340,3 +371,4 @@ router.get("/me", async (req, res) => {
 });
 
 export default router;
+

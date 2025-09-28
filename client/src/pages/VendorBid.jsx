@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import "./VendorBid.css";
@@ -87,7 +87,7 @@ export default function VendorBid() {
       </p>
       {isFixed && (
         <p>
-          <strong>Fixed payout:</strong> ₦{Number(job?.quotedPrice ?? 0).toFixed(2)}
+          <strong>Fixed payout:</strong> \${Number(job?.quotedPrice ?? 0).toFixed(2)}
         </p>
       )}
       {job.dropoffAddress && (
@@ -120,7 +120,7 @@ export default function VendorBid() {
         {isFixed ? (
           <div className="vendorbid-fixed">
             <strong>Fixed payout:</strong>
-            <span>₦{Number(job?.quotedPrice ?? 0).toFixed(2)}</span>
+            <span>\${Number(job?.quotedPrice ?? 0).toFixed(2)}</span>
             <small>Only an ETA is required for this job.</small>
           </div>
         ) : (
@@ -144,5 +144,6 @@ export default function VendorBid() {
     </div>
   );
 }
+
 
 

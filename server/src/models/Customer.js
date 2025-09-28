@@ -1,4 +1,4 @@
-﻿// server/src/models/Customer.js
+// server/src/models/Customer.js
 import mongoose from "mongoose";
 
 const SavedProfileSchema = new mongoose.Schema(

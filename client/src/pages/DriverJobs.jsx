@@ -187,7 +187,7 @@ export default function DriverJobs() {
             <li key={j._id} className="dcard">
               <div className="dtitle">{j.serviceType || "Service"}</div>
               <div className="dsub">{j.pickupAddress}</div>
-              <div className="muted small">Earnings split: {j.earningsSplit ?? "—"}</div>
+              <div className="muted small">Earnings split: {j.earningsSplit ?? "-"}</div>
             </li>
           ))}
         </ul>
@@ -195,3 +195,4 @@ export default function DriverJobs() {
     </div>
   );
 }
+

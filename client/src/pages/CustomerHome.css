@@ -11,17 +11,18 @@
 
 /* Header */
 .customer-home-header {
-    background: linear-gradient(135deg, var(--color-success) 0%, var(--color-success) 100%);
+    background: linear-gradient(135deg, rgba(10, 122, 255, 0.14) 0%, rgba(10, 122, 255, 0.05) 100%);
     border-radius: 20px;
     padding: 24px;
     margin-bottom: 24px;
-    color: white;
+    color: var(--color-text-strong, #0f172a);
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 16px;
-    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
 }
 
 .user-info {
@@ -34,12 +35,13 @@
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(10, 122, 255, 0.12);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.5rem;
     font-weight: 600;
+    color: var(--color-text-strong, #0f172a);
     backdrop-filter: blur(10px);
 }
 
@@ -56,9 +58,9 @@
 }
 
 .new-request-btn {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(10, 122, 255, 0.08);
+    color: var(--color-text-strong, #0f172a);
+    border: 2px solid rgba(10, 122, 255, 0.18);
     padding: 10px 18px;
     border-radius: 16px;
     font-weight: 600;
@@ -72,9 +74,9 @@
 }
 
 .new-request-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(10, 122, 255, 0.14);
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 5px 15px rgba(15, 23, 42, 0.12);
 }
 
 /* Stats Grid */
@@ -559,5 +561,8 @@
         grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     }
 }
+
+
+
 
 

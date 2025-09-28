@@ -155,7 +155,7 @@ export default function VendorPortal() {
               <div>
                 <dt>Customer</dt>
                 <dd>
-                  {customer.name} · {customer.phone}
+                  {customer.name} - {customer.phone}
                 </dd>
               </div>
             )}
@@ -320,7 +320,7 @@ export default function VendorPortal() {
 
             {job.flags?.underReport && (
               <p className="warning-text small">
-                ⚠️ Report flagged for review — {job.flags.reason}
+                 Report flagged for review - {job.flags.reason}
               </p>
             )}
           </section>
@@ -329,4 +329,5 @@ export default function VendorPortal() {
     </div>
   );
 }
+
 

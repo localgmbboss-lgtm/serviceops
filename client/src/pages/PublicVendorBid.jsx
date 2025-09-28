@@ -178,7 +178,7 @@ export default function PublicVendorBid() {
           </div>
           {isFixed && (
             <div>
-              <b>Fixed payout:</b> ₦{Number(info?.quotedPrice ?? 0).toFixed(2)}
+              <b>Fixed payout:</b> ${Number(info?.quotedPrice ?? 0).toFixed(2)}
             </div>
           )}
           {info.dropoffAddress && (
@@ -227,7 +227,7 @@ export default function PublicVendorBid() {
                   border: "1px solid rgba(59, 130, 246, 0.35)",
                 }}
               >
-                <strong>Fixed payout:</strong> ₦{Number(info?.quotedPrice ?? 0).toFixed(2)}
+                <strong>Fixed payout:</strong> ${Number(info?.quotedPrice ?? 0).toFixed(2)}
                 <small style={{ display: "block", marginTop: 4 }}>
                   Price is locked. Only your ETA is required.
                 </small>
@@ -259,6 +259,7 @@ export default function PublicVendorBid() {
     </div>
   );
 }
+
 
 
 

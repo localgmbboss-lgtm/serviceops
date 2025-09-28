@@ -118,7 +118,7 @@ export default function LiveMap({
 
       // popup
       const when = d.lastSeenAt ? new Date(d.lastSeenAt) : null;
-      const last = when ? timeAgo(when) : "—";
+      const last = when ? timeAgo(when) : "-";
       entry.marker.bindPopup(`
         <div class="lm-popup">
           <div class="lm-name"><strong>${escapeHtml(
@@ -216,6 +216,7 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
 
 
 

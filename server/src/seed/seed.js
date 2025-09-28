@@ -53,7 +53,7 @@ serviceType: 'installation',
 ]);
 
 
-console.log('✅ Seed complete');
+console.log(' Seed complete');
 process.exit(0);
 } catch (e) {
 console.error(e);

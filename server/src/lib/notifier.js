@@ -32,7 +32,7 @@ export async function notifySMS(to, body, jobId = null) {
     }
   }
 
-  // No Twilio → queue for later
+  // No Twilio -> queue for later
   const rec = await Outbox.create({
     kind: "sms",
     to,

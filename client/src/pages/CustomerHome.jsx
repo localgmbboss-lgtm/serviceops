@@ -249,7 +249,7 @@ export default function CustomerHome() {
     return (
       <div className="customer-home-container">
         <div className="error-state">
-          <div className="error-icon">⚡</div>
+          <div className="error-icon"></div>
           <h3>Oops! Something went wrong</h3>
           <p>{err}</p>
           <div className="error-actions">
@@ -295,14 +295,14 @@ export default function CustomerHome() {
             <span className="stat-number">{grouped.Active.length}</span>
             <span className="stat-label">Active Requests</span>
           </div>
-          <div className="stat-icon">🔥</div>
+          <div className="stat-icon"></div>
         </div>
         <div className="stat-card completed">
           <div className="stat-content">
             <span className="stat-number">{grouped.Completed.length}</span>
             <span className="stat-label">Completed</span>
           </div>
-          <div className="stat-icon">✅</div>
+          <div className="stat-icon"></div>
         </div>
       </div>
 
@@ -312,7 +312,7 @@ export default function CustomerHome() {
           className={`tab ${activeTab === "active" ? "active" : ""}`}
           onClick={() => setActiveTab("active")}
         >
-          <span className="tab-icon">⏳</span>
+          <span className="tab-icon"></span>
           Active
           <span className="tab-badge">{grouped.Active.length}</span>
         </button>
@@ -320,7 +320,7 @@ export default function CustomerHome() {
           className={`tab ${activeTab === "history" ? "active" : ""}`}
           onClick={() => setActiveTab("history")}
         >
-          <span className="tab-icon">📊</span>
+          <span className="tab-icon"></span>
           History
           <span className="tab-badge">{grouped.Completed.length}</span>
         </button>
@@ -331,7 +331,7 @@ export default function CustomerHome() {
         {activeTab === "active" ? (
           grouped.Active.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">🚀</div>
+              <div className="empty-icon"></div>
               <h3>No active requests</h3>
               <p>Ready to get started? Create your first service request</p>
               <button className="btn primary small" onClick={startNew}>
@@ -343,7 +343,7 @@ export default function CustomerHome() {
           )
         ) : grouped.Completed.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🏆</div>
+            <div className="empty-icon"></div>
             <h3>No history yet</h3>
             <p>Your completed requests will appear here</p>
           </div>
@@ -360,11 +360,11 @@ export default function CustomerHome() {
 // Job Card Component
 function JobCard({ job, isCompleted = false }) {
   const statusConfig = {
-    Unassigned: { color: "#FF9500", bg: "#FFF4E6", icon: "⏳" },
-    Assigned: { color: "#007AFF", bg: "#E6F2FF", icon: "✅" },
-    OnTheWay: { color: "#5856D6", bg: "#F0F0FF", icon: "🚗" },
-    Arrived: { color: "#AF52DE", bg: "#F6F0FF", icon: "📍" },
-    Completed: { color: "#34C759", bg: "#E6F7ED", icon: "🎉" },
+    Unassigned: { color: "#FF9500", bg: "#FFF4E6", icon: "" },
+    Assigned: { color: "#007AFF", bg: "#E6F2FF", icon: "" },
+    OnTheWay: { color: "#5856D6", bg: "#F0F0FF", icon: "" },
+    Arrived: { color: "#AF52DE", bg: "#F6F0FF", icon: "" },
+    Completed: { color: "#34C759", bg: "#E6F7ED", icon: "" },
   };
 
   const status = statusConfig[job.status] || statusConfig.Unassigned;
@@ -373,7 +373,7 @@ function JobCard({ job, isCompleted = false }) {
     <div className="job-card">
       <div className="job-header">
         <div className="service-info">
-          <span className="service-icon">🔧</span>
+          <span className="service-icon"></span>
           <h3>{job.serviceType || "Service Request"}</h3>
         </div>
         <div
@@ -390,18 +390,18 @@ function JobCard({ job, isCompleted = false }) {
 
       <div className="job-content">
         <div className="detail-item">
-          <span className="detail-icon">📌</span>
+          <span className="detail-icon"></span>
           <span className="detail-text">{job.pickupAddress}</span>
         </div>
         {job.dropoffAddress && (
           <div className="detail-item">
-            <span className="detail-icon">🎯</span>
+            <span className="detail-icon"></span>
             <span className="detail-text">{job.dropoffAddress}</span>
           </div>
         )}
         {job.createdAt && (
           <div className="detail-item">
-            <span className="detail-icon">📅</span>
+            <span className="detail-icon"></span>
             <span className="detail-text">
               {new Date(job.createdAt).toLocaleDateString()}
             </span>
@@ -415,7 +415,7 @@ function JobCard({ job, isCompleted = false }) {
             to={`/choose/${job.customerToken}`}
             className="btn primary small"
           >
-            <span className="action-icon">💰</span>
+            <span className="action-icon"></span>
             View Bids
           </Link>
         ) : (
@@ -423,7 +423,7 @@ function JobCard({ job, isCompleted = false }) {
             to={`/status/${job._id}`}
             className={`btn ${isCompleted ? "secondary" : "primary"} small`}
           >
-            <span className="action-icon">{isCompleted ? "👁️" : "📱"}</span>
+            <span className="action-icon">{isCompleted ? "" : ""}</span>
             {isCompleted ? "Details" : "Track"}
           </Link>
         )}
@@ -431,4 +431,5 @@ function JobCard({ job, isCompleted = false }) {
     </div>
   );
 }
+
 

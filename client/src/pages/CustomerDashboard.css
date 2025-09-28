@@ -1,4 +1,4 @@
-.custdash {
+﻿.custdash {
   padding: clamp(18px, 4vw, 42px) clamp(16px, 5vw, 56px);
   background: var(--bg);
 }
@@ -297,7 +297,7 @@
   height: 52px;
   border-radius: 16px;
   background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
-  color: #ffffff;
+  color: #111111;
   font-weight: 700;
   font-size: 18px;
   display: flex;
@@ -432,7 +432,7 @@
 
 .custdash-action.primary .custdash-action__icon {
   background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
-  color: #ffffff;
+  color: #111111;
 }
 
 .custdash-action.ghost {
@@ -447,7 +447,7 @@
 
 .custdash-action.call .custdash-action__icon {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: #ffffff;
+  color: #111111;
 }
 
 .custdash-action.muted {
@@ -705,3 +705,4 @@
     height: 30px;
   }
 }
+

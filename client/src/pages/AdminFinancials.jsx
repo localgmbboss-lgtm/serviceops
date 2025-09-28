@@ -78,10 +78,10 @@ export default function AdminFinancials(){
 
       {/* Summary */}
       <section className="grid4">
-        <div className="card metric"><span className="muted">Revenue</span><strong>₦{(sum?.revenue.total||0).toFixed(2)}</strong></div>
-        <div className="card metric"><span className="muted">Payouts (accrued)</span><strong>₦{(sum?.payouts.total||0).toFixed(2)}</strong></div>
-        <div className="card metric"><span className="muted">Expenses</span><strong>₦{(sum?.expenses.total||0).toFixed(2)}</strong></div>
-        <div className={"card metric "+((sum?.net||0)>=0?"ok":"bad")}><span className="muted">Net</span><strong>₦{(sum?.net||0).toFixed(2)}</strong></div>
+        <div className="card metric"><span className="muted">Revenue</span><strong>${(sum?.revenue.total||0).toFixed(2)}</strong></div>
+        <div className="card metric"><span className="muted">Payouts (accrued)</span><strong>${(sum?.payouts.total||0).toFixed(2)}</strong></div>
+        <div className="card metric"><span className="muted">Expenses</span><strong>${(sum?.expenses.total||0).toFixed(2)}</strong></div>
+        <div className={"card metric "+((sum?.net||0)>=0?"ok":"bad")}><span className="muted">Net</span><strong>${(sum?.net||0).toFixed(2)}</strong></div>
       </section>
 
       {/* By city & owed by driver */}
@@ -92,7 +92,7 @@ export default function AdminFinancials(){
             <thead><tr><th>City</th><th>Total</th></tr></thead>
             <tbody>
               {(sum?.byCity||[]).map(r=>(
-                <tr key={r.city}><td>{r.city}</td><td>₦{r.total.toFixed(2)}</td></tr>
+                <tr key={r.city}><td>{r.city}</td><td>${r.total.toFixed(2)}</td></tr>
               ))}
               {(sum?.byCity||[]).length===0 && <tr><td colSpan="2" className="muted">No data</td></tr>}
             </tbody>
@@ -104,7 +104,7 @@ export default function AdminFinancials(){
             <thead><tr><th>Driver</th><th>City</th><th>Amount</th></tr></thead>
             <tbody>
               {(sum?.payouts?.byDriver||[]).map(d=>(
-                <tr key={d.driverId}><td>{d.name}</td><td>{d.city||"—"}</td><td>₦{d.amount.toFixed(2)}</td></tr>
+                <tr key={d.driverId}><td>{d.name}</td><td>{d.city||"-"}</td><td>${d.amount.toFixed(2)}</td></tr>
               ))}
               {(sum?.payouts?.byDriver||[]).length===0 && <tr><td colSpan="3" className="muted">No data</td></tr>}
             </tbody>
@@ -168,9 +168,9 @@ export default function AdminFinancials(){
                 <tr key={p._id}>
                   <td>{new Date(p.receivedAt).toLocaleString()}</td>
                   <td><code>{p.jobId}</code></td>
-                  <td>₦{(p.amount||0).toFixed(2)}</td>
+                  <td>${(p.amount||0).toFixed(2)}</td>
                   <td>{p.method}</td>
-                  <td>{p.note||"—"}</td>
+                  <td>{p.note||"-"}</td>
                 </tr>
               ))}
               {(sum?.latest?.payments||[]).length===0 && <tr><td colSpan="5" className="muted">No payments</td></tr>}
@@ -191,9 +191,9 @@ export default function AdminFinancials(){
                 <tr key={e._id}>
                   <td>{new Date(e.date).toLocaleDateString()}</td>
                   <td>{e.title}</td>
-                  <td>₦{(e.amount||0).toFixed(2)}</td>
+                  <td>${(e.amount||0).toFixed(2)}</td>
                   <td>{e.type}</td>
-                  <td>{e.notes||"—"}</td>
+                  <td>{e.notes||"-"}</td>
                 </tr>
               ))}
               {(sum?.latest?.expenses||[]).length===0 && <tr><td colSpan="5" className="muted">No expenses</td></tr>}
@@ -204,5 +204,6 @@ export default function AdminFinancials(){
     </div>
   );
 }
+
 
 

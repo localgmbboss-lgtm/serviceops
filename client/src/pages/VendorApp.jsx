@@ -142,11 +142,11 @@ function suggestedPrice(job) {
 function normalizeMultiline(value) {
   if (value === null || value === undefined) return "";
   return String(value)
+    .replace(/\r\n/g, "\n")
     .replace(/\\r\\n/g, "\n")
     .replace(/\\n/g, "\n")
     .trim();
 }
-
 function extractNote(job) {
   const raw =
     job?.description ||
@@ -640,11 +640,7 @@ export default function VendorApp() {
                     job.dropoffAddress ||
                     job.destination ||
                     job.dropoff?.address;
-                  const noteText =
-                    job.description ||
-                    job.notes ||
-                    job.customerNote ||
-                    job.jobNotes;
+                  const noteText = extractNote(job);
                   const vehicleDetails = [
                     job.vehicleMake,
                     job.vehicleModel,
@@ -659,6 +655,8 @@ export default function VendorApp() {
                     vehicleDetails ? { label: "Vehicle", value: vehicleDetails } : null,
                     noteText ? { label: "Notes", value: noteText } : null,
                   ].filter(Boolean);
+                  const statusLabel = (job.status && String(job.status).trim()) || "Unassigned";
+                  const statusClass = statusLabel.toLowerCase().replace(/\s+/g, "");
                   return (
                     <li
                       key={job._id}
@@ -674,7 +672,7 @@ export default function VendorApp() {
                           <div className="va-job__title">{job.serviceType || "Service"}</div>
                           <div className="va-chip-group">
                             {job.guestRequest && (
-                              <span className="va-chip va-chip--guest">Guest</span>
+                              <span className="va-chip va-chip--customer">Customer</span>
                             )}
                             {job.heavyDuty && (
                               <span className="va-chip va-chip--heavy">Heavy duty</span>
@@ -798,11 +796,7 @@ export default function VendorApp() {
                     job.dropoffAddress ||
                     job.destination ||
                     job.dropoff?.address;
-                  const noteText =
-                    job.description ||
-                    job.notes ||
-                    job.customerNote ||
-                    job.jobNotes;
+                  const noteText = extractNote(job);
                   const vehicleDetails = [
                     job.vehicleMake,
                     job.vehicleModel,
@@ -839,6 +833,8 @@ export default function VendorApp() {
                     vehicleDetails ? { label: "Vehicle", value: vehicleDetails } : null,
                     noteText ? { label: "Notes", value: noteText } : null,
                   ].filter(Boolean);
+                  const statusLabel = (job.status && String(job.status).trim()) || "Unassigned";
+                  const statusClass = statusLabel.toLowerCase().replace(/\s+/g, "");
                   return (
                     <li
                       key={job._id}
@@ -852,8 +848,8 @@ export default function VendorApp() {
                       <div className="va-job__main">
                         <div className="va-job__header">
                           <div className="va-job__title">{job.serviceType || "Service"}</div>
-                          <span className={`va-chip va-chip--status va-chip--${(job.status || "Unknown").toLowerCase()}`}>
-                            {job.status || "Unknown"}
+                          <span className={`va-chip va-chip--status va-chip--${statusClass}`}>
+                            {statusLabel}
                           </span>
                         </div>
                         <p className="va-job__address">{job.pickupAddress}</p>
@@ -1100,5 +1096,8 @@ export default function VendorApp() {
     </div>
   );
 }
+
+
+
 
 

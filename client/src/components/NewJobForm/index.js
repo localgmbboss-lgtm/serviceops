@@ -70,7 +70,7 @@ export default function NewJobForm({ drivers = [], onCreated }) {
         <div>
           <label><span>Assign Driver (optional)</span>
             <select value={driverId} onChange={e=>setDriverId(e.target.value)}>
-              <option value="">— unassigned —</option>
+              <option value="">- unassigned -</option>
               {drivers.map(d => <option key={d._id} value={d._id}>{d.name} ({d.city})</option>)}
             </select>
           </label>

@@ -381,7 +381,7 @@ export default function JobCreate({ onCreated }) {
               ))}
             </select>
             {vendorsLoading ? (
-              <small className="jobcreate-hint">Loading vendors…</small>
+              <small className="jobcreate-hint">Loading vendors</small>
             ) : vendors.length === 0 ? (
               <small className="jobcreate-hint jobcreate-hint-error">
                 Add a vendor before brokering a job.

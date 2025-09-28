@@ -25,6 +25,42 @@ export const API_BASE_URL =
   runtimeApiUrl ||
   (isLocalhost ? "http://localhost:5000" : DEFAULT_PRODUCTION_API);
 
+const windowAppBase =
+  (hasWindow &&
+    (win.APP_BASE_URL || win.APP_URL || win.__APP_BASE_URL__ || win.__APP_URL__)) ||
+  runtimeWindowEnv?.APP_BASE_URL ||
+  runtimeWindowEnv?.APP_URL;
+
+const runtimeAppBase =
+  viteEnv.VITE_APP_BASE_URL ||
+  viteEnv.VITE_APP_URL ||
+  craEnv.REACT_APP_APP_BASE_URL ||
+  craEnv.REACT_APP_APP_URL ||
+  windowAppBase;
+const trimTrailingSlash = (value) => {
+  if (!value) return "";
+  let output = String(value);
+  while (output.endsWith("/")) {
+    output = output.slice(0, -1);
+  }
+  return output;
+};
+
+const stripApiSuffix = (value) => {
+  if (!value) return "";
+  const str = String(value);
+  const idx = str.toLowerCase().indexOf("/api");
+  return idx >= 0 ? str.slice(0, idx) : str;
+};
+
+const normalizeBase = (value) => trimTrailingSlash(value);
+
+const fallbackAppUrl = hasWindow && win.location?.origin
+  ? trimTrailingSlash(win.location.origin)
+  : normalizeBase(stripApiSuffix(runtimeApiUrl)) || trimTrailingSlash(DEFAULT_PRODUCTION_API);
+
+export const APP_BASE_URL = normalizeBase(runtimeAppBase) || fallbackAppUrl;
+
 const FALLBACK_GOOGLE_MAPS_KEY = "AIzaSyCbrg4XJFiFekefKuqm33I8dUzQfhdZ0X8";
 
 function computeGoogleMapsKey() {
@@ -54,8 +90,10 @@ export function getGoogleMapsKey() {
     window.__ENV__ = {
       ...(window.__ENV__ || {}),
       API_URL: API_BASE_URL,
+      APP_BASE_URL,
       GOOGLE_MAPS_KEY: key,
     };
+    window.APP_BASE_URL = APP_BASE_URL;
 
     if (key) {
       window.GOOGLE_MAPS_KEY = key;
@@ -66,3 +104,5 @@ export function getGoogleMapsKey() {
 }
 
 export const GOOGLE_MAPS_KEY = getGoogleMapsKey();
+
+

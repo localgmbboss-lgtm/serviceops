@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+﻿import { useEffect, useMemo, useState, useCallback } from "react";
 import { api } from "../lib/api";
 import JobTable from "../components/JobTable";
 import JobCreate from "../components/JobCreate";
@@ -186,7 +186,7 @@ export default function AdminJobs() {
       <details className="admin-jobs-card admin-jobs-create-card" open>
         <summary className="admin-jobs-create-summary">
           <span>Create a new job</span>
-          <span className="admin-jobs-dropdown-icon">▼</span>
+          <span className="admin-jobs-dropdown-icon">v</span>
         </summary>
         <JobCreate onCreated={load} />
       </details>
@@ -206,7 +206,6 @@ export default function AdminJobs() {
             aria-selected={view === "table"}
             role="tab"
           >
-            <span className="admin-jobs-tab-icon">📋</span>
             <span className="admin-jobs-tab-text">Table</span>
           </button>
           <button
@@ -217,14 +216,12 @@ export default function AdminJobs() {
             aria-selected={view === "kanban"}
             role="tab"
           >
-            <span className="admin-jobs-tab-icon">📌</span>
             <span className="admin-jobs-tab-text">Kanban</span>
           </button>
         </div>
 
         <div className="admin-jobs-filters">
           <div className="admin-jobs-search-container">
-            <span className="admin-jobs-search-icon">🔍</span>
             <input
               className="admin-jobs-search"
               placeholder="Search jobs..."
@@ -270,7 +267,7 @@ export default function AdminJobs() {
                 loading ? "admin-jobs-refresh-spinner" : ""
               }`}
             >
-              {loading ? "⏳" : "🔄"}
+              {loading ? "" : ""}
             </span>
             <span className="admin-jobs-btn-text">
               {loading ? "Refreshing..." : "Refresh"}
@@ -279,9 +276,8 @@ export default function AdminJobs() {
 
           <div className="admin-jobs-dropdown-container">
             <button className="admin-jobs-btn admin-jobs-dropdown-btn">
-              <span className="admin-jobs-btn-icon">📊</span>
               <span className="admin-jobs-btn-text">Export</span>
-              <span className="admin-jobs-dropdown-arrow">▼</span>
+              <span className="admin-jobs-dropdown-arrow">v</span>
             </button>
             <div className="admin-jobs-dropdown-menu">
               <button className="admin-jobs-dropdown-item" onClick={exportCsv}>
@@ -368,7 +364,7 @@ export default function AdminJobs() {
                 onClick={() => setLinksOpen(false)}
                 aria-label="Close"
               >
-                ×
+                x
               </button>
             </div>
             <div className="admin-jobs-modal-body">
@@ -448,5 +444,8 @@ export default function AdminJobs() {
     </div>
   );
 }
+
+
+
 
 

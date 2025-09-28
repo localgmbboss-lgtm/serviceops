@@ -151,12 +151,13 @@
     width: 60px;
     height: 60px;
     margin: 0 auto 1rem;
-    background: linear-gradient(135deg, var(--color-danger), var(--color-danger));
+    background: rgba(10, 122, 255, 0.1);
     border-radius: 50%;
+    border: 1px solid rgba(10, 122, 255, 0.24);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: var(--color-text-strong, #0f172a);
 }
 
 .customer-login-icon svg {
@@ -287,7 +288,7 @@
 .customer-login-btn {
     margin-top: 0.25rem;
     background: linear-gradient(135deg, var(--color-danger), var(--color-primary));
-    color: #ffffff;
+    color: #111111;
     border: none;
     padding: 0.95rem 1.5rem;
     border-radius: 16px;
@@ -633,9 +634,18 @@
 }
 
 .customer-login-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   font-weight: 600;
   font-size: 0.9rem;
   color: var(--foreground, #0f172a);
+}
+
+.customer-login-field .optional {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: rgba(15, 23, 42, 0.6);
 }
 
 .customer-login-field input {
@@ -658,7 +668,7 @@
 .customer-login-submit {
   margin-top: 0.75rem;
   background: linear-gradient(135deg, var(--color-danger), var(--color-primary));
-  color: #ffffff;
+  color: #111111;
   border: none;
   padding: 1rem 1.5rem;
   border-radius: 18px;
@@ -679,3 +689,7 @@
   cursor: not-allowed;
   box-shadow: none;
 }
+
+
+
+

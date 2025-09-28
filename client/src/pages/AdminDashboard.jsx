@@ -224,7 +224,7 @@ export default function AdminDashboard() {
     ctx.fillText(`${Math.round((five / total) * 100)}%`, cx, cy + 4);
     ctx.fillStyle = "#6b7280";
     ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto";
-    ctx.fillText(`5★ vs private`, cx, cy + 22);
+    ctx.fillText(`5* vs private`, cx, cy + 22);
   }, [dash, viewportW]);
 
   const snap = dash?.revenue?.[slice] || {
@@ -248,12 +248,12 @@ export default function AdminDashboard() {
             {loading ? (
               <span className="btn-loader"></span>
             ) : (
-              <span className="refresh-icon">↻</span>
+              <span className="refresh-icon"></span>
             )}
             {loading ? "Refreshing..." : "Refresh"}
           </button>
           <Link className="btn ghost settings-btn" to="/admin/settings">
-            ⚙️ Settings
+             Settings
           </Link>
         </div>
       </header>
@@ -282,13 +282,13 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* KPI row — left-aligned, small gap (CSS handles layout) */}
+      {/* KPI row - left-aligned, small gap (CSS handles layout) */}
       <section className="kpis">
         <div className="kpi-card">
           <KPIBlock
             label="Completed Jobs"
             value={Number(summary?.completed ?? summary?.completedCount ?? 0)}
-            icon="✅"
+            icon=""
             trend={
               summary?.trendJobs > 0
                 ? "up"
@@ -303,7 +303,7 @@ export default function AdminDashboard() {
           <KPIBlock
             label="Avg Revenue / Job"
             value={formatAbbr(summary?.avgRevenue || 0, { currency: true })}
-            icon="💰"
+            icon=""
             trend={
               summary?.trendRevenue > 0
                 ? "up"
@@ -318,7 +318,7 @@ export default function AdminDashboard() {
           <KPIBlock
             label="Avg Rating"
             value={Number(summary?.avgRating || 0).toFixed(2)}
-            icon="⭐"
+            icon="*"
             trend={
               summary?.trendRating > 0
                 ? "up"
@@ -374,7 +374,7 @@ export default function AdminDashboard() {
               </strong>
             </div>
           </div>
-          <p className="muted small tip">Net = Gross − Payouts − Expenses</p>
+          <p className="muted small tip">Net = Gross - Payouts - Expenses</p>
         </div>
 
         <div className="card satisfaction-card">
@@ -383,7 +383,7 @@ export default function AdminDashboard() {
           </div>
           <canvas ref={satCanvasRef} className="chart-canvas" />
           <div className="legend">
-            <span className="dot green"></span> 5★ (
+            <span className="dot green"></span> 5* (
             {dash?.satisfaction?.five || 0})<span className="dot gray"></span>{" "}
             Private ({dash?.satisfaction?.private || 0})
           </div>
@@ -407,13 +407,13 @@ export default function AdminDashboard() {
           <div className="card-head">
             <h3 className="section-title">Expiring Documents (7 days)</h3>
             <Link to="/admin/documents" className="small link view-all">
-              View all →
+              View all ->
             </Link>
           </div>
           <ul className="doc-list">
             {expiring.length === 0 && (
               <li className="muted empty-state">
-                All documents are up to date 👍
+                All documents are up to date 
               </li>
             )}
             {expiring.map((d) => (
@@ -468,7 +468,7 @@ export default function AdminDashboard() {
               <li key={p.driverId} className="perf-item">
                 <div className="pf-main">
                   <strong>{p.name}</strong>
-                  <span className="muted small">{p.city || "—"}</span>
+                  <span className="muted small">{p.city || "-"}</span>
                 </div>
                 <div className="pf-metrics">
                   <span className="chip">{p.jobs} jobs</span>
@@ -476,7 +476,7 @@ export default function AdminDashboard() {
                     {formatAbbr(p.revenue || 0, { currency: true })}
                   </span>
                   <span className="chip">
-                    {p.avgRating?.toFixed(1) || "—"}★
+                    {p.avgRating?.toFixed(1) || "-"}*
                   </span>
                 </div>
               </li>
@@ -490,5 +490,6 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 
 

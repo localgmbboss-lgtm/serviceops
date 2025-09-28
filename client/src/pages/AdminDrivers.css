@@ -1,4 +1,4 @@
-.adrivers .title {
+﻿.adrivers .title {
     margin: 0;
 }
 
@@ -33,7 +33,7 @@
 .adrivers .btn {
     background: var(--color-primary);
     border: 1px solid var(--color-primary);
-    color: #ffffff;
+    color: #111111;
     padding: 8px 12px;
     border-radius: 10px;
     font-weight: 600;
@@ -182,10 +182,11 @@
 .adrivers .danger {
     border: 1px solid var(--color-danger);
     background: var(--color-danger);
-    color: #ffffff;
+    color: #111111;
     border-radius: 10px;
     padding: 6px 10px;
     cursor: pointer;
 }
+
 
 

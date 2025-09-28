@@ -4,7 +4,7 @@
     --white: #ffffff;
     --black: #0f172a;
     --dark-gray: #1f2937;
-    --primary-blue: var(--color-primary, #2563eb);
+    --primary-blue: var(--color-success, #2563eb);
     --primary-blue-dark: var(--color-primary-dark, #1d4ed8);
     --accent-green: var(--color-success, #10b981);
     --alert-red: var(--color-danger, #ef4444);
@@ -266,7 +266,7 @@ body {
 }
 
 .select-wrapper::after {
-    content: "⌄";
+    content: "v";
     position: absolute;
     right: var(--space-md);
     top: 50%;
@@ -1077,3 +1077,4 @@ textarea:focus-visible {
         gap: var(--space-xs);
     }
 }
+

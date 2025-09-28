@@ -23,6 +23,7 @@ import vendorFeed from "./routes/vendorFeed.js";
 import vendorPortal from "./routes/vendorPortal.js";
 import customerAuth from "./routes/customerAuth.js";
 import adminAuth from "./routes/adminAuth.js";
+import vendors from "./routes/vendors.js";
 
 dotenv.config();
 
@@ -120,6 +121,7 @@ app.use("/api/vendor/auth", vendorAuth);
 app.use("/api/vendor/feed", vendorFeed);
 app.use("/api/vendor", vendorPortal);
 app.use("/api/customer/auth", customerAuth);
+app.use("/api/vendors", vendors);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, _req, res, _next) => {
@@ -145,10 +147,3 @@ app.use((err, _req, res, _next) => {
     }
   });
 })();
-
-
-
-
-
-
-
