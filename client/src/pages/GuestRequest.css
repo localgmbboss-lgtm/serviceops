@@ -348,75 +348,80 @@ body {
 }
 
 .guest-request-container .location-card--method {
-    background: linear-gradient(135deg, #0f172a, #1e293b);
-    color: #f8fafc;
-    border: none;
-    box-shadow: 0 32px 64px rgba(15, 23, 42, 0.38);
+    background: #ffffff;
+    color: var(--dark-gray, #1f2937);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
 }
 
 .guest-request-container .pickup-method-card__header h3 {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 700;
+    color: inherit;
 }
 
 .guest-request-container .pickup-method-card__header p {
-    margin: 2px 0 0;
-    font-size: 0.75rem;
-    color: rgba(248, 250, 252, 0.72);
+    margin: 4px 0 0;
+    font-size: 0.8rem;
+    color: rgba(15, 23, 42, 0.6);
 }
 
 .guest-request-container .pickup-method-card__options {
     display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: var(--space-sm);
     margin-top: var(--space-sm);
 }
-
-
 
 .guest-request-container .pickup-method-card__text {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    text-align: left;
 }
 
 .guest-request-container .pickup-method-card__option {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 14px 16px;
-    border-radius: 16px;
-    border: 1px solid rgba(248, 250, 252, 0.24);
-    background: rgba(15, 23, 42, 0.25);
-    color: #f8fafc;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(15, 23, 42, 0.04);
+    color: inherit;
     cursor: pointer;
-    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.guest-request-container .pickup-method-card__option:hover {
+    border-color: rgba(15, 23, 42, 0.2);
+    background: rgba(15, 23, 42, 0.08);
+}
+
+.guest-request-container .pickup-method-card__option.is-active {
+    border-color: var(--primary-blue, #2563eb);
+    background: rgba(37, 99, 235, 0.12);
+    box-shadow: 0 10px 18px rgba(37, 99, 235, 0.14);
+    transform: translateY(-1px);
 }
 
 .guest-request-container .pickup-method-card__icon {
-    font-size: 1rem;
+    font-size: 1.15rem;
     display: grid;
     place-items: center;
+    color: var(--primary-blue, #2563eb);
 }
 
 .guest-request-container .pickup-method-card__label {
     font-weight: 600;
-    font-size: 0.82rem;
+    font-size: 0.9rem;
 }
 
 .guest-request-container .pickup-method-card__helper {
-    font-size: 0.72rem;
-    opacity: 0.72;
+    font-size: 0.75rem;
+    color: rgba(15, 23, 42, 0.6);
 }
-
-.guest-request-container .pickup-method-card__option.is-active {
-    border-color: #f8fafc;
-    background: rgba(248, 250, 252, 0.16);
-    transform: translateY(-2px);
-}
-
 .location-card__header {
     display: grid;
     gap: 6px;
@@ -429,22 +434,11 @@ body {
     color: rgba(15, 23, 42, 0.55);
 }
 
-.guest-request-container .location-card--method .pickup-method-card__header p,
-.guest-request-container .location-card--method .pickup-method-card__label,
-.guest-request-container .location-card--method .pickup-method-card__helper {
-    color: rgba(248, 250, 252, 0.82);
-}
-
 .location-card__title {
     margin: 0;
     font-size: 1.35rem;
     font-weight: 700;
     color: #0f172a;
-}
-
-.guest-request-container .location-card--method .location-card__title,
-.guest-request-container .location-card--method .location-card__eyebrow {
-    color: rgba(248, 250, 252, 0.82);
 }
 
 .guest-request-container .pickup-current {
@@ -1035,8 +1029,7 @@ textarea:focus-visible {
 
 @media (max-width: 560px) {
     .guest-request-container .pickup-method-card__options {
-        grid-auto-flow: row;
-        grid-auto-columns: unset;
+        grid-template-columns: 1fr;
     }
 }
 
