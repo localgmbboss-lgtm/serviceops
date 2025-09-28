@@ -1,4 +1,4 @@
-﻿/* ===================== LANDING PAGE ENHANCEMENTS ===================== */
+/* ===================== LANDING PAGE ENHANCEMENTS ===================== */
 .landing {
     max-width: min(1100px, 95vw);
     margin: clamp(16px, 3vw, 32px) auto clamp(40px, 7vw, 80px);
@@ -680,7 +680,7 @@
 
 .hero-action--primary {
     background: #0f172a;
-    color: #111111;
+    color: #ffffff;
     box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
 }
 
@@ -1067,5 +1067,6 @@
     background: linear-gradient(135deg, rgba(255, 215, 194, 0.45) 0%, rgba(255, 240, 225, 0.18) 100%);
     color: #111827;
 }
+
 
 
