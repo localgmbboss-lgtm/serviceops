@@ -186,7 +186,7 @@ export default function DocumentsHub() {
                 <td>
                   {d.expiresAt
                     ? new Date(d.expiresAt).toLocaleDateString()
-                    : "—"}
+                    : "-"}
                 </td>
                 <td>
                   <a href={d.url} target="_blank" rel="noreferrer">
@@ -201,3 +201,4 @@ export default function DocumentsHub() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-.driver .card {
+﻿.driver .card {
     background: #ffffff;
     border: 1px solid var(--color-border);
     border-radius: 12px;
@@ -104,13 +104,13 @@
 
 .driver .btn.Assigned {
     background: var(--color-primary);
-    color: #ffffff;
+    color: #111111;
     border-color: var(--color-primary);
 }
 
 .driver .btn.OnTheWay {
     background: var(--color-success);
-    color: #ffffff;
+    color: #111111;
     border-color: var(--color-success);
 }
 
@@ -122,8 +122,9 @@
 
 .driver .btn.Completed {
     background: var(--color-success);
-    color: #ffffff;
+    color: #111111;
     border-color: var(--color-success);
 }
+
 
 

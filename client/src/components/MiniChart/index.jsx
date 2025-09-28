@@ -41,3 +41,4 @@ export default function MiniChart({ data = [], height = 64 }) {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-﻿import Settings from "../models/Settings.js";
+import Settings from "../models/Settings.js";
 
 const DEFAULT_COMMISSION_CONFIG = Object.freeze({
   enabled: true,

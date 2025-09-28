@@ -151,12 +151,13 @@
     width: 60px;
     height: 60px;
     margin: 0 auto 1rem;
-    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-soft));
+    background: rgba(10, 122, 255, 0.1);
     border-radius: 50%;
+    border: 1px solid rgba(10, 122, 255, 0.24);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: var(--color-text-strong, #0f172a);
 }
 
 .vendor-login-icon svg {
@@ -277,7 +278,7 @@
 .vendor-login-btn {
     margin-top: 0.5rem;
     padding: 1rem 2rem;
-    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-soft));
+    background: linear-gradient(135deg, #0a7aff, #2563eb);
     color: white;
     border: none;
     border-radius: 12px;
@@ -448,5 +449,6 @@
         padding: 0.875rem 1.5rem;
     }
 }
+
 
 

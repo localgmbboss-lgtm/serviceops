@@ -351,8 +351,8 @@
 }
 
 .admin-jobs-dropdown-btn {
-  background: var(--aj-primary);
-  color: white;
+  background: var(--aj-primary-light);
+  color: var(--color-text-strong, #0f172a);
   border: none;
   padding: 0.5rem 0.75rem;
 }
@@ -441,7 +441,7 @@
 
 .admin-jobs-chip-active {
   background: var(--aj-primary);
-  color: #ffffff;
+  color: #111111;
   border-color: var(--aj-primary);
 }
 
@@ -767,5 +767,7 @@
     padding: 1rem;
   }
 }
+
+
 
 

@@ -195,7 +195,7 @@ export default function AdminDrivers() {
                 <th>Available</th>
                 <th>Docs</th>
                 <th>Completed</th>
-                <th>Avg ★</th>
+                <th>Avg *</th>
                 <th>Revenue</th>
                 <th>Payout Owed</th>
                 <th>Actions</th>
@@ -213,7 +213,7 @@ export default function AdminDrivers() {
                       <div className="main">{d.name}</div>
                       <div className="muted">{d.phone}</div>
                     </td>
-                    <td>{d.city || "—"}</td>
+                    <td>{d.city || "-"}</td>
                     <td>
                       <button
                         className={"pill " + (d.available ? "ok" : "off")}
@@ -250,10 +250,10 @@ export default function AdminDrivers() {
                         </a>
                       )}
                     </td>
-                    <td>{stats ? stats.completed : "—"}</td>
-                    <td>{stats ? stats.avgRating.toFixed(2) : "—"}</td>
-                    <td>{stats ? `₦${stats.revenue.toFixed(2)}` : "—"}</td>
-                    <td>{stats ? `₦${stats.payoutOwed.toFixed(2)}` : "—"}</td>
+                    <td>{stats ? stats.completed : "-"}</td>
+                    <td>{stats ? stats.avgRating.toFixed(2) : "-"}</td>
+                    <td>{stats ? `$${stats.revenue.toFixed(2)}` : "-"}</td>
+                    <td>{stats ? `$${stats.payoutOwed.toFixed(2)}` : "-"}</td>
                     <td>
                       <button className="danger" onClick={() => del(d)}>
                         Delete
@@ -276,3 +276,4 @@ export default function AdminDrivers() {
     </div>
   );
 }
+

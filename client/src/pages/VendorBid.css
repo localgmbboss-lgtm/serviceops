@@ -1,4 +1,4 @@
-.vb-wrap {
+﻿.vb-wrap {
     max-width: 720px;
     margin: 0 auto;
     padding: 16px;
@@ -34,7 +34,7 @@
     border-radius: 10px;
     border: 1px solid var(--color-text);
     background: var(--color-text);
-    color: #ffffff;
+    color: #111111;
 }
 
 .muted {
@@ -96,3 +96,4 @@
 .vendorbid-fixed small {
     color: var(--muted);
 }
+

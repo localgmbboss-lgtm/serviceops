@@ -32,7 +32,7 @@ export default function CustomerChoose() {
   const select = async (bidId) => {
     try {
       await api.post(`/api/bids/customer/${token}/select`, { bidId });
-      setMsg("✅ Bid selected! You’ll be contacted shortly.");
+      setMsg(" Bid selected! You'll be contacted shortly.");
       setOpen(false);
       load();
     } catch (e) {
@@ -72,7 +72,7 @@ export default function CustomerChoose() {
                     <div className="muted small">{b.vendorPhone}</div>
                   </div>
                   <div className="cc-metrics">
-                    <span className="chip">₦{Number(b.price).toFixed(0)}</span>
+                    <span className="chip">${Number(b.price).toFixed(0)}</span>
                     <span className="chip">{b.etaMinutes} min</span>
                   </div>
                   <div className="cc-actions">
@@ -87,7 +87,7 @@ export default function CustomerChoose() {
         ) : (
           <p className="muted">
             Bidding is closed{" "}
-            {job?.selectedBidId ? "— a bid was selected." : ""}
+            {job?.selectedBidId ? "- a bid was selected." : ""}
           </p>
         )}
 
@@ -96,3 +96,4 @@ export default function CustomerChoose() {
     </div>
   );
 }
+

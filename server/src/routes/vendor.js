@@ -1,4 +1,4 @@
-﻿// server/src/routes/vendor.js
+// server/src/routes/vendor.js
 import { Router } from "express";
 import Job from "../models/Jobs.js";
 import Customer from "../models/Customer.js";

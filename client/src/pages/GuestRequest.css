@@ -4,7 +4,7 @@
     --white: #ffffff;
     --black: #0f172a;
     --dark-gray: #1f2937;
-    --primary-blue: var(--color-primary, #2563eb);
+    --primary-blue: var(--color-success, #2563eb);
     --primary-blue-dark: var(--color-primary-dark, #1d4ed8);
     --accent-green: var(--color-success, #10b981);
     --alert-red: var(--color-danger, #ef4444);
@@ -60,11 +60,29 @@ body {
 }
 
 .guest-request-container {
+    width: 100%;
+    --guest-request-x-pad: 0;
     max-width: 480px;
     margin: 0 auto;
     background: var(--white);
     min-height: 100vh;
     position: relative;
+    padding-left: var(--guest-request-x-pad);
+    padding-right: var(--guest-request-x-pad);
+}
+
+@media (min-width: 768px) {
+    .guest-request-container {
+        max-width: 960px;
+        --guest-request-x-pad: var(--space-2xl);
+    }
+}
+
+@media (min-width: 1140px) {
+    .guest-request-container {
+        max-width: 1120px;
+        --guest-request-x-pad: var(--space-3xl);
+    }
 }
 
 /* Header Styles - Uber-like */
@@ -248,7 +266,7 @@ body {
 }
 
 .select-wrapper::after {
-    content: "⌄";
+    content: "v";
     position: absolute;
     right: var(--space-md);
     top: 50%;
@@ -326,11 +344,12 @@ body {
     display: grid;
     gap: var(--space-xl);
     margin-top: var(--space-xl);
+    align-items: stretch;
 }
 
 @media (min-width: 900px) {
     .guest-request-container .location-stage {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.15fr);
     }
     .location-card--vehicle {
         grid-column: span 2;
@@ -368,10 +387,11 @@ body {
 }
 
 .guest-request-container .pickup-method-card__options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: var(--space-sm);
-    margin-top: var(--space-sm);
+    margin-top: var(--space-md);
+    flex: 1;
 }
 
 .guest-request-container .pickup-method-card__text {
@@ -421,6 +441,31 @@ body {
 .guest-request-container .pickup-method-card__helper {
     font-size: 0.75rem;
     color: rgba(15, 23, 42, 0.6);
+}
+
+.pickup-method-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: var(--space-md);
+}
+
+.location-card--method {
+    display: flex;
+}
+
+.location-card--method > * {
+    flex: 1;
+}
+
+@media (min-width: 900px) {
+    .location-card--method {
+        padding: var(--space-lg);
+    }
+}
+
+.guest-request-container .pickup-method-card__option {
+    width: 100%;
 }
 .location-card__header {
     display: grid;
@@ -949,8 +994,8 @@ textarea:focus-visible {
 /* Safe Area Support for Notched Devices */
 @supports(padding: max(0px)) {
     .guest-request-container {
-        padding-left: max(var(--space-md), env(safe-area-inset-left));
-        padding-right: max(var(--space-md), env(safe-area-inset-right));
+        padding-left: max(var(--guest-request-x-pad), env(safe-area-inset-left));
+        padding-right: max(var(--guest-request-x-pad), env(safe-area-inset-right));
     }
 
     .form-actions {
@@ -1029,7 +1074,7 @@ textarea:focus-visible {
 
 @media (max-width: 560px) {
     .guest-request-container .pickup-method-card__options {
-        grid-template-columns: 1fr;
+        gap: var(--space-xs);
     }
 }
 

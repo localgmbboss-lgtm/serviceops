@@ -8,7 +8,7 @@ import { requireFields } from "../lib/validate.js";
 const router = Router();
 const isObjId = (s) => mongoose.isValidObjectId(s);
 
-// CREATE customer — POST /api/customers
+// CREATE customer - POST /api/customers
 router.post("/", async (req, res, next) => {
   try {
     requireFields(req.body, ["name", "phone"]);
@@ -22,7 +22,7 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// LIST customers — GET /api/customers
+// LIST customers - GET /api/customers
 router.get("/", async (_req, res, next) => {
   try {
     const list = await Customer.find({}, "name phone").lean();
@@ -33,7 +33,7 @@ router.get("/", async (_req, res, next) => {
 });
 
 /**
- * STATUS — GET /api/customers/:id/status
+ * STATUS - GET /api/customers/:id/status
  * Accepts:
  *  - :id = jobId  -> return that job + driver
  *  - :id = customerId -> return latest (active first, else latest) job for that customer

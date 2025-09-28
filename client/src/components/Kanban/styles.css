@@ -1,4 +1,4 @@
-﻿/* Kanban.css - Advanced UI with Glassmorphism & Water Ripples */
+/* Kanban.css - Advanced UI with Glassmorphism & Water Ripples */
 
 .kanban-container {
     --kanban-primary: var(--color-primary);
@@ -118,8 +118,8 @@
 }
 
 .kanban-pagination-btn:hover:not(:disabled) {
-    background: var(--kanban-primary);
-    color: white;
+    background: var(--kanban-primary-light);
+    color: var(--kanban-gray-900);
     border-color: var(--kanban-primary);
 }
 
@@ -530,8 +530,8 @@
 }
 
 .kanban-action-btn.next {
-    background: var(--kanban-primary);
-    color: white;
+    background: var(--kanban-primary-light);
+    color: var(--kanban-primary-dark);
     border-color: var(--kanban-primary);
 }
 
@@ -542,14 +542,14 @@
 }
 
 .kanban-action-btn.unassign {
-    background: var(--kanban-warning);
-    color: white;
+    background: var(--color-warning-soft);
+    color: var(--kanban-gray-900);
     border-color: var(--kanban-warning);
 }
 
 .kanban-action-btn.escalate {
     background: linear-gradient(135deg, var(--kanban-danger), #d93040);
-    color: #ffffff;
+    color: #111111;
     border-color: transparent;
     box-shadow: 0 6px 14px rgba(250, 77, 86, 0.3);
 }
@@ -566,7 +566,7 @@
 
 .kanban-action-btn.deescalate {
     background: linear-gradient(135deg, var(--kanban-gray-600), #1f2933);
-    color: #ffffff;
+    color: #111111;
     border-color: transparent;
     box-shadow: 0 6px 12px rgba(15, 23, 42, 0.25);
 }
@@ -776,6 +776,9 @@
         border: 1px solid var(--color-text) !important;
     }
 }
+
+
+
 
 
 

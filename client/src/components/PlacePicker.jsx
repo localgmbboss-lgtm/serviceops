@@ -1,4 +1,4 @@
-﻿// client/src/components/PlacePicker.jsx
+// client/src/components/PlacePicker.jsx
 import { useEffect, useRef, useState } from "react";
 import { getGoogleMapsKey } from "../config/env.js";
 
@@ -275,3 +275,4 @@ export default function PlacePicker({
     </div>
   );
 }
+

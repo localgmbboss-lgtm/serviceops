@@ -17,10 +17,10 @@
 
 ## Live Map
 - Driver toggles "Share live location" on /driver.
-- Admin/Customer poll every 5s; map shows fresh (≤60s) vs stale (>60s).
+- Admin/Customer poll every 5s; map shows fresh (60s) vs stale (>60s).
 
 ## Accepted Flow
-Create job → Assign → OnTheWay → Arrived → Completed.
+Create job -> Assign -> OnTheWay -> Arrived -> Completed.
 Completed jobs are locked (API + UI).
 
 ## Deploy

@@ -1,4 +1,4 @@
-.choose.container {
+﻿.choose.container {
     max-width: 760px;
     margin: 0 auto;
     padding: 16px;
@@ -114,7 +114,7 @@
     appearance: none;
     border: none;
     background: var(--color-text);
-    color: #ffffff;
+    color: #111111;
     border-radius: 10px;
     padding: 10px 14px;
     font-weight: 600;
@@ -198,5 +198,6 @@
         justify-content: flex-start;
     }
 }
+
 
 

@@ -7,6 +7,28 @@ import Payment from "../models/Payment.js";
 import { complianceSummary } from "../lib/compliance.js";
 
 const r = Router();
+r.get("/vendors", async (_req, res, next) => {
+  try {
+    const vendors = await Vendor.find({}).sort({ name: 1 }).lean();
+
+    res.json(
+      vendors.map((v) => ({
+        _id: v._id,
+        name: v.name,
+        phone: v.phone || "",
+        email: v.email || "",
+        city: v.city || "",
+        services: Array.isArray(v.services) ? v.services : [],
+        heavyDuty: !!v.heavyDuty,
+        lat: typeof v.lat === "number" ? v.lat : null,
+        lng: typeof v.lng === "number" ? v.lng : null,
+        active: v.active !== false,
+      }))
+    );
+  } catch (e) {
+    next(e);
+  }
+});
 
 // /api/admin/drivers/overview
 r.get("/drivers/overview", async (_req, res, next) => {
@@ -160,3 +182,4 @@ r.get("/vendors/overview", async (_req, res, next) => {
 });
 
 export default r;
+

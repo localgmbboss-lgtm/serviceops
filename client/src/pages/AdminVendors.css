@@ -1,4 +1,4 @@
-.avendors {
+﻿.avendors {
     display: grid;
     gap: 24px;
     padding-bottom: 24px;
@@ -149,7 +149,7 @@
 .avendors .btn {
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     border: none;
-    color: #ffffff;
+    color: #111111;
     padding: 12px 20px;
     border-radius: 999px;
     font-weight: 600;
@@ -406,3 +406,4 @@
         justify-content: space-between;
     }
 }
+

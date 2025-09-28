@@ -71,7 +71,7 @@
   flex-wrap: wrap;
 }
 
-.va-chip--guest {
+.va-chip--customer {
   background: rgba(255, 107, 136, 0.2);
   color: var(--color-primary-soft);
 }
@@ -112,6 +112,11 @@
   color: var(--color-success-soft);
 }
 
+.va-chip--unassigned {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--color-text-muted);
+}
+
 .va-toggle {
   display: inline-flex;
   align-items: center;
@@ -142,7 +147,7 @@
 .va-alert.info {
   border-color: rgba(255, 209, 102, 0.55);
   background: rgba(255, 209, 102, 0.14);
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--color-text-strong, #0f172a);
 }
 
 .va-alert.error {
@@ -409,6 +414,7 @@
   line-height: 1.4;
   color: #0f172a;
   word-break: break-word;
+  white-space: pre-line;
 }
 .va-job__map {
   margin-top: 16px;
@@ -486,7 +492,7 @@
   font-weight: 600;
 }
 
-.va-job__header .va-chip.va-chip--guest {
+.va-job__header .va-chip.va-chip--customer {
   background: rgba(255, 107, 136, 0.2);
   color: #9f1d3c;
   border-color: rgba(255, 107, 136, 0.26);
@@ -874,3 +880,8 @@
     padding: 6px 10px;
   }
 }
+
+
+
+
+

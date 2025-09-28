@@ -69,8 +69,8 @@ export default function CustomerIntake() {
     return (
       <div className="container intake">
         <div className="card">
-          <h2>Request received ✅</h2>
-          <p>We’ve sent your request to nearby operators.</p>
+          <h2>Request received </h2>
+          <p>We've sent your request to nearby operators.</p>
           <p>You can view bids here:</p>
           <p>
             <a className="btn" href={done.customerLink}>
@@ -142,10 +142,10 @@ export default function CustomerIntake() {
           />
           <div className="muted small">
             {form.lat && form.lng
-              ? `Location captured ✓ (${form.lat.toFixed(
+              ? `Location captured  (${form.lat.toFixed(
                   5
                 )}, ${form.lng.toFixed(5)})`
-              : "We’ll try to capture your GPS location automatically."}
+              : "We'll try to capture your GPS location automatically."}
           </div>
           <button onClick={submit}>Submit Request</button>
         </div>
@@ -153,3 +153,4 @@ export default function CustomerIntake() {
     </div>
   );
 }
+

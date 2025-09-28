@@ -86,7 +86,7 @@ export default function CustomerBids() {
                 <div className="muted small">ETA {b.etaMinutes} min</div>
               </div>
               <div className="right">
-                <div className="price">₦{Number(b.price).toFixed(0)}</div>
+                <div className="price">${Number(b.price).toFixed(0)}</div>
                 {data.selectedBidId === b._id ? (
                   <span className="chip ok">Selected</span>
                 ) : (
@@ -103,7 +103,7 @@ export default function CustomerBids() {
         </ul>
         {data.selectedBidId && (
           <p className="muted small">
-            We’ll notify the selected operator. You’ll receive ETA & contact
+            We'll notify the selected operator. You'll receive ETA & contact
             next.
           </p>
         )}
@@ -111,3 +111,4 @@ export default function CustomerBids() {
     </div>
   );
 }
+

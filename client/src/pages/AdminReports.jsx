@@ -205,7 +205,7 @@ export default function AdminReports() {
             <span
               className={`r-filter-status ${loading ? "is-loading" : filtersDirty ? "is-active" : ""}`}
             >
-              {loading ? "Refreshing…" : filtersDirty ? "Custom filters" : "Last 7 days"}
+              {loading ? "Refreshing..." : filtersDirty ? "Custom filters" : "Last 7 days"}
             </span>
             <button
               type="button"
@@ -336,4 +336,5 @@ export default function AdminReports() {
     </div>
   );
 }
+
 

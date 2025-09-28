@@ -1,4 +1,4 @@
-﻿// server/src/routes/jobs.js
+// server/src/routes/jobs.js
 import { Router } from "express";
 import crypto from "crypto";
 import mongoose from "mongoose";
@@ -97,19 +97,165 @@ router.post("/", async (req, res, next) => {
     if (!body.pickupAddress)
       return res.status(400).json({ message: "pickupAddress required" });
 
-    const job = await Job.create({
+    const vendorId = body.vendorId ? String(body.vendorId).trim() : null;
+    let vendorDoc = null;
+    if (vendorId) {
+      assertId(vendorId);
+      vendorDoc = await Vendor.findById(vendorId).lean();
+      if (!vendorDoc) {
+        return res.status(404).json({ message: "Vendor not found" });
+      }
+    }
+
+    const quotedPrice = Number(body.quotedPrice) || 0;
+    const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+
+    const jobPayload = {
       customerId: body.customerId,
       pickupAddress: body.pickupAddress.trim(),
       dropoffAddress: body.dropoffAddress?.trim() || undefined,
       serviceType: body.serviceType?.trim() || "",
-      quotedPrice: Number(body.quotedPrice) || 0,
-      notes: body.notes || "",
+      quotedPrice,
+      notes,
       bidMode: body.bidMode === "fixed" ? "fixed" : "open",
       status: "Unassigned",
       priority: body.priority === "urgent" ? "urgent" : "normal",
-    });
+    };
+
+    if (vendorDoc) {
+      jobPayload.vendorId = vendorDoc._id;
+      jobPayload.vendorName = vendorDoc.name || null;
+      jobPayload.vendorPhone = vendorDoc.phone || null;
+      jobPayload.status = "Assigned";
+      jobPayload.bidMode = "fixed";
+      jobPayload.biddingOpen = false;
+      jobPayload.assignedAt = new Date();
+      jobPayload.finalPrice =
+        Number(body.finalPrice) > 0 ? Number(body.finalPrice) : quotedPrice;
+    }
+
+    const job = await Job.create(jobPayload);
 
     res.status(201).json(job);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.patch("/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    assertId(id);
+
+    const payload = req.body || {};
+    if (!payload || typeof payload !== "object") {
+      return res.status(400).json({ message: "Update payload required" });
+    }
+
+    const job = await Job.findById(id);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    const set = {};
+    const unset = {};
+
+    if (Object.prototype.hasOwnProperty.call(payload, "priority")) {
+      const normalizedPriority = payload.priority === "urgent" ? "urgent" : "normal";
+      set.priority = normalizedPriority;
+      if (normalizedPriority === "urgent") {
+        set.escalatedAt = job.escalatedAt || new Date();
+      } else {
+        unset.escalatedAt = "";
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "finalPrice")) {
+      const finalPrice = Number(payload.finalPrice);
+      if (Number.isFinite(finalPrice)) {
+        set.finalPrice = finalPrice;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "notes")) {
+      set.notes = String(payload.notes);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "vendorId")) {
+      const vendorId = payload.vendorId;
+      if (!vendorId) {
+        set.vendorId = null;
+        set.vendorName = null;
+        set.vendorPhone = null;
+        set.vendorAcceptedToken = null;
+        set.biddingOpen = true;
+      } else {
+        if (!mongoose.isValidObjectId(vendorId)) {
+          return res.status(400).json({ message: "Invalid vendorId" });
+        }
+        const vendor = await Vendor.findById(vendorId).lean();
+        if (!vendor) {
+          return res.status(404).json({ message: "Vendor not found" });
+        }
+        set.vendorId = vendor._id;
+        set.vendorName = vendor.name || null;
+        set.vendorPhone = vendor.phone || null;
+        set.biddingOpen = false;
+        if (!payload.status) {
+          payload.status = "Assigned";
+        }
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "status")) {
+      const nextStatus = payload.status;
+      if (!STAGES.includes(nextStatus)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const currentStatus = job.status;
+      if (nextStatus !== currentStatus) {
+        const allowed = new Set(ALLOWED_NEXT[currentStatus] || []);
+        const currentIndex = STAGES.indexOf(currentStatus);
+        if (currentIndex > 0) {
+          allowed.add(STAGES[currentIndex - 1]);
+        }
+        allowed.add(currentStatus);
+
+        if (!allowed.has(nextStatus)) {
+          return res
+            .status(409)
+            .json({ message: `Cannot move job from ${currentStatus} to ${nextStatus}` });
+        }
+
+        set.status = nextStatus;
+        const now = new Date();
+        if (nextStatus === "Assigned" && !job.assignedAt) set.assignedAt = now;
+        if (nextStatus === "OnTheWay" && !job.onTheWayAt) set.onTheWayAt = now;
+        if (nextStatus === "Arrived" && !job.arrivedAt) set.arrivedAt = now;
+        if (nextStatus === "Completed") {
+          set.completedAt = job.completedAt || now;
+          set.completed = job.completed || now;
+        }
+        if (nextStatus === "Unassigned") {
+          set.vendorId = null;
+          set.vendorName = null;
+          set.vendorPhone = null;
+          set.vendorAcceptedToken = null;
+          set.biddingOpen = true;
+        }
+      }
+    }
+
+    if (!Object.keys(set).length && !Object.keys(unset).length) {
+      return res.json(job.toObject());
+    }
+
+    const update = {};
+    if (Object.keys(set).length) update.$set = set;
+    if (Object.keys(unset).length) update.$unset = unset;
+
+    await Job.updateOne({ _id: id }, update);
+    const refreshed = await Job.findById(id).lean();
+    res.json(refreshed);
   } catch (e) {
     next(e);
   }
@@ -411,6 +557,9 @@ router.get("/:id", async (req, res, next) => {
 });
 
 export default router;
+
+
+
 
 
 

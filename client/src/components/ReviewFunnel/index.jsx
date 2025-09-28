@@ -24,7 +24,7 @@ export default function ReviewFunnel({ jobId }) {
         <p className="rf-thanks">
           {rating >= 5
             ? "Thanks! We may feature this review on our public routes."
-            : "Thanks for the feedback — we’ve saved it privately."}
+            : "Thanks for the feedback - we've saved it privately."}
         </p>
       </div>
     );
@@ -41,7 +41,7 @@ export default function ReviewFunnel({ jobId }) {
             aria-pressed={n === rating}
             type="button"
           >
-            ★
+            *
           </button>
         ))}
         <span className="rf-score">{rating}/5</span>
@@ -64,3 +64,4 @@ export default function ReviewFunnel({ jobId }) {
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
 
 export default function VendorHeroHeader({
@@ -36,6 +37,9 @@ export default function VendorHeroHeader({
         )}
       </div>
       <div className="va-hero__meta">
+        <Link className="btn ghost" to="/vendor/profile">
+          Update profile
+        </Link>
         <div className="va-chip">Last sync {lastSyncLabel}</div>
         <label className="va-toggle">
           <input
@@ -78,3 +82,4 @@ VendorHeroHeader.defaultProps = {
   cityFilter: false,
   onToggleCityFilter: undefined,
 };
+

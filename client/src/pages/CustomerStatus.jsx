@@ -31,7 +31,7 @@ export default function CustomerChoose() {
     try {
       await api.post(`/api/bids/customer/${token}/select`, { bidId });
       await load();
-      setMsg("Vendor selected ✅");
+      setMsg("Vendor selected ");
     } catch (e) {
       setMsg(e?.response?.data?.message || "Failed to select");
     } finally {
@@ -68,7 +68,7 @@ export default function CustomerChoose() {
       {data.job.selectedBidId ? (
         <div className="card">
           <h3>All set!</h3>
-          <p>We’ve assigned your driver. You can track progress here:</p>
+          <p>We've assigned your driver. You can track progress here:</p>
           {statusPath && (
             <Link className="btn" to={statusPath}>
               Open Status
@@ -102,3 +102,4 @@ export default function CustomerChoose() {
     </div>
   );
 }
+

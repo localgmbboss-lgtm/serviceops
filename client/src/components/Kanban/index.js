@@ -12,7 +12,7 @@ const PAYMENT_METHOD_LABELS = {
   other: "Other",
 };
 
-const formatCurrency = (value, currency = "NGN") => {
+const formatCurrency = (value, currency = "USD") => {
   if (value == null) return "-";
   const num = Number(value);
   if (!Number.isFinite(num)) return "-";
@@ -71,8 +71,10 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
 
   const sortedJobs = [...filteredJobs].sort((a, b) => {
     if (sortBy === "priority") {
-      if (a.priority === "urgent" && b.priority !== "urgent") return -1;
-      if (a.priority !== "urgent" && b.priority === "urgent") return 1;
+      const aPriority = (a.priority || "").toLowerCase();
+      const bPriority = (b.priority || "").toLowerCase();
+      if (aPriority === "urgent" && bPriority !== "urgent") return -1;
+      if (aPriority !== "urgent" && bPriority === "urgent") return 1;
       return 0;
     }
     if (sortBy === "service") {
@@ -133,6 +135,13 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
     }, 600);
   };
 
+  const setCardUrgency = (jobId, urgent) => {
+    const card = cardRefs.current[jobId];
+    if (card) {
+      card.classList.toggle("urgent", !!urgent);
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === "Escape" && expandedCard) {
@@ -149,7 +158,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
       {/* Controls */}
       <div className="kanban-controls">
         <div className="kanban-search">
-          <span className="kanban-search-icon">🔍</span>
+          <span className="kanban-search-icon"></span>
           <input
             type="text"
             placeholder="Search jobs..."
@@ -177,7 +186,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             disabled={safeCurrentPage === 1}
           >
-            ◀
+            -
           </button>
           <span className="kanban-pagination-info">
             Page {safeCurrentPage} of {totalPages || 1}
@@ -189,7 +198,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
             }
             disabled={safeCurrentPage === totalPages || totalPages === 0}
           >
-            ▶
+            >
           </button>
         </div>
       </div>
@@ -212,20 +221,21 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
               <div className="kanban-cards">
                 {items.length === 0 ? (
                   <div className="kanban-empty-state">
-                    <div className="kanban-empty-icon">○</div>
+                    <div className="kanban-empty-icon">o</div>
                     <p>No jobs in this stage</p>
                   </div>
                 ) : (
                   items.map((j) => {
                     const next = nextOf(j.status);
                     const prev = prevOf(j.status);
+                    const isUrgent = (j.priority || "").toLowerCase() === "urgent";
                     const isExpanded = expandedCard === j._id;
 
                     return (
                       <div
                         key={j._id}
                         className={`kanban-card ${
-                          j.priority === "urgent" ? "urgent" : ""
+                          isUrgent ? "urgent" : ""
                         } ${j.flags?.underReport ? "flagged" : ""} ${
                           j.reportedPayment?.amount ? "has-report" : ""
                         } ${isExpanded ? "expanded" : ""}`}
@@ -240,7 +250,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                             <span className="kanban-card-service">
                               {j.serviceType || "Service"}
                             </span>
-                            {j.priority === "urgent" && (
+                            {isUrgent && (
                               <span className="kanban-card-priority urgent">
                                 URGENT
                               </span>
@@ -249,7 +259,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
 
                           {j.quotedPrice && (
                             <div className="kanban-card-price">
-                              {formatCurrency(j.quotedPrice, j.currency || "NGN")}
+                              {formatCurrency(j.quotedPrice, j.currency || "USD")}
                             </div>
                           )}
                         </div>
@@ -281,21 +291,21 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                           {j.reportedPayment?.amount > 0 && (
                             <div className="kanban-card-metrics">
                               <span className="kanban-card-metric">
-                                Received {formatCurrency(j.reportedPayment.amount, j.currency || "NGN")}
+                                Received {formatCurrency(j.reportedPayment.amount, j.currency || "USD")}
                               </span>
                               <span
                                 className={`kanban-card-metric status-${
                                   j.commission?.status || "pending"
                                 }`}
                               >
-                                Commission {formatCurrency(j.commission?.amount || 0, j.currency || "NGN")}
+                                Commission {formatCurrency(j.commission?.amount || 0, j.currency || "USD")}
                               </span>
                             </div>
                           )}
 
                           {j.flags?.underReport && (
                             <div className="kanban-card-flag warning">
-                              ⚠️ {j.flags.reason || "Reported below expected amount"}
+                               {j.flags.reason || "Reported below expected amount"}
                             </div>
                           )}
                         </div>
@@ -325,7 +335,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                               <div className="kanban-card-financial">
                                 <span className="label">Reported</span>
                                 <span className="value">
-                                  {formatCurrency(j.reportedPayment?.amount || 0, j.currency || "NGN")}
+                                  {formatCurrency(j.reportedPayment?.amount || 0, j.currency || "USD")}
                                 </span>
                                 <span className="meta">
                                   {methodLabel(j.reportedPayment?.method)} | {formatDateTime(j.reportedPayment?.reportedAt)}
@@ -334,7 +344,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                               <div className="kanban-card-financial">
                                 <span className="label">Commission</span>
                                 <span className="value">
-                                  {formatCurrency(j.commission?.amount || 0, j.currency || "NGN")}
+                                  {formatCurrency(j.commission?.amount || 0, j.currency || "USD")}
                                 </span>
                                 <span className={`status-pill status-${j.commission?.status || "pending"}`}>
                                   {j.commission?.status || "pending"}
@@ -362,7 +372,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                                   move(j, prev);
                                 }}
                               >
-                                ◀ Back
+                                - Back
                               </button>
                             )}
 
@@ -375,7 +385,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                                   move(j, next);
                                 }}
                               >
-                                Next ▶
+                                Next >
                               </button>
                             )}
                           </div>
@@ -390,7 +400,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                                   move(j, "Completed");
                                 }}
                               >
-                                ✓ Complete
+                                 Complete
                               </button>
                             )}
 
@@ -403,7 +413,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                                   move(j, "Unassigned", { vendorId: null });
                                 }}
                               >
-                                ↺ Unassign
+                                 Unassign
                               </button>
                             ) : (
                               <span className="kanban-no-driver">No vendor</span>
@@ -411,12 +421,13 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                           </div>
 
                           <div className="kanban-action-group">
-                            {j.priority !== "urgent" ? (
+                            {!isUrgent ? (
                               <button
                                 className="kanban-action-btn escalate priority-pulse"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   createRipple(event);
+                                  setCardUrgency(j._id, true);
                                   onUpdateJob?.(j._id, { priority: "urgent" });
                                 }}
                                 type="button"
@@ -431,6 +442,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   createRipple(event);
+                                  setCardUrgency(j._id, false);
                                   onUpdateJob?.(j._id, { priority: "normal" });
                                 }}
                                 type="button"
@@ -461,7 +473,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
             kanbanBoard?.scrollBy({ left: -300, behavior: "smooth" });
           }}
         >
-          ◀
+          -
         </button>
 
         <div className="kanban-mobile-indicators">
@@ -487,9 +499,14 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
             kanbanBoard?.scrollBy({ left: 300, behavior: "smooth" });
           }}
         >
-          ▶
+          >
         </button>
       </div>
     </div>
   );
 }
+
+
+
+
+

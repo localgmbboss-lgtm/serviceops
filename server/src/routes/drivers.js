@@ -4,7 +4,7 @@ import { expectNumber, requireFields } from '../lib/validate.js';
 
 const router = Router();
 
-// CREATE driver  — POST /api/drivers
+// CREATE driver  - POST /api/drivers
 router.post('/', async (req, res, next) => {
   try {
     requireFields(req.body, ['name', 'phone', 'city']);
@@ -22,7 +22,7 @@ router.post('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// LIST  — GET /api/drivers?available=true
+// LIST  - GET /api/drivers?available=true
 router.get('/', async (req, res, next) => {
   try {
     const q = {};
@@ -32,7 +32,7 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// PATCH availability/docs — PATCH /api/drivers/:id
+// PATCH availability/docs - PATCH /api/drivers/:id
 router.patch('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -48,7 +48,7 @@ router.patch('/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// UPDATE location — PATCH /api/drivers/:id/location  { lat, lng }
+// UPDATE location - PATCH /api/drivers/:id/location  { lat, lng }
 router.patch('/:id/location', async (req, res, next) => {
   try {
     const { id } = req.params;

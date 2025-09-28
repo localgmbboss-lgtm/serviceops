@@ -1,4 +1,4 @@
-﻿// server/src/models/Vendor.js
+// server/src/models/Vendor.js
 import mongoose from "mongoose";
 
 const VendorSchema = new mongoose.Schema(
@@ -18,6 +18,7 @@ const VendorSchema = new mongoose.Schema(
     services: [{ type: String, trim: true }], // e.g. ["towing service","jumpstart","heavy duty"]
     heavyDuty: { type: Boolean, default: false },
     radiusKm: { type: Number, default: 25 },
+    baseAddress: { type: String, trim: true },
 
     lat: { type: Number }, // optional for geo filtering
     lng: { type: Number },
@@ -39,3 +40,5 @@ const VendorSchema = new mongoose.Schema(
 );
 
 export default mongoose.model("Vendor", VendorSchema);
+
+

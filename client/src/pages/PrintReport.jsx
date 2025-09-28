@@ -24,12 +24,12 @@ export default function PrintReport(){
   return (
     <div className="print-report">
       <h1>ServiceOps Report</h1>
-      <div className="sub">Period: {new Date(data.from).toLocaleDateString()} – {new Date(data.to).toLocaleDateString()} {service ? `(Service: ${service})` : ""}</div>
+      <div className="sub">Period: {new Date(data.from).toLocaleDateString()} - {new Date(data.to).toLocaleDateString()} {service ? `(Service: ${service})` : ""}</div>
 
       <section className="grid3">
         <div className="block"><div className="lbl">Jobs</div><div className="val">{data.totals?.count||0}</div></div>
         <div className="block"><div className="lbl">Completed</div><div className="val">{data.totals?.completed||0}</div></div>
-        <div className="block"><div className="lbl">Gross</div><div className="val">₦{(data.totals?.gross||0).toFixed(2)}</div></div>
+        <div className="block"><div className="lbl">Gross</div><div className="val">${(data.totals?.gross||0).toFixed(2)}</div></div>
       </section>
 
       <section className="grid2">
@@ -58,12 +58,12 @@ export default function PrintReport(){
       <section>
         <h3>Top Drivers</h3>
         <table>
-          <thead><tr><th>Name</th><th>City</th><th className="num">Jobs</th><th className="num">Revenue (₦)</th></tr></thead>
+          <thead><tr><th>Name</th><th>City</th><th className="num">Jobs</th><th className="num">Revenue ($)</th></tr></thead>
           <tbody>
             {(data.topDrivers||[]).map(d=>(
               <tr key={d.driverId || d.name}>
-                <td>{d.name||"—"}</td>
-                <td>{d.city||"—"}</td>
+                <td>{d.name||"-"}</td>
+                <td>{d.city||"-"}</td>
                 <td className="num">{d.jobs}</td>
                 <td className="num">{Math.round(d.revenue)}</td>
               </tr>
@@ -75,3 +75,4 @@ export default function PrintReport(){
     </div>
   );
 }
+

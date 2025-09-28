@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { loadGoogleMaps } from "../../lib/loadGoogleMaps";
 import { getGoogleMapsKey } from "../../config/env.js";
 import "./styles.css";
@@ -46,7 +46,7 @@ function createPinIcon(g, label, options = {}) {
     : "";
   const displayLabel = rawLabel || badgeLabel;
   const background = options.background || "#2563eb";
-  const color = options.color || "#ffffff";
+  const color = options.color || "#111111";
   const textColor = options.textColor || color;
   const avatarUrl = sanitizeUrl(options.avatarUrl || options.avatar || options.imageUrl);
 
@@ -56,7 +56,7 @@ function createPinIcon(g, label, options = {}) {
     const pillMarkup = pillText
       ? `<g>
           <rect x="10" y="40" width="24" height="12" rx="6" fill="rgba(15,23,42,0.75)" />
-          <text x="22" y="48" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600" fill="#ffffff">${pillText}</text>
+          <text x="22" y="48" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="600" fill="#111111">${pillText}</text>
         </g>`
       : "";
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="60" viewBox="0 0 44 60">
@@ -66,7 +66,7 @@ function createPinIcon(g, label, options = {}) {
         </clipPath>
       </defs>
       <path d="M22 0C11.402 0 2.75 8.652 2.75 19.25c0 13.04 14.38 28.48 18.53 32.89a3 3 0 0 0 4.44 0C27.87 47.73 42.25 32.29 42.25 19.25 42.25 8.652 32.598 0 22 0z" fill="${background}"/>
-      <circle cx="22" cy="20" r="15" fill="#ffffff" opacity="0.92"/>
+      <circle cx="22" cy="20" r="15" fill="#111111" opacity="0.92"/>
       <image href="${avatarUrl}" x="7" y="5" width="30" height="30" clip-path="url(#${clipId})" preserveAspectRatio="xMidYMid slice"/>
       ${pillMarkup}
     </svg>`;
@@ -186,7 +186,7 @@ export default function GMap({
   const destinationColor =
     destinationMeta?.color || (destinationMeta?.role === "customer" ? "#f97316" : "#0ea5e9");
   const destinationTextColor =
-    destinationMeta?.textColor || (destinationMeta?.role === "customer" ? "#0f172a" : "#ffffff");
+    destinationMeta?.textColor || (destinationMeta?.role === "customer" ? "#0f172a" : "#111111");
   const destinationAvatar = destinationMeta?.avatarUrl || null;
   const destinationTitle = destinationMeta?.title ||
     (destinationMeta?.role === "customer" ? "Customer" : "Destination");
@@ -304,7 +304,7 @@ export default function GMap({
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       const label = d?.label || (idx === 0 ? "DRV" : "CAR");
       const background = d?.color || d?.pinColor || (idx === 0 ? "#2563eb" : "#334155");
-      const textColor = d?.textColor || d?.pinTextColor || "#ffffff";
+      const textColor = d?.textColor || d?.pinTextColor || "#111111";
       const avatarUrl = sanitizeUrl(
         d?.avatarUrl ||
         d?.avatar ||
@@ -359,8 +359,8 @@ export default function GMap({
         title: landmark?.title || landmark?.label || "Location",
         icon: createPinIcon(g, landmark?.label || "LOC", {
           background: landmark?.color || "#0f172a",
-          color: landmark?.textColor || "#ffffff",
-          textColor: landmark?.textColor || "#ffffff",
+          color: landmark?.textColor || "#111111",
+          textColor: landmark?.textColor || "#111111",
           avatarUrl: landmark?.avatarUrl || null
         })
       });
@@ -421,6 +421,7 @@ export default function GMap({
     </div>
   );
 }
+
 
 
 

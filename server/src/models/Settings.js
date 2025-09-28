@@ -1,4 +1,4 @@
-﻿// server/src/models/Settings.js
+// server/src/models/Settings.js
 import mongoose from "mongoose";
 
 const SettingsSchema = new mongoose.Schema(
@@ -23,9 +23,9 @@ const SettingsSchema = new mongoose.Schema(
 
     // 3) Defaults (global)
     defaults: {
-      currency: { type: String, default: "NGN" },
+      currency: { type: String, default: "USD" },
       defaultCity: { type: String, default: "" },
-      // store as 0â€“1 internally (UI can accept â€œ60â€ and convert to 0.6)
+      // store as 0-1 internally (UI can accept "60" and convert to 0.6)
       defaultEarningsSplit: { type: Number, default: 0.6, min: 0, max: 1 },
     },
 
@@ -58,4 +58,5 @@ const SettingsSchema = new mongoose.Schema(
 );
 
 export default mongoose.model("Settings", SettingsSchema);
+
 

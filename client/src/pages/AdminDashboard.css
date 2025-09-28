@@ -1,4 +1,4 @@
-/* AdminDashboard.css — SCOPED to .admindash to prevent bleed */
+﻿/* AdminDashboard.css - SCOPED to .admindash to prevent bleed */
 
 /* Put design tokens on the root dashboard wrapper, not :root */
 .admindash {
@@ -104,7 +104,7 @@
 .admindash .btn {
   background: var(--brand);
   border: 1px solid var(--brand);
-  color: #ffffff;
+  color: #111111;
   padding: 10px 16px;
   border-radius: var(--r-sm);
   font-weight: 700;
@@ -206,7 +206,7 @@
   font-weight: 700;
   color: var(--color-text)
 }
-/* Section spacing so components don’t crowd */
+/* Section spacing so components don't crowd */
 .admindash section {
   margin-bottom: 24px;
 }
@@ -223,13 +223,13 @@
 }
 
 
-/* KPI cards — compact height */
+/* KPI cards - compact height */
 .admindash .kpi-card {
   flex: 0 0 auto;
   background: #ffffff;
   border: 1px solid var(--border);
   border-radius: 12px;
-  /* ↓ tighten padding and height */
+  /* v tighten padding and height */
   padding: 10px 12px;
   min-height: 64px;
   line-height: 1.15;
@@ -365,7 +365,7 @@
   margin-top: var(--s-3)
 }
 
-/* Charts — CSS controls height; JS sizes canvas to clientHeight */
+/* Charts - CSS controls height; JS sizes canvas to clientHeight */
 .admindash .chart-canvas {
   width: 100%;
   height: var(--chart-h);
@@ -601,10 +601,17 @@
     justify-content: center
   }
 
-  /* KPIs remain flex with small gap; no grid overrides */
+    /* Stack KPI cards for smaller screens */
   .admindash .kpis {
-    gap: var(--s-3)
+    flex-direction: column;
+    gap: var(--s-3);
   }
+
+  .admindash .kpi-card {
+    max-width: none;
+    width: 100%;
+  }
+
 
   .admindash .section-title {
     font-size: 16px
@@ -654,6 +661,8 @@
     justify-content: flex-start;
   }
 }
+
+
 
 
 

@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import "./PublicCustomerChoose.css";
 
 export default function PublicCustomerChoose() {
-  // ✅ read the correct route param
+  //  read the correct route param
   const { customerToken } = useParams();
   const nav = useNavigate();
 
@@ -77,7 +77,7 @@ export default function PublicCustomerChoose() {
     }
   };
 
-  // Sort by price (asc), then ETA (asc) – nicer for customers
+  // Sort by price (asc), then ETA (asc) - nicer for customers
   const sortedBids = useMemo(() => {
     return [...bids].sort((a, b) => {
       const priceCmp = (a.price ?? 0) - (b.price ?? 0);
@@ -134,7 +134,7 @@ export default function PublicCustomerChoose() {
         {sortedBids.length === 0 ? (
           <div className="empty">
             <p className="muted">
-              Waiting for bids... we’ve notified nearby vendors. This page updates
+              Waiting for bids... we've notified nearby vendors. This page updates
               automatically.
             </p>
           </div>
@@ -149,7 +149,7 @@ export default function PublicCustomerChoose() {
                   </div>
                   <div className="meta">
                     <span className="price">${Number(b.price).toFixed(2)}</span>
-                    <span className="dot">•</span>
+                    <span className="dot">*</span>
                     <span className="eta">ETA {b.etaMinutes} min</span>
                   </div>
                 </div>
@@ -177,5 +177,6 @@ export default function PublicCustomerChoose() {
     </div>
   );
 }
+
 
 

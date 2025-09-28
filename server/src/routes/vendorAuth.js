@@ -12,6 +12,13 @@ function signToken(vendorId) {
   return jwt.sign({ vid: String(vendorId) }, JWT_SECRET, { expiresIn: "30d" });
 }
 
+function normalizePhone(input = "") {
+  const trimmed = String(input).trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("+")) return "+" + trimmed.slice(1).replace(/\D+/g, "");
+  return trimmed.replace(/\D+/g, "");
+}
+
 function sanitizeVendor(v) {
   if (!v) return null;
   return {
@@ -23,6 +30,7 @@ function sanitizeVendor(v) {
     services: Array.isArray(v.services) ? v.services : [],
     heavyDuty: !!v.heavyDuty,
     radiusKm: typeof v.radiusKm === "number" ? v.radiusKm : 25,
+    baseAddress: v.baseAddress || null,
     lat: typeof v.lat === "number" ? v.lat : null,
     lng: typeof v.lng === "number" ? v.lng : null,
     active: v.active !== false,
@@ -57,12 +65,14 @@ router.post("/register", async (req, res, next) => {
       radiusKm,
       lat,
       lng,
+      baseAddress,
     } = req.body || {};
 
     name = String(name || "").trim();
-    phone = phone ? String(phone).trim() : undefined;
+    phone = normalizePhone(phone);
     email = email ? String(email).trim().toLowerCase() : undefined;
     city = city ? String(city).trim() : undefined;
+    baseAddress = baseAddress ? String(baseAddress).trim() : undefined;
 
     if (!name || !password || (!phone && !email)) {
       return res
@@ -87,9 +97,10 @@ router.post("/register", async (req, res, next) => {
 
     const v = await Vendor.create({
       name,
-      phone,
+      phone: phone || undefined,
       email,
       city,
+      baseAddress,
       passHash,
       services: Array.isArray(services) ? services.map(String) : [],
       heavyDuty: !!heavyDuty,
@@ -139,6 +150,34 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
+// ---- POST /api/vendor/auth/phone-login ----
+// Accepts: phone only; creates login session without password.
+router.post("/phone-login", async (req, res, next) => {
+  try {
+    const phone = normalizePhone(req.body?.phone);
+    if (!phone) {
+      return res.status(400).json({ message: "Enter a valid phone number" });
+    }
+
+    const vendor = await Vendor.findOne({ phone }).exec();
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({
+          message:
+            "We couldn't find a vendor with that number. Please contact support to get set up.",
+        });
+    }
+
+    vendor.lastLoginAt = new Date();
+    await vendor.save();
+
+    const token = signToken(vendor._id);
+    res.json({ token, vendor: sanitizeVendor(vendor) });
+  } catch (e) {
+    next(e);
+  }
+});
 // ---- GET /api/vendor/auth/me ----
 // Use this on VendorApp load to restore the session
 router.get("/me", requireVendorAuth, async (req, res, next) => {
@@ -158,11 +197,12 @@ router.patch("/profile", requireVendorAuth, async (req, res, next) => {
     const v = await Vendor.findById(req.vendorId);
     if (!v) return res.status(404).json({ message: "Vendor not found" });
 
-    const { name, city, services, heavyDuty, radiusKm, lat, lng, active } =
+    const { name, city, services, heavyDuty, radiusKm, lat, lng, active, baseAddress } =
       req.body || {};
 
     if (typeof name === "string") v.name = name.trim();
     if (typeof city === "string") v.city = city.trim();
+    if (typeof baseAddress === "string") v.baseAddress = baseAddress.trim();
     if (Array.isArray(services)) v.services = services.map(String);
     if (typeof heavyDuty === "boolean") v.heavyDuty = heavyDuty;
     if (Number.isFinite(Number(radiusKm))) v.radiusKm = Number(radiusKm);
@@ -178,3 +218,10 @@ router.patch("/profile", requireVendorAuth, async (req, res, next) => {
 });
 
 export default router;
+
+
+
+
+
+
+
