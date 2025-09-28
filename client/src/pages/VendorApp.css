@@ -70,11 +70,7 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-
-.va-chip--customer {
-  background: rgba(255, 107, 136, 0.2);
-  color: var(--color-primary-soft);
-}
+
 
 .va-chip--heavy {
   background: rgba(255, 209, 102, 0.18);
@@ -880,6 +876,7 @@
     padding: 6px 10px;
   }
 }
+
 
 
 

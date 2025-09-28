@@ -671,16 +671,14 @@ export default function VendorApp() {
                         <div className="va-job__header">
                           <div className="va-job__title">{job.serviceType || "Service"}</div>
                           <div className="va-chip-group">
-                            {job.guestRequest && (
-                              <span className="va-chip va-chip--customer">Customer</span>
-                            )}
                             {job.heavyDuty && (
                               <span className="va-chip va-chip--heavy">Heavy duty</span>
                             )}
-                            <span className={`va-chip va-chip--mode ${job.bidMode}`}>
-                              {job.bidMode === "fixed" ? "Fixed price" : "Bid only"}
-                            </span>
-                            {hasBid && <span className="va-chip va-chip--success">Bid placed</span>}
+                            {job.bidMode === "fixed" && (
+                              <span className={`va-chip va-chip--mode ${job.bidMode}`}>
+                                Fixed price
+                              </span>
+                            )}
                           </div>
                         </div>
                         <p className="va-job__address">{job.pickupAddress}</p>
@@ -1096,6 +1094,8 @@ export default function VendorApp() {
     </div>
   );
 }
+
+
 
 
 

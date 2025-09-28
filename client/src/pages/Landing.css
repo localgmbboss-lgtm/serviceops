@@ -1068,5 +1068,36 @@
     color: #111827;
 }
 
+.landing-support {
+    margin-top: clamp(24px, 5vw, 48px);
+    padding: clamp(18px, 4vw, 28px);
+    text-align: center;
+    display: grid;
+    gap: 8px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+}
 
+.landing-support__title {
+    margin: 0;
+    font-size: clamp(18px, 3vw, 22px);
+    font-weight: 700;
+    color: var(--color-text);
+}
 
+.landing-support__copy {
+    margin: 0;
+    color: var(--muted);
+    font-size: clamp(14px, 2.5vw, 16px);
+}
+
+.landing-support__phone {
+    color: var(--color-primary);
+    font-weight: 600;
+    text-decoration: none;
+    margin-left: 6px;
+}
+
+.landing-support__phone:hover {
+    text-decoration: underline;
+}
