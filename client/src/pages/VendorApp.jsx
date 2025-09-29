@@ -172,9 +172,10 @@ export default function VendorApp() {
   const [bidError, setBidError] = useState("");
   const [bidSubmitting, setBidSubmitting] = useState(false);
 
+  const { publish } = useNotifications();
+
   const nav = useNavigate();
   const pollRef = useRef(null);
-  const { publish } = useNotifications();
   const openJobsSnapshotRef = useRef(new Map());
   const openJobsInitializedRef = useRef(false);
   const assignedSnapshotRef = useRef(new Map());
@@ -322,11 +323,25 @@ export default function VendorApp() {
       }
 
       if (previousJob.status !== job.status && job.status) {
+        const etaLabel =
+          job.etaMinutes || job.vendorEtaMinutes || job.suggestedEtaMinutes;
+        let body;
+        if (job.status === "OnTheWay") {
+          body = etaLabel
+            ? `You're en route. Target arrival in ${etaLabel} minutes.`
+            : "You're marked as en route to the customer.";
+        } else if (job.status === "Arrived") {
+          body = "Marked on-site with the customer.";
+        } else if (job.status === "Completed") {
+          body = "Job marked complete. Don't forget to close out paperwork.";
+        } else {
+          body = job.serviceType
+            ? `${job.serviceType} is now ${job.status}.`
+            : `Assigned job status changed to ${job.status}.`;
+        }
         publish({
-          title: "Job status: " + job.status,
-          body: job.serviceType
-            ? job.serviceType + " is now " + job.status + "."
-            : "Assigned job status changed to " + job.status + ".",
+          title: `${job.serviceType || "Job"}: ${job.status}`,
+          body,
           severity: job.status === "Completed" ? "success" : "info",
           meta: {
             role: "vendor",
@@ -467,6 +482,7 @@ export default function VendorApp() {
       } catch (error) {}
     }
   };
+
 
   const openBidSheet = (job) => {
     const eta = suggestedEta(job);
@@ -988,6 +1004,14 @@ export default function VendorApp() {
         </div>
       </section>
 
+      <footer className="va-support card" role="contentinfo">
+        <p className="va-support__title">Need assistance?</p>
+        <p className="va-support__copy">
+          Call our dispatch team at{" "}
+          <a className="va-support__phone" href="tel:+18883623743">1 (888) 362-3743</a>
+        </p>
+      </footer>
+
       {bidSheet?.job && (
         <div className="va-sheet" role="dialog" aria-modal="true">
           <div className="va-sheet__backdrop" onClick={closeBidSheet} />
@@ -1094,10 +1118,4 @@ export default function VendorApp() {
     </div>
   );
 }
-
-
-
-
-
-
 

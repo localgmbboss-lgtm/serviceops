@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
+import GMap from "../components/GMap";
 
 const ALLOWED_NEXT = {
   Unassigned: ["Assigned"],
@@ -21,6 +22,13 @@ const PAYMENT_OPTIONS = [
 
 const methodLabel = (value) =>
   PAYMENT_OPTIONS.find((opt) => opt.value === value)?.label || "-";
+
+const toCoords = (lat, lng) => {
+  const latNum = Number(lat);
+  const lngNum = Number(lng);
+  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
+  return { lat: latNum, lng: lngNum };
+};
 
 const formatCurrency = (value) => {
   if (value == null) return "-";
@@ -115,7 +123,67 @@ export default function VendorPortal() {
 
   const job = payload?.job;
   const customer = payload?.customer;
+  const vendor = payload?.vendor;
   const nexts = useMemo(() => (job ? ALLOWED_NEXT[job.status] || [] : []), [job]);
+
+  const pickupCoords = useMemo(() => toCoords(job?.pickupLat, job?.pickupLng), [job?.pickupLat, job?.pickupLng]);
+  const dropoffCoords = useMemo(
+    () => toCoords(job?.dropoffLat, job?.dropoffLng),
+    [job?.dropoffLat, job?.dropoffLng]
+  );
+  const vendorCoords = useMemo(() => toCoords(vendor?.lat, vendor?.lng), [vendor?.lat, vendor?.lng]);
+  const mapDrivers = useMemo(() => {
+    if (!vendorCoords) return [];
+    const initials = vendor?.name
+      ? vendor.name
+          .trim()
+          .split(/\s+/)
+          .map((part) => part[0])
+          .filter(Boolean)
+          .join("")
+          .slice(0, 3)
+          .toUpperCase()
+      : "BASE";
+    return [
+      {
+        lat: vendorCoords.lat,
+        lng: vendorCoords.lng,
+        label: initials || "BASE",
+        title: vendor?.baseAddress || vendor?.name || "Vendor base",
+        color: "#1f2937",
+        textColor: "#ffffff",
+      },
+    ];
+  }, [vendorCoords, vendor?.name, vendor?.baseAddress]);
+
+  const mapDestination = useMemo(
+    () =>
+      pickupCoords
+        ? {
+            position: pickupCoords,
+            role: "customer",
+            title: job?.pickupAddress || "Pickup location",
+            label: "Pickup",
+          }
+        : null,
+    [pickupCoords, job?.pickupAddress]
+  );
+
+  const mapLandmarks = useMemo(() => {
+    if (!dropoffCoords) return [];
+    return [
+      {
+        position: dropoffCoords,
+        label: "Drop",
+        title: job?.dropoffAddress || "Drop-off",
+        color: "#0ea5e9",
+        textColor: "#0f172a",
+      },
+    ];
+  }, [dropoffCoords, job?.dropoffAddress]);
+
+  const mapCenter = useMemo(() => vendorCoords || pickupCoords || null, [vendorCoords, pickupCoords]);
+  const canShowRoute = Boolean(vendorCoords && pickupCoords);
 
   if (err)
     return (
@@ -164,6 +232,55 @@ export default function VendorPortal() {
               <dd>{job.status}</dd>
             </div>
           </dl>
+
+          <section className="vp-map">
+            <h3 className="section-title">Route preview</h3>
+            {pickupCoords || vendorCoords ? (
+              <>
+                <GMap
+                  center={mapCenter || undefined}
+                  drivers={vendorCoords ? mapDrivers : []}
+                  destination={mapDestination}
+                  landmarks={mapLandmarks}
+                  showRoute={canShowRoute}
+                />
+                <div className="vp-map-legend">
+                  {vendor?.baseAddress && (
+                    <div className="vp-map-row">
+                      <strong>Base</strong>
+                      <span>{vendor.baseAddress}</span>
+                    </div>
+                  )}
+                  {job.pickupAddress && (
+                    <div className="vp-map-row">
+                      <strong>Pickup</strong>
+                      <span>{job.pickupAddress}</span>
+                    </div>
+                  )}
+                  {job.dropoffAddress && (
+                    <div className="vp-map-row">
+                      <strong>Drop-off</strong>
+                      <span>{job.dropoffAddress}</span>
+                    </div>
+                  )}
+                </div>
+                {!pickupCoords && (
+                  <p className="muted small">
+                    The pickup address is set, but we are waiting on precise GPS coordinates for routing.
+                  </p>
+                )}
+                {!vendorCoords && (
+                  <p className="muted small">
+                    Add your base location in the vendor profile to unlock turn-by-turn directions.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="muted small">
+                Waiting on precise pickup details. The map will appear as soon as the location is confirmed.
+              </p>
+            )}
+          </section>
 
           {job.status !== "Completed" && (
             <div className="vp-actions">
@@ -329,5 +446,11 @@ export default function VendorPortal() {
     </div>
   );
 }
+
+
+
+
+
+
 
 

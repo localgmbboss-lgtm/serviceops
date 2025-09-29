@@ -2,6 +2,7 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import Job from "../models/Jobs.js";
 import Customer from "../models/Customer.js";
+import Vendor from "../models/Vendor.js";
 
 const router = Router();
 
@@ -14,6 +15,10 @@ router.get("/:token", async (req, res, next) => {
       return res.status(404).json({ message: "Invalid or expired link" });
 
     const customer = await Customer.findById(job.customerId).lean();
+    const vendor = job.vendorId
+      ? await Vendor.findById(job.vendorId, "name phone baseAddress lat lng").lean()
+      : null;
+
     res.json({
       job: {
         _id: job._id,
@@ -21,9 +26,25 @@ router.get("/:token", async (req, res, next) => {
         serviceType: job.serviceType,
         pickupAddress: job.pickupAddress,
         dropoffAddress: job.dropoffAddress || null,
+        pickupLat: job.pickupLat ?? null,
+        pickupLng: job.pickupLng ?? null,
+        dropoffLat: job.dropoffLat ?? null,
+        dropoffLng: job.dropoffLng ?? null,
+        estimatedDuration: job.estimatedDuration || null,
+        estimatedDistance: job.estimatedDistance || null,
       },
       customer: customer
         ? { name: customer.name, phone: customer.phone }
+        : null,
+      vendor: vendor
+        ? {
+            _id: vendor._id,
+            name: vendor.name || null,
+            phone: vendor.phone || null,
+            baseAddress: vendor.baseAddress || null,
+            lat: vendor.lat ?? null,
+            lng: vendor.lng ?? null,
+          }
         : null,
     });
   } catch (e) {
@@ -56,3 +77,5 @@ router.patch("/:token/status", async (req, res, next) => {
 });
 
 export default router;
+
+

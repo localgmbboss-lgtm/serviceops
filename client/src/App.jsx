@@ -168,6 +168,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/vendor/profile"
+            element={
+              <ProtectedRoute requiredRole="vendor" fallbackPath="/vendor/login">
+                <VendorProfile />
+              </ProtectedRoute>
+            }
+          />
           {/* Driver routes */}
           <Route
             path="/driver"
@@ -210,6 +218,7 @@ export default function App() {
     </AuthProvider>
   );
 }
+
 
 
 

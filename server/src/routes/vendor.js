@@ -1,7 +1,8 @@
-// server/src/routes/vendor.js
+﻿// server/src/routes/vendor.js
 import { Router } from "express";
 import Job from "../models/Jobs.js";
 import Customer from "../models/Customer.js";
+import Vendor from "../models/Vendor.js";
 import { completeJobWithPayment } from "../lib/jobCompletion.js";
 
 const router = Router();
@@ -33,6 +34,12 @@ const serializeJob = (jobDoc) => {
     dropoffAddress: job.dropoffAddress || null,
     status: job.status,
     created: job.created,
+    pickupLat: job.pickupLat ?? null,
+    pickupLng: job.pickupLng ?? null,
+    dropoffLat: job.dropoffLat ?? null,
+    dropoffLng: job.dropoffLng ?? null,
+    estimatedDuration: job.estimatedDuration || null,
+    estimatedDistance: job.estimatedDistance || null,
     reportedPayment: job.reportedPayment || null,
     commission: job.commission || null,
     flags: job.flags || null,
@@ -47,17 +54,27 @@ router.get("/:token", async (req, res, next) => {
     const job = await Job.findOne({ vendorAcceptedToken: token }).lean();
     if (!job) return res.status(404).json({ message: "Invalid link" });
 
-    const customer = await Customer.findById(
-      job.customerId,
-      "name phone"
-    ).lean();
+    const customer = await Customer.findById(job.customerId, "name phone").lean();
+    const vendor = job.vendorId
+      ? await Vendor.findById(job.vendorId, "name phone baseAddress lat lng").lean()
+      : null;
 
     res.json({
       job: serializeJob(job),
       customer: customer || null,
+      vendor: vendor
+        ? {
+            _id: vendor._id,
+            name: vendor.name || null,
+            phone: vendor.phone || null,
+            baseAddress: vendor.baseAddress || null,
+            lat: vendor.lat ?? null,
+            lng: vendor.lng ?? null,
+          }
+        : null,
     });
-  } catch (e) {
-    next(e);
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -89,8 +106,8 @@ router.patch("/:token/status", async (req, res, next) => {
     await job.save();
 
     res.json({ ok: true, status: job.status });
-  } catch (e) {
-    next(e);
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -134,8 +151,8 @@ router.post("/:token/complete", async (req, res, next) => {
       summary,
       charge,
     });
-  } catch (e) {
-    next(e);
+  } catch (error) {
+    next(error);
   }
 });
 

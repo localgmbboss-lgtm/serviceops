@@ -256,12 +256,26 @@
   margin-bottom: 16px;
 }
 
+@media (max-width: 900px) {
+  .admindash .kpis {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .admindash .kpi-card {
+    width: 100%;
+    max-width: none;
+  }
+}
+
 /* smaller phones */
 @media (max-width: 480px) {
   .admindash .kpi-card {
-    min-width: 160px;
-    max-width: 220px;
-    padding: 8px 10px;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    padding: 10px 12px;
     min-height: 56px;
   }
 }
@@ -661,6 +675,8 @@
     justify-content: flex-start;
   }
 }
+
+
 
 
 

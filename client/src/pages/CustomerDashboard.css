@@ -77,7 +77,7 @@
   padding: 8px 18px;
   border-radius: 999px;
   font-weight: 600;
-  text-transform: capitalize;
+  text-transform: none;
   background: rgba(15, 23, 42, 0.24);
   color: #f8fafc;
   letter-spacing: 0.02em;
@@ -705,4 +705,5 @@
     height: 30px;
   }
 }
+
 

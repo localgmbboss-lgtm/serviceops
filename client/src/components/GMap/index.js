@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { loadGoogleMaps } from "../../lib/loadGoogleMaps";
 import { getGoogleMapsKey } from "../../config/env.js";
 import "./styles.css";
@@ -168,6 +168,7 @@ export default function GMap({
   const dirRendererRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState("");
+  const [directionsReady, setDirectionsReady] = useState(false);
 
   const origin = useMemo(() => {
     const d = drivers.find(
@@ -271,26 +272,76 @@ export default function GMap({
     });
     mapRef.current = map;
 
-    if (g.maps.DirectionsService) {
-      dirServiceRef.current = new g.maps.DirectionsService();
-      dirRendererRef.current = new g.maps.DirectionsRenderer({
-        suppressMarkers: true,
-        polylineOptions: {
-          strokeColor: "#0ea5e9",
-          strokeOpacity: 0.85,
-          strokeWeight: 5,
-        },
-      });
-      dirRendererRef.current.setMap(map);
-    }
-  }, [ready, center, zoom]);
+    let cancelled = false;
+
+    const attachDirections = async () => {
+      try {
+        if (g.maps.importLibrary) {
+          const { DirectionsService, DirectionsRenderer } = await g.maps.importLibrary("routes");
+          if (cancelled) return;
+          dirServiceRef.current = new DirectionsService();
+          dirRendererRef.current = new DirectionsRenderer({
+            suppressMarkers: true,
+            polylineOptions: {
+              strokeColor: "#0ea5e9",
+              strokeOpacity: 0.85,
+              strokeWeight: 5,
+            },
+          });
+          dirRendererRef.current.setMap(map);
+          setDirectionsReady(true);
+        } else if (g.maps.DirectionsService && g.maps.DirectionsRenderer) {
+          dirServiceRef.current = new g.maps.DirectionsService();
+          dirRendererRef.current = new g.maps.DirectionsRenderer({
+            suppressMarkers: true,
+            polylineOptions: {
+              strokeColor: "#0ea5e9",
+              strokeOpacity: 0.85,
+              strokeWeight: 5,
+            },
+          });
+          dirRendererRef.current.setMap(map);
+          setDirectionsReady(true);
+        } else {
+          console.warn("Directions library is unavailable");
+          if (!cancelled) {
+            setDirectionsReady(false);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to initialize directions", error);
+          setDirectionsReady(false);
+        }
+      }
+    };
+
+    attachDirections();
+
+    return () => {
+      if (!cancelled) {
+        setDirectionsReady(false);
+      }
+      cancelled = true;
+      if (dirRendererRef.current) {
+        dirRendererRef.current.setMap(null);
+        dirRendererRef.current = null;
+      }
+      dirServiceRef.current = null;
+      if (mapRef.current === map) {
+        mapRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   useEffect(() => {
+    if (!ready || !directionsReady) return;
     const g = window.google;
     const map = mapRef.current;
     const svc = dirServiceRef.current;
     const rend = dirRendererRef.current;
-    if (!ready || !map || !g?.maps || !svc || !rend) return;
+    if (!map || !g?.maps || !svc || !rend) return;
 
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
@@ -412,7 +463,7 @@ export default function GMap({
         rend.setDirections({ routes: [] });
       }
     });
-  }, [ready, drivers, destinationPosition, destinationLabel, destinationTitle, destinationColor, destinationTextColor, destinationAvatar, normalizedLandmarks, center, zoom, origin, showRoute]);
+  }, [ready, directionsReady, drivers, destinationPosition, destinationLabel, destinationTitle, destinationColor, destinationTextColor, destinationAvatar, normalizedLandmarks, center, zoom, origin, showRoute]);
 
   return (
     <div className="gmap-wrap">
@@ -421,27 +472,4 @@ export default function GMap({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

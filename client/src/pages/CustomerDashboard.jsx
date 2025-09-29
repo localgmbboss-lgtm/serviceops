@@ -7,25 +7,26 @@ import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
+import { useNotifications } from "../contexts/NotificationsContext";
 import { LuCar, LuFlag, LuMapPin, LuSearch, LuTruck, LuUserCheck } from "react-icons/lu";
 import "./CustomerDashboard.css";
 
 const STAGES = ["Unassigned", "Assigned", "OnTheWay", "Arrived", "Completed"];
 
 const statusMessage = {
-  Unassigned: "We're matching you with the best nearby operator.",
-  Assigned: "A driver has accepted. We're getting them on the road.",
-  OnTheWay: "Your driver is on the way to you.",
-  Arrived: "Driver has arrived at the pickup point.",
-  Completed: "Trip completed - hope everything went smoothly!",
+  Unassigned: "Hang tight - we're lining up the right operator for you.",
+  Assigned: "Your driver is confirmed and getting ready to roll.",
+  OnTheWay: "Your driver is en route with live updates coming through.",
+  Arrived: "Your driver is on-site and ready to help.",
+  Completed: "Service complete. Thanks for trusting us.",
 };
 
 const stageMeta = {
-  Unassigned: { title: "Finding your specialist", icon: LuSearch },
-  Assigned: { title: "Operator confirmed", icon: LuUserCheck },
+  Unassigned: { title: "Matching your driver", icon: LuSearch },
+  Assigned: { title: "Driver confirmed", icon: LuUserCheck },
   OnTheWay: { title: "Driver en route", icon: LuCar },
   Arrived: { title: "Driver on-site", icon: LuMapPin },
-  Completed: { title: "Service wrapped", icon: LuFlag },
+  Completed: { title: "Service complete", icon: LuFlag },
 };
 
 export default function CustomerDashboard() {
@@ -60,6 +61,9 @@ export default function CustomerDashboard() {
   const hasGoogle = Boolean(mapsKey);
 
   const { customer, job, driver } = state;
+  const { publish } = useNotifications();
+  const previousStatusRef = useRef(null);
+  const previousDriverRef = useRef(null);
 
   const driverInitials = driver?.name
     ? driver.name
@@ -85,11 +89,58 @@ export default function CustomerDashboard() {
   const nextIndex = Math.min(activeIndex + 1, STAGES.length - 1);
   const nextStage = STAGES[nextIndex];
   const isFinalStage = nextIndex === activeIndex;
-  const nextCopy = isFinalStage ? "Done" : stageMeta[nextStage]?.title || nextStage;
+  const nextCopy = isFinalStage ? "All wrapped" : stageMeta[nextStage]?.title || nextStage;
   const currentTitle = stageMeta[currentStage]?.title || currentStage;
 
   const jobNumber = job?._id ? `#${job._id.slice(-6).toUpperCase()}` : "Pending";
   const etaText = job?.estimatedDuration || "Calculating";
+
+  useEffect(() => {
+    if (!job?._id || !job?.status) return;
+    const previousStatus = previousStatusRef.current;
+    const shouldAnnounceInitial =
+      !previousStatus && ["Assigned", "OnTheWay"].includes(job.status);
+    if ((previousStatus && job.status !== previousStatus) || shouldAnnounceInitial) {
+      const statusTitle = stageMeta[job.status]?.title || job.status;
+      let body = statusMessage[job.status] || `Your job is now ${statusTitle}.`;
+      if (job.status === "OnTheWay" && etaText) {
+        body = `Your driver is en route. Estimated arrival ${etaText}.`;
+      }
+      publish({
+        title: statusTitle,
+        body,
+        severity: "info",
+        meta: { jobId: job._id, stage: job.status, stageLabel: statusTitle, role: "customer" },
+        dedupeKey: `customer-job-${job._id}-${job.status}`,
+      });
+    }
+    previousStatusRef.current = job.status;
+  }, [job?._id, job?.status, etaText, publish]);
+
+  useEffect(() => {
+    if (!job?._id) {
+      previousDriverRef.current = null;
+      return;
+    }
+    const currentDriverKey = driver?._id || driver?.phone || driver?.name;
+    if (!currentDriverKey) {
+      previousDriverRef.current = null;
+      return;
+    }
+    const prevKey = previousDriverRef.current;
+    if (prevKey !== currentDriverKey) {
+      publish({
+        title: "Driver assigned",
+        body: driver?.name
+          ? `${driver.name} is on the way.`
+          : "A driver has been assigned to your service.",
+        severity: "success",
+        meta: { jobId: job._id, driver: driver?.name || currentDriverKey, role: "customer" },
+        dedupeKey: `customer-driver-${job._id}-${currentDriverKey}`,
+      });
+    }
+    previousDriverRef.current = currentDriverKey;
+  }, [driver?._id, driver?.phone, driver?.name, job?._id, publish]);
 
   const pickupAddress =
     job?.pickupAddress ||
@@ -108,6 +159,8 @@ export default function CustomerDashboard() {
   const customerCoordinates = useMemo(() => deriveCustomerCoordinates(job), [job]);
   const dropoffCoordinates = useMemo(() => deriveDropoffCoordinates(job), [job]);
 
+  const customerAvatar =
+    customer?.avatarUrl || customer?.photoUrl || customer?.photo || customer?.image || null;
   const routeDestination = useMemo(() => {
     if (customerCoordinates) {
       return {
@@ -117,7 +170,7 @@ export default function CustomerDashboard() {
         title: pickupAddress || "Your pickup location",
         color: "#f97316",
         textColor: "#0f172a",
-        avatarUrl: (customer?.avatarUrl || customer?.photoUrl || customer?.photo || customer?.image) ?? null,
+        avatarUrl: customerAvatar,
       };
     }
     if (dropoffCoordinates) {
@@ -131,7 +184,7 @@ export default function CustomerDashboard() {
       };
     }
     return null;
-  }, [customerCoordinates, dropoffCoordinates, pickupAddress, dropoffAddress]);
+  }, [customerCoordinates, dropoffCoordinates, pickupAddress, dropoffAddress, customerAvatar]);
 
   const mapLandmarks = useMemo(() => {
     if (!dropoffCoordinates || !customerCoordinates) return [];
@@ -273,7 +326,7 @@ export default function CustomerDashboard() {
             </div>
             <div className="custdash-hero__status">
               <span className={`custdash-status-chip ${currentStage.toLowerCase()}`}>
-                {currentStage}
+                {currentTitle}
               </span>
               <p className="custdash-status-line">{statusMessage[currentStage]}</p>
               <span className="custdash-job-id">Job {jobNumber}</span>
@@ -291,7 +344,7 @@ export default function CustomerDashboard() {
                   </div>
                 </div>
               </div>
-              <span className="custdash-pill custdash-pill--next">{isFinalStage ? "Completed" : nextCopy}</span>
+              <span className="custdash-pill custdash-pill--next">{isFinalStage ? "All wrapped" : nextCopy}</span>
             </div>
           </div>
 
@@ -360,7 +413,7 @@ export default function CustomerDashboard() {
 
             <div className="custdash-driver__status">
               <span className={`custdash-status-chip ${currentStage.toLowerCase()}`}>
-                {currentStage}
+                {currentTitle}
               </span>
               <span className="custdash-driver__status-note">
                 {statusMessage[currentStage]}
@@ -463,9 +516,6 @@ export default function CustomerDashboard() {
     </div>
   );
 }
-
-
-
 
 
 

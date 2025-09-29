@@ -51,7 +51,6 @@ export default function AdminDashboard() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [slice, setSlice] = useState("month");
-  const [activeTab, setActiveTab] = useState("overview");
 
   // trigger re-draw of canvases on window resize
   const [viewportW, setViewportW] = useState(
@@ -259,28 +258,6 @@ export default function AdminDashboard() {
       </header>
 
       {err && <div className="card alert error">{err}</div>}
-
-      {/* Dashboard Tabs */}
-      <div className="dashboard-tabs">
-        <button
-          className={`tab ${activeTab === "overview" ? "active" : ""}`}
-          onClick={() => setActiveTab("overview")}
-        >
-          Overview
-        </button>
-        <button
-          className={`tab ${activeTab === "performance" ? "active" : ""}`}
-          onClick={() => setActiveTab("performance")}
-        >
-          Performance
-        </button>
-        <button
-          className={`tab ${activeTab === "compliance" ? "active" : ""}`}
-          onClick={() => setActiveTab("compliance")}
-        >
-          Compliance
-        </button>
-      </div>
 
       {/* KPI row - left-aligned, small gap (CSS handles layout) */}
       <section className="kpis">
@@ -490,6 +467,8 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
 
 
 

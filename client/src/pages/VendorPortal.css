@@ -170,3 +170,54 @@
 .vendor-portal .small {
     font-size: 0.85rem;
 }
+
+.vp-map {
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 16px;
+    background: rgba(248, 250, 252, 0.9);
+    display: grid;
+    gap: 12px;
+}
+
+.vp-map .gmap-container {
+    height: 320px;
+    border-radius: 12px;
+}
+
+.vp-map-legend {
+    display: grid;
+    gap: 6px;
+}
+
+.vp-map-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+}
+
+.vp-map-row strong {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+}
+
+.vp-map-row span {
+    font-weight: 600;
+    color: var(--color-text);
+    text-align: right;
+}
+
+@media (max-width: 720px) {
+    .vp-map {
+        padding: 12px;
+    }
+
+    .vp-map .gmap-container {
+        height: 280px;
+    }
+}
+
