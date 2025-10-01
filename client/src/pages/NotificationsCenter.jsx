@@ -138,7 +138,7 @@ export default function NotificationsCenter() {
                   >
                     {content}
                     <span className="notifications-item__chevron" aria-hidden="true">
-                      >
+                      &gt;
                     </span>
                   </Link>
                 ) : (

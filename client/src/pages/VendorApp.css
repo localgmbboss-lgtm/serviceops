@@ -70,7 +70,6 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-
 
 .va-chip--heavy {
   background: rgba(255, 209, 102, 0.18);
@@ -189,8 +188,6 @@
   outline-offset: 2px;
 }
 
-
-
 .va-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -260,7 +257,6 @@
   font-size: 14px;
 }
 
-
 .va-workflows {
   display: grid;
   gap: 18px;
@@ -309,7 +305,6 @@
   gap: 18px;
 }
 
-
 .va-list {
   list-style: none;
   margin: 0;
@@ -318,6 +313,7 @@
   flex-direction: column;
   gap: 16px;
 }
+
 .va-pagination {
   display: flex;
   align-items: center;
@@ -355,7 +351,6 @@
   cursor: not-allowed;
   transform: none;
 }
-
 
 .va-job {
   cursor: pointer;
@@ -404,7 +399,6 @@
   color: rgba(15, 23, 42, 0.5);
 }
 
-
 .va-detail__value {
   font-size: 13px;
   line-height: 1.4;
@@ -412,6 +406,7 @@
   word-break: break-word;
   white-space: pre-line;
 }
+
 .va-job__map {
   margin-top: 16px;
   border-radius: 18px;
@@ -456,9 +451,6 @@
   color: rgba(15, 23, 42, 0.7);
 }
 
-
-
-
 .va-job__main {
   flex: 1;
   display: grid;
@@ -472,6 +464,7 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+
 .va-job__header .va-chip-group {
   display: flex;
   gap: 6px;
@@ -506,14 +499,11 @@
   border-color: rgba(84, 224, 166, 0.3);
 }
 
-
-
 .va-job__title {
   font-weight: 700;
   font-size: 17px;
   color: #0f172a;
 }
-
 
 .va-job__address {
   margin: 0;
@@ -522,7 +512,6 @@
   line-height: 1.45;
 }
 
-
 .va-job__meta {
   display: flex;
   flex-wrap: wrap;
@@ -530,7 +519,6 @@
   font-size: 12px;
   color: #111827;
 }
-
 
 .va-job__cta {
   display: inline-flex;
@@ -549,7 +537,6 @@
 .va-job__cta--stack .btn {
   min-width: 140px;
 }
-
 
 .va-job--skeleton {
   display: grid;
@@ -692,43 +679,54 @@
   .va-workflows {
     gap: 14px;
   }
+
   .va-hero {
     padding: 18px;
     gap: 14px;
   }
+
   .va-hero__main h1 {
     font-size: 24px;
   }
+
   .va-subtitle {
     font-size: 12px;
   }
+
   .va-stats {
     display: flex;
     gap: 12px;
     flex-wrap: nowrap;
   }
+
   .va-stat {
     flex: 1 1 0;
     min-width: 0;
     padding: 16px;
   }
+
   .va-stat__value {
     font-size: 24px;
   }
+
   .va-stat__label {
     font-size: 12px;
   }
+
   .va-stat__hint {
     font-size: 11px;
   }
+
   .va-tabs {
     width: 100%;
     justify-content: space-between;
   }
+
   .va-tab {
     flex: 1 1 0;
     text-align: center;
   }
+
   .va-job__title {
     font-size: 16px;
   }
@@ -740,6 +738,7 @@
     align-items: stretch;
     gap: 10px;
   }
+
   .va-pagination__indicator {
     font-size: 12px;
   }
@@ -749,55 +748,71 @@
   .va-panel__head h2 {
     font-size: 16px;
   }
+
   .va-panel__hint {
     font-size: 11px;
   }
+
   .va-hero {
     padding: 16px;
     gap: 12px;
   }
+
   .va-hero__main h1 {
     font-size: 20px;
   }
+
   .va-subtitle {
     font-size: 11px;
   }
+
   .va-stats {
     flex-wrap: wrap;
     gap: 10px;
   }
+
   .va-stat {
     flex: 1 1 calc(33.333% - 10px);
     min-width: 120px;
     padding: 14px;
   }
+
   .va-stat__value {
     font-size: 22px;
   }
+
   .va-stat__hint {
     font-size: 11px;
   }
+
   .va-tabs {
     padding: 3px;
     gap: 4px;
   }
+
   .va-tab {
+    flex: 1 1 0;
     font-size: 12px;
   }
+
   .va-job {
     padding: 12px;
     gap: 10px;
   }
+
   .va-job__title {
     font-size: 14px;
   }
+
   .va-job__address {
     font-size: 13px;
   }
+
   .va-job__meta {
     font-size: 11px;
     gap: 6px;
   }
+
   .va-job__header .va-chip {
     font-size: 10px;
     padding: 4px 8px;
@@ -809,67 +824,85 @@
     padding: 12px;
     gap: 10px;
   }
+
   .va-hero__main h1 {
     font-size: 18px;
   }
+
   .va-subtitle {
     font-size: 10px;
   }
+
   .va-hero__meta {
     gap: 8px;
   }
+
   .va-alert--dismissible {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
   }
+
   .va-alert__dismiss {
     width: 100%;
   }
+
   .va-chip {
     padding: 6px 10px;
     font-size: 11px;
   }
+
   .va-stats {
     flex-wrap: nowrap;
     gap: 6px;
   }
+
   .va-stat {
     flex: 1 1 calc(33.333% - 6px);
     min-width: 0;
     padding: 10px;
   }
+
   .va-stat__value {
     font-size: 18px;
   }
+
   .va-stat__label {
     font-size: 10px;
   }
+
   .va-stat__hint {
     font-size: 9px;
   }
+
   .va-tabs {
     flex-wrap: wrap;
     gap: 6px;
   }
+
   .va-tab {
     flex: 1 1 calc(50% - 6px);
     font-size: 10px;
   }
+
   .va-job {
     padding: 8px;
     gap: 6px;
   }
+
   .va-job__title {
     font-size: 12px;
   }
+
   .va-job__address {
     font-size: 11px;
   }
+
   .va-job__meta {
     font-size: 9px;
     gap: 4px;
   }
+
   .va-job__cta .btn {
     font-size: 11px;
     min-height: 28px;
@@ -877,11 +910,71 @@
   }
 }
 
+/* Compact "Get directions" CTA used in assigned tab (replaces embedded map) */
+.va-job__map {
+  margin-top: 16px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-soft, rgba(255, 255, 255, 0.96));
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 12px;
+}
 
+.va-job__map-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
 
+/* primary CTA style for the maps link */
+.va-job__map-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 700;
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.16);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  white-space: nowrap;
+}
 
+.va-job__map-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+}
 
+/* mobile: stack meta text above the CTA and make CTA full width */
+@media (max-width: 720px) {
+  .va-job__map-meta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
 
+  .va-job__map-button {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 14px;
+  }
+}
+
+/* keep the placeholder styling consistent */
+.va-job__map-placeholder {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px dashed rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
 
 .va-support {
   margin-top: clamp(24px, 5vw, 48px);

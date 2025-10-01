@@ -51,8 +51,8 @@ const normalizeOrigin = (origin) => {
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
-  "https://www.localgmbboss.com",
-  "https://localgmbboss.com",
+  "https://serviceops.pro",
+  "https://www.serviceops.pro",
   "https://serviceops.onrender.com",
 ].map(normalizeOrigin);
 
