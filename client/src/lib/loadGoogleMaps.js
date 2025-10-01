@@ -2,7 +2,7 @@
 import { getGoogleMapsKey } from "../config/env.js";
 
 let loadingPromise = null;
-let requestedLibraries = new Set(["places", "geometry"]);
+let requestedLibraries = new Set(["places", "geometry", "routes"]);
 
 export function loadGoogleMaps(options = {}) {
   if (typeof window !== "undefined" && window.google && window.google.maps) {

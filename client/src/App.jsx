@@ -25,6 +25,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import PrintReport from "./pages/PrintReport";
 import VendorLogin from "./pages/VendorLogin";
 import VendorApp from "./pages/VendorApp";
+import VendorProfile from "./pages/VendorProfile";
 import AdminLogin from "./pages/AdminLogin";
 
 // Public + auth
@@ -167,6 +168,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/vendor/profile"
+            element={
+              <ProtectedRoute requiredRole="vendor" fallbackPath="/vendor/login">
+                <VendorProfile />
+              </ProtectedRoute>
+            }
+          />
           {/* Driver routes */}
           <Route
             path="/driver"
@@ -209,6 +218,9 @@ export default function App() {
     </AuthProvider>
   );
 }
+
+
+
 
 
 

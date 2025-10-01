@@ -51,7 +51,6 @@ export default function AdminDashboard() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [slice, setSlice] = useState("month");
-  const [activeTab, setActiveTab] = useState("overview");
 
   // trigger re-draw of canvases on window resize
   const [viewportW, setViewportW] = useState(
@@ -118,81 +117,12 @@ export default function AdminDashboard() {
     return { ctx, cssW, cssH };
   }
 
-  // City trend bar chart
-  const cityCanvasRef = useRef(null);
-  useEffect(() => {
-    if (!dash?.cityTrend || !cityCanvasRef.current) return;
-    const { labels, series } = dash.cityTrend;
-    const cities = Object.keys(series).slice(0, 4);
-
-    const canvas = cityCanvasRef.current;
-    const { ctx, cssW, cssH } = sizeCanvas(canvas);
-    ctx.clearRect(0, 0, cssW, cssH);
-
-    const N = labels.length;
-    const pad = 24;
-    const gy = 20;
-    const plotW = cssW - pad * 2;
-    const plotH = cssH - gy - 24;
-
-    const maxY = Math.max(
-      1,
-      ...labels.map((_, i) =>
-        cities.reduce((s, c) => s + (series[c]?.[i] || 0), 0)
-      )
-    );
-
-    // Axes
-    ctx.strokeStyle = "#e5e7eb";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(pad, gy);
-    ctx.lineTo(pad, gy + plotH);
-    ctx.lineTo(pad + plotW, gy + plotH);
-    ctx.stroke();
-
-    // Gridlines
-    ctx.strokeStyle = "#f3f4f6";
-    ctx.setLineDash([3, 3]);
-    for (let k = 1; k <= 3; k++) {
-      const y = gy + (plotH * k) / 4;
-      ctx.beginPath();
-      ctx.moveTo(pad, y);
-      ctx.lineTo(pad + plotW, y);
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
-
-    // Stacked bars
-    const barW = (plotW / N) * 0.72;
-    const palette = ["#0f62fe", "#22c55e", "#f59e0b", "#ef4444"];
-
-    labels.forEach((_, i) => {
-      const x = pad + (i + 0.14) * (plotW / N);
-      let yBase = gy + plotH;
-
-      cities.forEach((c, idx) => {
-        const v = series[c]?.[i] ?? 0;
-        const h = (v / maxY) * plotH;
-        ctx.fillStyle = palette[idx % palette.length];
-        ctx.fillRect(x, yBase - h, barW, h);
-        yBase -= h;
-      });
-    });
-
-    // X labels
-    ctx.fillStyle = "#6b7280";
-    ctx.font = "10px system-ui, -apple-system, Segoe UI, Roboto";
-    labels.forEach((lab, i) => {
-      if (i % 3 !== 0 && i !== labels.length - 1) return;
-      const x = pad + (i + 0.5) * (plotW / N);
-      ctx.textAlign = "center";
-      ctx.fillText(lab.slice(5), x, gy + plotH + 12);
-    });
-  }, [dash, viewportW]);
-
   // Satisfaction donut chart
   const satCanvasRef = useRef(null);
+
+  // <-- ADDED: city canvas ref to fix the missing-ref runtime error
+  const cityCanvasRef = useRef(null);
+
   useEffect(() => {
     if (!dash?.satisfaction || !satCanvasRef.current) return;
     const { five = 0, private: priv = 0 } = dash.satisfaction;
@@ -227,6 +157,58 @@ export default function AdminDashboard() {
     ctx.fillText(`5* vs private`, cx, cy + 22);
   }, [dash, viewportW]);
 
+  // Simple Jobs-by-City bar chart effect (prevents runtime errors when rendering)
+  useEffect(() => {
+    if (!cityCanvasRef.current) return;
+    const canvas = cityCanvasRef.current;
+    const { ctx, cssW, cssH } = sizeCanvas(canvas);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const data = dash?.jobsByCity || dash?.jobs_by_city || []; // tolerate different shapes
+    if (!Array.isArray(data) || data.length === 0) {
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
+      ctx.textAlign = "center";
+      ctx.fillText("No data", cssW / 2, cssH / 2);
+      return;
+    }
+
+    // Expect data items like { city: "Name", count: 12 } or { city: "X", jobs: 12 }
+    const points = data.map((d) => ({
+      label: d.city || d.name || "-",
+      value: Number(d.count ?? d.jobs ?? 0),
+    }));
+
+    const maxV = Math.max(...points.map((p) => p.value), 1);
+    const padding = 28;
+    const availableW = cssW - padding * 2;
+    const gap = 12;
+    const barWidth = Math.max(8, (availableW - gap * (points.length - 1)) / points.length);
+    const bottomY = cssH - 28;
+
+    // draw labels and bars
+    points.forEach((p, i) => {
+      const x = padding + i * (barWidth + gap);
+      const h = (p.value / maxV) * (cssH - 80);
+      // bar
+      ctx.fillStyle = "#3b82f6";
+      ctx.fillRect(x, bottomY - h, barWidth, h);
+      // value text
+      ctx.fillStyle = "#111827";
+      ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto";
+      ctx.textAlign = "center";
+      ctx.fillText(p.value.toString(), x + barWidth / 2, bottomY - h - 8);
+      // label (wrap/clip)
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto";
+      ctx.fillText(
+        p.label.length > 10 ? p.label.slice(0, 10) + "…" : p.label,
+        x + barWidth / 2,
+        bottomY + 16
+      );
+    });
+  }, [dash, viewportW]);
+
   const snap = dash?.revenue?.[slice] || {
     gross: 0,
     payouts: 0,
@@ -259,28 +241,6 @@ export default function AdminDashboard() {
       </header>
 
       {err && <div className="card alert error">{err}</div>}
-
-      {/* Dashboard Tabs */}
-      <div className="dashboard-tabs">
-        <button
-          className={`tab ${activeTab === "overview" ? "active" : ""}`}
-          onClick={() => setActiveTab("overview")}
-        >
-          Overview
-        </button>
-        <button
-          className={`tab ${activeTab === "performance" ? "active" : ""}`}
-          onClick={() => setActiveTab("performance")}
-        >
-          Performance
-        </button>
-        <button
-          className={`tab ${activeTab === "compliance" ? "active" : ""}`}
-          onClick={() => setActiveTab("compliance")}
-        >
-          Compliance
-        </button>
-      </div>
 
       {/* KPI row - left-aligned, small gap (CSS handles layout) */}
       <section className="kpis">
@@ -407,7 +367,8 @@ export default function AdminDashboard() {
           <div className="card-head">
             <h3 className="section-title">Expiring Documents (7 days)</h3>
             <Link to="/admin/documents" className="small link view-all">
-              View all ->
+                View all &gt;
+
             </Link>
           </div>
           <ul className="doc-list">
@@ -490,6 +451,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-
-

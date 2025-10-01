@@ -662,7 +662,7 @@ export default function GuestRequest({
                   isSubmitting ||
                   !formData.name.trim() ||
                   !formData.phone.trim() ||
-                  !formData.email.trim()
+                  (requireEmail && !formData.email.trim())
                 }
               >
                 Continue
@@ -997,6 +997,7 @@ export default function GuestRequest({
     </div>
   );
 }
+
 
 
 

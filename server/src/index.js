@@ -9,6 +9,7 @@ import jobs from "./routes/jobs.js";
 import customers from "./routes/customers.js";
 import feedback from "./routes/feedback.js";
 import reports from "./routes/reports.js";
+import financials from "./routes/financials.js";
 import documents from "./routes/documents.js";
 import settings from "./routes/settings.js";
 import expenses from "./routes/expenses.js";
@@ -50,8 +51,8 @@ const normalizeOrigin = (origin) => {
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
-  "https://www.localgmbboss.com",
-  "https://localgmbboss.com",
+  "https://serviceops.pro",
+  "https://www.serviceops.pro",
   "https://serviceops.onrender.com",
 ].map(normalizeOrigin);
 
@@ -109,6 +110,7 @@ app.use("/api/jobs", jobs);
 app.use("/api/customers", customers);
 app.use("/api/feedback", feedback);
 app.use("/api/reports", reports);
+app.use("/api/financials", financials);
 app.use("/api/expenses", expenses);
 app.use("/api/vendor", vendorRouter);
 app.use("/api/admin/auth", adminAuth);

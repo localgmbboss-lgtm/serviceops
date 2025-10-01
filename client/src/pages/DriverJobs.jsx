@@ -10,14 +10,33 @@ export default function DriverJobs() {
   const [jobs, setJobs] = useState([]);
   const [share, setShare] = useState(localStorage.getItem("shareLocation") === "1");
   const [pushMs, setPushMs] = useState(15000); // default, can be overridden by settings
+  const [pollMs, setPollMs] = useState(7000); // polling interval for jobs
   const [loading, setLoading] = useState(true);
 
   // Load settings for interval override
   useEffect(() => {
-    api.get("/api/settings")
-      .then(r => {
-        const ms = Number(r.data?.intervals?.driverPushMs);
-        if (Number.isFinite(ms) && ms > 1000) setPushMs(ms);
+    api
+      .get("/api/settings")
+      .then((r) => {
+        const intervals = r.data?.intervals || {};
+        const pushMsSetting = (() => {
+          const pushMsValue = Number(intervals.driverPushMs);
+          if (Number.isFinite(pushMsValue) && pushMsValue > 0) {
+            return pushMsValue;
+          }
+          const patchSec = Number(intervals.driverPatchSec);
+          if (Number.isFinite(patchSec) && patchSec > 0) {
+            return patchSec * 1000;
+          }
+          return null;
+        })();
+        if (Number.isFinite(pushMsSetting) && pushMsSetting >= 1000) {
+          setPushMs(pushMsSetting);
+        }
+        const pollSec = Number(intervals.pollDriversSec);
+        if (Number.isFinite(pollSec) && pollSec > 0) {
+          setPollMs(Math.max(3000, pollSec * 1000));
+        }
       })
       .catch(() => {});
   }, []);
@@ -61,7 +80,7 @@ export default function DriverJobs() {
   // Location hook (pushes to API on interval or movement)
   const loc = useDriverLocation({ driverId, enabled: share, pushMs });
 
-  // Poll jobs (7s) and filter for this driver
+  // Poll jobs and filter for this driver
   useEffect(() => {
     let alive = true;
     const fetchJobs = async () => {
@@ -74,31 +93,43 @@ export default function DriverJobs() {
       }
     };
     fetchJobs();
-    const t = setInterval(fetchJobs, 7000);
-    return () => { alive = false; clearInterval(t); };
-  }, []);
+    const intervalMs = Math.max(3000, pollMs);
+    const t = setInterval(fetchJobs, intervalMs);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [pollMs]);
 
   const myJobs = useMemo(
-    () => jobs.filter(j => j.driverId === driverId),
+    () => jobs.filter((j) => j.driverId === driverId),
     [jobs, driverId]
   );
-  const assigned = myJobs.filter(j => j.status === "Assigned");
-  const progress = myJobs.filter(j => j.status === "OnTheWay" || j.status === "Arrived");
-  const done     = myJobs.filter(j => j.status === "Completed");
+  const assigned = myJobs.filter((j) => j.status === "Assigned");
+  const progress = myJobs.filter(
+    (j) => j.status === "OnTheWay" || j.status === "Arrived"
+  );
+  const done = myJobs.filter((j) => j.status === "Completed");
 
   async function move(id, status) {
     try {
       const { data } = await api.patch(`/api/jobs/${id}`, { status });
-      setJobs(prev => prev.map(j => (j._id === id ? data : j)));
+      setJobs((prev) => prev.map((j) => (j._id === id ? data : j)));
     } catch (e) {
       console.error(e);
       alert(e?.response?.data?.message || "Failed to update job");
     }
   }
 
-  async function accept(id) { await move(id, "OnTheWay"); }
-  async function arrived(id) { await move(id, "Arrived"); }
-  async function complete(id) { await move(id, "Completed"); }
+  async function accept(id) {
+    await move(id, "OnTheWay");
+  }
+  async function arrived(id) {
+    await move(id, "Arrived");
+  }
+  async function complete(id) {
+    await move(id, "Completed");
+  }
 
   return (
     <div className="driver-page">
@@ -129,8 +160,13 @@ export default function DriverJobs() {
 
           <div className="muted small">
             {share ? (
-              loc.error ? <>GPS error: {loc.error}</> :
-              (Number.isFinite(loc.lat) ? <>Sending every ~{Math.round(pushMs/1000)}s (lat {loc.lat.toFixed(5)}, lng {loc.lng.toFixed(5)})</> : <>Waiting for GPS...</>)
+              loc.error ? (
+                <>GPS error: {loc.error}</>
+              ) : Number.isFinite(loc.lat) ? (
+                <>Sending every ~{Math.round(pushMs / 1000)}s (lat {loc.lat.toFixed(5)}, lng {loc.lng.toFixed(5)})</>
+              ) : (
+                <>Waiting for GPS...</>
+              )
             ) : (
               <>Location sharing is OFF</>
             )}
@@ -145,12 +181,14 @@ export default function DriverJobs() {
           <h3>Assigned</h3>
           {assigned.length === 0 && <p className="muted">No assigned jobs.</p>}
           <ul className="dlist">
-            {assigned.map(j => (
+            {assigned.map((j) => (
               <li key={j._id} className="dcard">
                 <div className="dtitle">{j.serviceType || "Service"}</div>
                 <div className="dsub">{j.pickupAddress}</div>
                 <div className="row">
-                  <button className="btn" onClick={() => accept(j._id)}>Accept / On The Way</button>
+                  <button className="btn" onClick={() => accept(j._id)}>
+                    Accept / On The Way
+                  </button>
                 </div>
               </li>
             ))}
@@ -161,16 +199,20 @@ export default function DriverJobs() {
           <h3>In Progress</h3>
           {progress.length === 0 && <p className="muted">No active job.</p>}
           <ul className="dlist">
-            {progress.map(j => (
+            {progress.map((j) => (
               <li key={j._id} className="dcard">
                 <div className="dtitle">{j.serviceType || "Service"}</div>
                 <div className="dsub">{j.pickupAddress}</div>
                 <div className="row">
                   {j.status === "OnTheWay" && (
-                    <button className="btn" onClick={() => arrived(j._id)}>Arrived</button>
+                    <button className="btn" onClick={() => arrived(j._id)}>
+                      Arrived
+                    </button>
                   )}
                   {(j.status === "OnTheWay" || j.status === "Arrived") && (
-                    <button className="btn primary" onClick={() => complete(j._id)}>Complete</button>
+                    <button className="btn primary" onClick={() => complete(j._id)}>
+                      Complete
+                    </button>
                   )}
                 </div>
               </li>
@@ -183,11 +225,13 @@ export default function DriverJobs() {
         <h3>History</h3>
         {done.length === 0 && <p className="muted">No completed jobs yet.</p>}
         <ul className="dlist">
-          {done.map(j => (
+          {done.map((j) => (
             <li key={j._id} className="dcard">
               <div className="dtitle">{j.serviceType || "Service"}</div>
               <div className="dsub">{j.pickupAddress}</div>
-              <div className="muted small">Earnings split: {j.earningsSplit ?? "-"}</div>
+              <div className="muted small">
+                Earnings split: {j.earningsSplit ?? "-"}
+              </div>
             </li>
           ))}
         </ul>
@@ -195,4 +239,3 @@ export default function DriverJobs() {
     </div>
   );
 }
-

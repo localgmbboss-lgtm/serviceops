@@ -235,14 +235,24 @@ export default function Topbar() {
               )}
 
               {isVendor && (
-                <button
-                  className={
-                    isActivePath("/vendor/app") ? "nav-link active" : "nav-link"
-                  }
-                  onClick={() => handleNavigation("/vendor/app")}
-                >
-                  Vendor Dashboard
-                </button>
+                <>
+                  <button
+                    className={
+                      isActivePath("/vendor/app") ? "nav-link active" : "nav-link"
+                    }
+                    onClick={() => handleNavigation("/vendor/app")}
+                  >
+                    Vendor Dashboard
+                  </button>
+                  <button
+                    className={
+                      isActivePath("/vendor/profile") ? "nav-link active" : "nav-link"
+                    }
+                    onClick={() => handleNavigation("/vendor/profile")}
+                  >
+                    Profile
+                  </button>
+                </>
               )}
 
               {isDriver && (
@@ -314,4 +324,5 @@ export default function Topbar() {
     </header>
   );
 }
+
 

@@ -1,4 +1,3 @@
-// client/src/pages/VendorApp.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { vendorApi } from "../lib/vendorApi";
@@ -63,7 +62,6 @@ const derivePickupCoordinates = (job) => {
     toFiniteNumber(job?.vehicleLocation?.lng);
   return lat !== null && lng !== null ? { lat, lng } : null;
 };
-
 
 const deriveDropoffCoordinates = (job) => {
   const lat =
@@ -172,9 +170,10 @@ export default function VendorApp() {
   const [bidError, setBidError] = useState("");
   const [bidSubmitting, setBidSubmitting] = useState(false);
 
+  const { publish } = useNotifications();
+
   const nav = useNavigate();
   const pollRef = useRef(null);
-  const { publish } = useNotifications();
   const openJobsSnapshotRef = useRef(new Map());
   const openJobsInitializedRef = useRef(false);
   const assignedSnapshotRef = useRef(new Map());
@@ -322,11 +321,25 @@ export default function VendorApp() {
       }
 
       if (previousJob.status !== job.status && job.status) {
+        const etaLabel =
+          job.etaMinutes || job.vendorEtaMinutes || job.suggestedEtaMinutes;
+        let body;
+        if (job.status === "OnTheWay") {
+          body = etaLabel
+            ? `You're en route. Target arrival in ${etaLabel} minutes.`
+            : "You're marked as en route to the customer.";
+        } else if (job.status === "Arrived") {
+          body = "Marked on-site with the customer.";
+        } else if (job.status === "Completed") {
+          body = "Job marked complete. Don't forget to close out paperwork.";
+        } else {
+          body = job.serviceType
+            ? `${job.serviceType} is now ${job.status}.`
+            : `Assigned job status changed to ${job.status}.`;
+        }
         publish({
-          title: "Job status: " + job.status,
-          body: job.serviceType
-            ? job.serviceType + " is now " + job.status + "."
-            : "Assigned job status changed to " + job.status + ".",
+          title: `${job.serviceType || "Job"}: ${job.status}`,
+          body,
           severity: job.status === "Completed" ? "success" : "info",
           meta: {
             role: "vendor",
@@ -347,12 +360,24 @@ export default function VendorApp() {
     }
   }, [assigned, publish]);
 
-  const openPageCount = Math.max(1, Math.ceil(openJobs.length / OPEN_PAGE_SIZE));
-  const assignedPageCount = Math.max(1, Math.ceil(assigned.length / ASSIGNED_PAGE_SIZE));
+  const openPageCount = Math.max(
+    1,
+    Math.ceil(openJobs.length / OPEN_PAGE_SIZE)
+  );
+  const assignedPageCount = Math.max(
+    1,
+    Math.ceil(assigned.length / ASSIGNED_PAGE_SIZE)
+  );
   const openSliceStart = openPage * OPEN_PAGE_SIZE;
-  const openSliceEnd = Math.min(openJobs.length, openSliceStart + OPEN_PAGE_SIZE);
+  const openSliceEnd = Math.min(
+    openJobs.length,
+    openSliceStart + OPEN_PAGE_SIZE
+  );
   const assignedSliceStart = assignedPage * ASSIGNED_PAGE_SIZE;
-  const assignedSliceEnd = Math.min(assigned.length, assignedSliceStart + ASSIGNED_PAGE_SIZE);
+  const assignedSliceEnd = Math.min(
+    assigned.length,
+    assignedSliceStart + ASSIGNED_PAGE_SIZE
+  );
   const openRangeLabel =
     openJobs.length === 0
       ? "No open jobs"
@@ -364,14 +389,18 @@ export default function VendorApp() {
       ? "No active jobs"
       : assignedPageCount === 1
       ? `${assigned.length} active`
-      : `Showing ${assignedSliceStart + 1}-${assignedSliceEnd} of ${assigned.length}`;
+      : `Showing ${assignedSliceStart + 1}-${assignedSliceEnd} of ${
+          assigned.length
+        }`;
 
   useEffect(() => {
     setOpenPage((page) => Math.min(page, Math.max(0, openPageCount - 1)));
   }, [openPageCount]);
 
   useEffect(() => {
-    setAssignedPage((page) => Math.min(page, Math.max(0, assignedPageCount - 1)));
+    setAssignedPage((page) =>
+      Math.min(page, Math.max(0, assignedPageCount - 1))
+    );
   }, [assignedPageCount]);
 
   useEffect(() => {
@@ -553,7 +582,6 @@ export default function VendorApp() {
         onToggleCityFilter={setCityFilter}
       />
 
-
       {err && <div className="va-alert error card">{err}</div>}
 
       <section className="va-stats">
@@ -587,416 +615,503 @@ export default function VendorApp() {
             aria-controls="va-tab-assigned"
             aria-selected={activeTab === "assigned"}
             tabIndex={activeTab === "assigned" ? 0 : -1}
-            className={"va-tab" + (activeTab === "assigned" ? " is-active" : "")}
+            className={
+              "va-tab" + (activeTab === "assigned" ? " is-active" : "")
+            }
             onClick={() => setActiveTab("assigned")}
           >
             Assigned ({assigned.length})
           </button>
         </div>
         <div className="va-tabpanels">
-        <div className="va-panel card" role="tabpanel" id="va-tab-open" aria-labelledby="va-tab-open-btn" hidden={activeTab !== "open"}>
-          <div className="va-panel__head">
-            <div>
-              <h2>Open jobs</h2>
-              <p className="va-panel__hint">
-                {loading ? "Refreshing feed..." : openRangeLabel}
-              </p>
+          <div
+            className="va-panel card"
+            role="tabpanel"
+            id="va-tab-open"
+            aria-labelledby="va-tab-open-btn"
+            hidden={activeTab !== "open"}
+          >
+            <div className="va-panel__head">
+              <div>
+                <h2>Open jobs</h2>
+                <p className="va-panel__hint">
+                  {loading ? "Refreshing feed..." : openRangeLabel}
+                </p>
+              </div>
             </div>
-          </div>
-          {loading && openJobs.length === 0 ? (
-            <ul className="va-list">
-              {[1, 2, 3].map((key) => (
-                <li key={key} className="va-job va-job--skeleton">
-                  <div className="skeleton" style={{ height: 16, width: "76%" }} />
-                  <div className="skeleton" style={{ height: 14, width: "50%" }} />
-                </li>
-              ))}
-            </ul>
-          ) : openJobs.length === 0 ? (
-            <div className="va-empty">
-              <h4>No open jobs right now</h4>
-              <p>Leave the app open and we will refresh automatically for you.</p>
-            </div>
-          ) : (
-            <>
+            {loading && openJobs.length === 0 ? (
               <ul className="va-list">
-                {pagedOpenJobs.map((job) => {
-                  const distanceLabel = formatDistance(job.distanceKm);
-                  const travelMinutes = estimateTravelMinutes(job.distanceKm);
-                  const hasBid = job.canBid === false;
-                  const expanded = expandedJobId === job._id;
-                  const contactName =
-                    job.contactName ||
-                    job.customerName ||
-                    job.customer?.name ||
-                    job.contact?.name ||
-                    job.clientName;
-                  const contactPhone =
-                    job.contactPhone ||
-                    job.customerPhone ||
-                    job.phone ||
-                    job.contact?.phone;
-                  const dropoffAddress =
-                    job.dropoffAddress ||
-                    job.destination ||
-                    job.dropoff?.address;
-                  const noteText = extractNote(job);
-                  const vehicleDetails = [
-                    job.vehicleMake,
-                    job.vehicleModel,
-                    job.vehicleColor,
-                  ]
-                    .filter(Boolean)
-                    .join(" / ");
-                  const detailRows = [
-                    contactName ? { label: "Contact", value: contactName } : null,
-                    contactPhone ? { label: "Phone", value: String(contactPhone).trim() } : null,
-                    dropoffAddress ? { label: "Dropoff", value: dropoffAddress } : null,
-                    vehicleDetails ? { label: "Vehicle", value: vehicleDetails } : null,
-                    noteText ? { label: "Notes", value: noteText } : null,
-                  ].filter(Boolean);
-                  const statusLabel = (job.status && String(job.status).trim()) || "Unassigned";
-                  const statusClass = statusLabel.toLowerCase().replace(/\s+/g, "");
-                  return (
-                    <li
-                      key={job._id}
-                      className={"va-job" + (expanded ? " va-job--expanded" : "")}
-                      onClick={() => toggleJobExpansion(job._id)}
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={expanded}
-                      onKeyDown={(event) => handleJobKeyDown(event, job._id)}
-                    >
-                      <div className="va-job__main">
-                        <div className="va-job__header">
-                          <div className="va-job__title">{job.serviceType || "Service"}</div>
-                          <div className="va-chip-group">
-                            {job.guestRequest && (
-                              <span className="va-chip va-chip--customer">Customer</span>
-                            )}
-                            {job.heavyDuty && (
-                              <span className="va-chip va-chip--heavy">Heavy duty</span>
-                            )}
-                            <span className={`va-chip va-chip--mode ${job.bidMode}`}>
-                              {job.bidMode === "fixed" ? "Fixed price" : "Bid only"}
-                            </span>
-                            {hasBid && <span className="va-chip va-chip--success">Bid placed</span>}
-                          </div>
-                        </div>
-                        <p className="va-job__address">{job.pickupAddress}</p>
-                        <div className="va-job__meta">
-                          <span>{distanceLabel}</span>
-                          <span>
-                            {job.suggestedEtaMinutes
-                              ? `Suggested ETA ${job.suggestedEtaMinutes} min`
-                              : travelMinutes
-                              ? `Travel time ~${travelMinutes} min`
-                              : "ETA flexible"}
-                          </span>
-                        </div>
-                        <div className="va-job__meta muted">
-                          <span>Posted {timeAgo(job.created)}</span>
-                        </div>
-                        {expanded && detailRows.length > 0 ? (
-                          <div className="va-job__details">
-                            {detailRows.map((row) => (
-                              <div className="va-detail" key={row.label}>
-                                <span className="va-detail__label">{row.label}</span>
-                                <span className="va-detail__value">{row.value}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="va-job__cta">
-                        <button
-                          className="btn"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openBidSheet(job);
-                          }}
-                        >
-                          {hasBid ? "Update bid" : "Place bid"}
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
+                {[1, 2, 3].map((key) => (
+                  <li key={key} className="va-job va-job--skeleton">
+                    <div
+                      className="skeleton"
+                      style={{ height: 16, width: "76%" }}
+                    />
+                    <div
+                      className="skeleton"
+                      style={{ height: 14, width: "50%" }}
+                    />
+                  </li>
+                ))}
               </ul>
-              {openPageCount > 1 ? (
-                <div className="va-pagination">
-                  <button
-                    type="button"
-                    className="va-pagination__btn"
-                    onClick={() => setOpenPage((page) => Math.max(page - 1, 0))}
-                    disabled={openPage === 0}
-                  >
-                    Previous
-                  </button>
-                  <span className="va-pagination__indicator">
-                    Page {openPage + 1} of {openPageCount}
-                  </span>
-                  <button
-                    type="button"
-                    className="va-pagination__btn"
-                    onClick={() =>
-                      setOpenPage((page) => Math.min(page + 1, openPageCount - 1))
-                    }
-                    disabled={openPage + 1 >= openPageCount}
-                  >
-                    Next
-                  </button>
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
-
-        <div className="va-panel card" role="tabpanel" id="va-tab-assigned" aria-labelledby="va-tab-assigned-btn" hidden={activeTab !== "assigned"}>
-          <div className="va-panel__head">
-            <div>
-              <h2>Assigned / In progress</h2>
-              <p className="va-panel__hint">
-                {assigned.length === 0
-                  ? "Waiting for selection"
-                  : assignedRangeLabel}
-              </p>
-            </div>
-          </div>
-
-          {loading && assigned.length === 0 ? (
-            <ul className="va-list">
-              <li className="va-job va-job--skeleton">
-                <div className="skeleton" style={{ height: 16, width: "70%" }} />
-                <div className="skeleton" style={{ height: 14, width: "45%" }} />
-              </li>
-            </ul>
-          ) : assigned.length === 0 ? (
-            <div className="va-empty">
-              <h4>No jobs assigned yet</h4>
-              <p>As soon as a customer selects your bid, you will see it here.</p>
-            </div>
-          ) : (
-            <>
-              <ul className="va-list">
-                {pagedAssignedJobs.map((job) => {
-                  const expanded = expandedJobId === job._id;
-                  const contactName =
-                    job.contactName ||
-                    job.customerName ||
-                    job.customer?.name ||
-                    job.contact?.name ||
-                    job.clientName;
-                  const contactPhone =
-                    job.contactPhone ||
-                    job.customerPhone ||
-                    job.phone ||
-                    job.contact?.phone;
-                  const dropoffAddress =
-                    job.dropoffAddress ||
-                    job.destination ||
-                    job.dropoff?.address;
-                  const noteText = extractNote(job);
-                  const vehicleDetails = [
-                    job.vehicleMake,
-                    job.vehicleModel,
-                    job.vehicleColor,
-                  ]
-                    .filter(Boolean)
-                    .join(" / ");
-                  const travelMinutes = estimateTravelMinutes(job.distanceKm);
-                  const pickupCoords = derivePickupCoordinates(job);
-                  const dropoffCoords = deriveDropoffCoordinates(job);
-                  const routeLandmarks = dropoffCoords
-                    ? [
-                        {
-                          key: `${job._id}-dropoff`,
-                          label: "Dropoff",
-                          position: dropoffCoords,
-                          color: "#2563eb",
-                          textColor: "#ffffff",
-                        },
-                      ]
-                    : [];
-                  const hasRoute = Boolean(vendorCoordinates && pickupCoords);
-                  const routeFallbackCopy = !vendorCoordinates
-                    ? "Add your base location in your vendor profile to unlock turn-by-turn directions."
-                    : "Waiting on the customer to share a precise pickup coordinate.";
-                  const mapsLink = pickupCoords
-                    ? `https://www.google.com/maps/dir/?api=1${vendorCoordinates ? `&origin=${vendorCoordinates.lat},${vendorCoordinates.lng}` : ""}&destination=${pickupCoords.lat},${pickupCoords.lng}`
-                    : null;
-                  const vendorAvatar = me?.photoUrl || me?.avatarUrl || me?.logoUrl || null;
-                  const detailRows = [
-                    contactName ? { label: "Contact", value: contactName } : null,
-                    contactPhone ? { label: "Phone", value: String(contactPhone).trim() } : null,
-                    dropoffAddress ? { label: "Dropoff", value: dropoffAddress } : null,
-                    vehicleDetails ? { label: "Vehicle", value: vehicleDetails } : null,
-                    noteText ? { label: "Notes", value: noteText } : null,
-                  ].filter(Boolean);
-                  const statusLabel = (job.status && String(job.status).trim()) || "Unassigned";
-                  const statusClass = statusLabel.toLowerCase().replace(/\s+/g, "");
-                  return (
-                    <li
-                      key={job._id}
-                      className={"va-job" + (expanded ? " va-job--expanded" : "")}
-                      onClick={() => toggleJobExpansion(job._id)}
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={expanded}
-                      onKeyDown={(event) => handleJobKeyDown(event, job._id)}
-                    >
-                      <div className="va-job__main">
-                        <div className="va-job__header">
-                          <div className="va-job__title">{job.serviceType || "Service"}</div>
-                          <span className={`va-chip va-chip--status va-chip--${statusClass}`}>
-                            {statusLabel}
-                          </span>
-                        </div>
-                        <p className="va-job__address">{job.pickupAddress}</p>
-                        <div className="va-job__meta">
-                          <span>{formatDistance(job.distanceKm)}</span>
-                          <span>Assigned {timeAgo(job.created)}</span>
-                        </div>
-                        {expanded && detailRows.length > 0 ? (
-                          <div className="va-job__details">
-                            {detailRows.map((row) => (
-                              <div className="va-detail" key={row.label}>
-                                <span className="va-detail__label">{row.label}</span>
-                                <span className="va-detail__value">{row.value}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                        {expanded ? (
-                          hasRoute ? (
-                            <div className="va-job__map">
-                              <GMap
-                                key={`vendor-route-${job._id}`}
-                                drivers={[
-                                  {
-                                    lat: vendorCoordinates.lat,
-                                    lng: vendorCoordinates.lng,
-                                    label: "YOU",
-                                    color: "#0f172a",
-                                    textColor: "#ffffff",
-                                    avatarUrl: vendorAvatar,
-                                  },
-                                ]}
-                                destination={{
-                                  position: pickupCoords,
-                                  role: "customer",
-                                  title: job.pickupAddress || "Pickup location",
-                                  label: "Pickup",
-                                  color: "#f97316",
-                                  textColor: "#0f172a",
-                                }}
-                                landmarks={routeLandmarks}
-                                showRoute
-                              />
-                              <div className="va-job__map-meta">
-                                <span>
-                                  {travelMinutes
-                                    ? `Approx drive ${travelMinutes} min`
-                                    : "Route preview from your saved base location"}
+            ) : openJobs.length === 0 ? (
+              <div className="va-empty">
+                <h4>No open jobs right now</h4>
+                <p>
+                  Leave the app open and we will refresh automatically for you.
+                </p>
+              </div>
+            ) : (
+              <>
+                <ul className="va-list">
+                  {pagedOpenJobs.map((job) => {
+                    const distanceLabel = formatDistance(job.distanceKm);
+                    const travelMinutes = estimateTravelMinutes(job.distanceKm);
+                    const hasBid = job.canBid === false;
+                    const expanded = expandedJobId === job._id;
+                    const contactName =
+                      job.contactName ||
+                      job.customerName ||
+                      job.customer?.name ||
+                      job.contact?.name ||
+                      job.clientName;
+                    const contactPhone =
+                      job.contactPhone ||
+                      job.customerPhone ||
+                      job.phone ||
+                      job.contact?.phone;
+                    const dropoffAddress =
+                      job.dropoffAddress ||
+                      job.destination ||
+                      job.dropoff?.address;
+                    const noteText = extractNote(job);
+                    const vehicleDetails = [
+                      job.vehicleMake,
+                      job.vehicleModel,
+                      job.vehicleColor,
+                    ]
+                      .filter(Boolean)
+                      .join(" / ");
+                    const detailRows = [
+                      contactName
+                        ? { label: "Contact", value: contactName }
+                        : null,
+                      contactPhone
+                        ? { label: "Phone", value: String(contactPhone).trim() }
+                        : null,
+                      dropoffAddress
+                        ? { label: "Dropoff", value: dropoffAddress }
+                        : null,
+                      vehicleDetails
+                        ? { label: "Vehicle", value: vehicleDetails }
+                        : null,
+                      noteText ? { label: "Notes", value: noteText } : null,
+                    ].filter(Boolean);
+                    const statusLabel =
+                      (job.status && String(job.status).trim()) || "Unassigned";
+                    const statusClass = statusLabel
+                      .toLowerCase()
+                      .replace(/\s+/g, "");
+                    return (
+                      <li
+                        key={job._id}
+                        className={
+                          "va-job" + (expanded ? " va-job--expanded" : "")
+                        }
+                        onClick={() => toggleJobExpansion(job._id)}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expanded}
+                        onKeyDown={(event) => handleJobKeyDown(event, job._id)}
+                      >
+                        <div className="va-job__main">
+                          <div className="va-job__header">
+                            <div className="va-job__title">
+                              {job.serviceType || "Service"}
+                            </div>
+                            <div className="va-chip-group">
+                              {job.heavyDuty && (
+                                <span className="va-chip va-chip--heavy">
+                                  Heavy duty
                                 </span>
-                                {mapsLink && (
-                                  <a
-                                    href={mapsLink}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="va-job__map-link"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                    }}
-                                  >
-                                    Open in Google Maps
-                                  </a>
-                                )}
-                              </div>
+                              )}
+                              {job.bidMode === "fixed" && (
+                                <span
+                                  className={`va-chip va-chip--mode ${job.bidMode}`}
+                                >
+                                  Fixed price
+                                </span>
+                              )}
                             </div>
-                          ) : (
-                            <div className="va-job__map-placeholder">
-                              {routeFallbackCopy}
+                          </div>
+                          <p className="va-job__address">{job.pickupAddress}</p>
+                          <div className="va-job__meta">
+                            <span>{distanceLabel}</span>
+                            <span>
+                              {job.suggestedEtaMinutes
+                                ? `Suggested ETA ${job.suggestedEtaMinutes} min`
+                                : travelMinutes
+                                ? `Travel time ~${travelMinutes} min`
+                                : "ETA flexible"}
+                            </span>
+                          </div>
+                          <div className="va-job__meta muted">
+                            <span>Posted {timeAgo(job.created)}</span>
+                          </div>
+                          {expanded && detailRows.length > 0 ? (
+                            <div className="va-job__details">
+                              {detailRows.map((row) => (
+                                <div className="va-detail" key={row.label}>
+                                  <span className="va-detail__label">
+                                    {row.label}
+                                  </span>
+                                  <span className="va-detail__value">
+                                    {row.value}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          )
-                        ) : null}`r`n                      </div>
-                      <div className="va-job__cta va-job__cta--stack">
-                        {job.status === "Assigned" && (
-                          <button
-                            className="btn ghost"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setStatus(job._id, "OnTheWay");
-                            }}
-                          >
-                            Mark on the way
-                          </button>
-                        )}
-                        {job.status === "OnTheWay" && (
-                          <button
-                            className="btn ghost"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setStatus(job._id, "Arrived");
-                            }}
-                          >
-                            Mark arrived
-                          </button>
-                        )}
-                        {(job.status === "OnTheWay" || job.status === "Arrived") && (
+                          ) : null}
+                        </div>
+                        <div className="va-job__cta">
                           <button
                             className="btn"
                             onClick={(event) => {
                               event.stopPropagation();
-                              setStatus(job._id, "Completed");
+                              openBidSheet(job);
                             }}
                           >
-                            Complete job
+                            {hasBid ? "Update bid" : "Place bid"}
                           </button>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {openPageCount > 1 ? (
+                  <div className="va-pagination">
+                    <button
+                      type="button"
+                      className="va-pagination__btn"
+                      onClick={() =>
+                        setOpenPage((page) => Math.max(page - 1, 0))
+                      }
+                      disabled={openPage === 0}
+                    >
+                      Previous
+                    </button>
+                    <span className="va-pagination__indicator">
+                      Page {openPage + 1} of {openPageCount}
+                    </span>
+                    <button
+                      type="button"
+                      className="va-pagination__btn"
+                      onClick={() =>
+                        setOpenPage((page) =>
+                          Math.min(page + 1, openPageCount - 1)
+                        )
+                      }
+                      disabled={openPage + 1 >= openPageCount}
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+
+          <div
+            className="va-panel card"
+            role="tabpanel"
+            id="va-tab-assigned"
+            aria-labelledby="va-tab-assigned-btn"
+            hidden={activeTab !== "assigned"}
+          >
+            <div className="va-panel__head">
+              <div>
+                <h2>Assigned / In progress</h2>
+                <p className="va-panel__hint">
+                  {assigned.length === 0
+                    ? "Waiting for selection"
+                    : assignedRangeLabel}
+                </p>
+              </div>
+            </div>
+
+            {loading && assigned.length === 0 ? (
+              <ul className="va-list">
+                <li className="va-job va-job--skeleton">
+                  <div
+                    className="skeleton"
+                    style={{ height: 16, width: "70%" }}
+                  />
+                  <div
+                    className="skeleton"
+                    style={{ height: 14, width: "45%" }}
+                  />
+                </li>
               </ul>
-              {assignedPageCount > 1 ? (
-                <div className="va-pagination">
-                  <button
-                    type="button"
-                    className="va-pagination__btn"
-                    onClick={() => setAssignedPage((page) => Math.max(page - 1, 0))}
-                    disabled={assignedPage === 0}
-                  >
-                    Previous
-                  </button>
-                  <span className="va-pagination__indicator">
-                    Page {assignedPage + 1} of {assignedPageCount}
-                  </span>
-                  <button
-                    type="button"
-                    className="va-pagination__btn"
-                    onClick={() =>
-                      setAssignedPage((page) => Math.min(page + 1, assignedPageCount - 1))
-                    }
-                    disabled={assignedPage + 1 >= assignedPageCount}
-                  >
-                    Next
-                  </button>
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
+            ) : assigned.length === 0 ? (
+              <div className="va-empty">
+                <h4>No jobs assigned yet</h4>
+                <p>
+                  As soon as a customer selects your bid, you will see it here.
+                </p>
+              </div>
+            ) : (
+              <>
+                <ul className="va-list">
+                  {pagedAssignedJobs.map((job) => {
+                    const expanded = expandedJobId === job._id;
+                    const contactName =
+                      job.contactName ||
+                      job.customerName ||
+                      job.customer?.name ||
+                      job.contact?.name ||
+                      job.clientName;
+                    const contactPhone =
+                      job.contactPhone ||
+                      job.customerPhone ||
+                      job.phone ||
+                      job.contact?.phone;
+                    const dropoffAddress =
+                      job.dropoffAddress ||
+                      job.destination ||
+                      job.dropoff?.address;
+                    const noteText = extractNote(job);
+                    const vehicleDetails = [
+                      job.vehicleMake,
+                      job.vehicleModel,
+                      job.vehicleColor,
+                    ]
+                      .filter(Boolean)
+                      .join(" / ");
+                    const travelMinutes = estimateTravelMinutes(job.distanceKm);
+                    const pickupCoords = derivePickupCoordinates(job);
+                    const dropoffCoords = deriveDropoffCoordinates(job);
+                    const routeLandmarks = dropoffCoords
+                      ? [
+                          {
+                            key: `${job._id}-dropoff`,
+                            label: "Dropoff",
+                            position: dropoffCoords,
+                            color: "#2563eb",
+                            textColor: "#ffffff",
+                          },
+                        ]
+                      : [];
+                    const hasRoute = Boolean(vendorCoordinates && pickupCoords);
+                    const routeFallbackCopy = !vendorCoordinates
+                      ? "Add your base location in your vendor profile to unlock turn-by-turn directions."
+                      : "Waiting on the customer to share a precise pickup coordinate.";
+                    const mapsLink = pickupCoords
+                      ? `https://www.google.com/maps/dir/?api=1${
+                          vendorCoordinates
+                            ? `&origin=${vendorCoordinates.lat},${vendorCoordinates.lng}`
+                            : ""
+                        }&destination=${pickupCoords.lat},${pickupCoords.lng}`
+                      : null;
+                    const vendorAvatar =
+                      me?.photoUrl || me?.avatarUrl || me?.logoUrl || null;
+                    const detailRows = [
+                      contactName
+                        ? { label: "Contact", value: contactName }
+                        : null,
+                      contactPhone
+                        ? { label: "Phone", value: String(contactPhone).trim() }
+                        : null,
+                      dropoffAddress
+                        ? { label: "Dropoff", value: dropoffAddress }
+                        : null,
+                      vehicleDetails
+                        ? { label: "Vehicle", value: vehicleDetails }
+                        : null,
+                      noteText ? { label: "Notes", value: noteText } : null,
+                    ].filter(Boolean);
+                    const statusLabel =
+                      (job.status && String(job.status).trim()) || "Unassigned";
+                    const statusClass = statusLabel
+                      .toLowerCase()
+                      .replace(/\s+/g, "");
+                    return (
+                      <li
+                        key={job._id}
+                        className={
+                          "va-job" + (expanded ? " va-job--expanded" : "")
+                        }
+                        onClick={() => toggleJobExpansion(job._id)}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expanded}
+                        onKeyDown={(event) => handleJobKeyDown(event, job._id)}
+                      >
+                        <div className="va-job__main">
+                          <div className="va-job__header">
+                            <div className="va-job__title">
+                              {job.serviceType || "Service"}
+                            </div>
+                            <span
+                              className={`va-chip va-chip--status va-chip--${statusClass}`}
+                            >
+                              {statusLabel}
+                            </span>
+                          </div>
+                          <p className="va-job__address">{job.pickupAddress}</p>
+                          <div className="va-job__meta">
+                            <span>{formatDistance(job.distanceKm)}</span>
+                            <span>Assigned {timeAgo(job.created)}</span>
+                          </div>
+                          {expanded && detailRows.length > 0 ? (
+                            <div className="va-job__details">
+                              {detailRows.map((row) => (
+                                <div className="va-detail" key={row.label}>
+                                  <span className="va-detail__label">
+                                    {row.label}
+                                  </span>
+                                  <span className="va-detail__value">
+                                    {row.value}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {/* REPLACED: embedded map -> Compact "Get directions" button for assigned jobs */}
+                          {expanded ? (
+                            mapsLink ? (
+                              <div className="va-job__map">
+                                <div className="va-job__map-meta">
+                                  <span>
+                                    {travelMinutes
+                                      ? `Approx drive ${travelMinutes} min`
+                                      : routeFallbackCopy}
+                                  </span>
+
+                                  <a
+                                    href={mapsLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="va-job__map-button"
+                                    onClick={(e) => {
+                                      // prevent parent li from collapsing when clicking CTA
+                                      e.stopPropagation();
+                                    }}
+                                  >
+                                    Get directions
+                                    <span aria-hidden="true">→</span>
+                                  </a>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="va-job__map-placeholder">
+                                {routeFallbackCopy}
+                              </div>
+                            )
+                          ) : null}
+                          {/* END replacement */}
+                        </div>
+
+                        <div className="va-job__cta va-job__cta--stack">
+                          {job.status === "Assigned" && (
+                            <button
+                              className="btn ghost"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setStatus(job._id, "OnTheWay");
+                              }}
+                            >
+                              Mark on the way
+                            </button>
+                          )}
+                          {job.status === "OnTheWay" && (
+                            <button
+                              className="btn ghost"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setStatus(job._id, "Arrived");
+                              }}
+                            >
+                              Mark arrived
+                            </button>
+                          )}
+                          {(job.status === "OnTheWay" ||
+                            job.status === "Arrived") && (
+                            <button
+                              className="btn"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setStatus(job._id, "Completed");
+                              }}
+                            >
+                              Complete job
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {assignedPageCount > 1 ? (
+                  <div className="va-pagination">
+                    <button
+                      type="button"
+                      className="va-pagination__btn"
+                      onClick={() =>
+                        setAssignedPage((page) => Math.max(page - 1, 0))
+                      }
+                      disabled={assignedPage === 0}
+                    >
+                      Previous
+                    </button>
+                    <span className="va-pagination__indicator">
+                      Page {assignedPage + 1} of {assignedPageCount}
+                    </span>
+                    <button
+                      type="button"
+                      className="va-pagination__btn"
+                      onClick={() =>
+                        setAssignedPage((page) =>
+                          Math.min(page + 1, assignedPageCount - 1)
+                        )
+                      }
+                      disabled={assignedPage + 1 >= assignedPageCount}
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
         </div>
       </section>
+
+      <footer className="va-support card" role="contentinfo">
+        <p className="va-support__title">Need assistance?</p>
+        <p className="va-support__copy">
+          Call our dispatch team at{" "}
+          <a className="va-support__phone" href="tel:+18883623743">
+            1 (888) 362-3743
+          </a>
+        </p>
+      </footer>
 
       {bidSheet?.job && (
         <div className="va-sheet" role="dialog" aria-modal="true">
           <div className="va-sheet__backdrop" onClick={closeBidSheet} />
           <div className="va-sheet__card card">
-            <button className="va-sheet__close" onClick={closeBidSheet} aria-label="Close">&times;</button>
+            <button
+              className="va-sheet__close"
+              onClick={closeBidSheet}
+              aria-label="Close"
+            >
+              &times;
+            </button>
             <p className="va-overline">Submit bid</p>
-            <h2 className="va-sheet__title">{bidSheet.job.serviceType || "Service"}</h2>
+            <h2 className="va-sheet__title">
+              {bidSheet.job.serviceType || "Service"}
+            </h2>
             <p className="va-sheet__address">{bidSheet.job.pickupAddress}</p>
             <div className="va-sheet__meta">
               <span>{formatDistance(bidSheet.job.distanceKm)}</span>
@@ -1024,7 +1139,9 @@ export default function VendorApp() {
                     <button
                       type="button"
                       className="va-pill"
-                      onClick={() => updateBidField("eta", bidSheet.suggestedEta)}
+                      onClick={() =>
+                        updateBidField("eta", bidSheet.suggestedEta)
+                      }
                     >
                       Use suggestion ({bidSheet.suggestedEta}m)
                     </button>
@@ -1060,7 +1177,9 @@ export default function VendorApp() {
                   <button
                     type="button"
                     className="va-pill"
-                    onClick={() => updateBidField("price", bidSheet.suggestedPrice)}
+                    onClick={() =>
+                      updateBidField("price", bidSheet.suggestedPrice)
+                    }
                   >
                     Suggested ${bidSheet.suggestedPrice}
                   </button>
@@ -1070,7 +1189,10 @@ export default function VendorApp() {
                     onClick={() =>
                       updateBidField(
                         "price",
-                        Math.max(40, Math.round(Number(bidSheet.price || 0) * 1.1))
+                        Math.max(
+                          40,
+                          Math.round(Number(bidSheet.price || 0) * 1.1)
+                        )
                       )
                     }
                   >
@@ -1080,13 +1202,23 @@ export default function VendorApp() {
               </div>
             </div>
 
-            {bidError && <div className="va-alert error compact">{bidError}</div>}
+            {bidError && (
+              <div className="va-alert error compact">{bidError}</div>
+            )}
 
             <div className="va-sheet__actions">
-              <button className="btn ghost" onClick={closeBidSheet} disabled={bidSubmitting}>
+              <button
+                className="btn ghost"
+                onClick={closeBidSheet}
+                disabled={bidSubmitting}
+              >
                 Cancel
               </button>
-              <button className="btn" onClick={submitBid} disabled={bidSubmitting}>
+              <button
+                className="btn"
+                onClick={submitBid}
+                disabled={bidSubmitting}
+              >
                 {bidSubmitting ? "Sending..." : "Send bid"}
               </button>
             </div>
@@ -1096,8 +1228,3 @@ export default function VendorApp() {
     </div>
   );
 }
-
-
-
-
-
