@@ -141,6 +141,7 @@ export default function AdminSettings() {
         <div className="grid2">
           {[
             ["requireDriverDocs", "Require Driver Docs"],
+            ["requireVendorDocs", "Require Vendor Docs"],
             ["showBusinessDocs", "Show Business Docs"],
             ["showLiveDriverMap", "Show Live Driver Map"],
             ["advancedJobWorkflow", "Advanced Job Workflow"],

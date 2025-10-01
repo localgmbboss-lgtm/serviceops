@@ -8,7 +8,6 @@ import {
   PiShieldCheckBold,
   PiHeadsetBold,
   PiPhoneCallBold,
-  PiTruckBold,
 } from "react-icons/pi";
 import { loadGoogleMaps } from "../lib/loadGoogleMaps";
 import img1 from "../images/img1.jpg";
@@ -52,14 +51,47 @@ const aboutStats = [
     detail: "Text, phone, and portal updates around the clock.",
   },
 ];
-
-const aboutBadges = [
-  { icon: PiLightningBold, label: "Jump starts" },
-  { icon: PiWrenchBold, label: "Heavy winch" },
-  { icon: PiSteeringWheelBold, label: "Exotic towing" },
-  { icon: PiHeadsetBold, label: "Live concierge" },
+const aboutSpotlights = [
+  {
+    id: "dispatch",
+    label: "Rapid dispatch",
+    metric: "2m 11s",
+    metricLabel: "first vendor acceptance",
+    title: "Rapid dispatch coverage",
+    description:
+      "Smart routing pings the closest certified truck and keeps escalating until a rig is locked in.",
+    bullets: [
+      "Bench vendors auto-notified if the closest unit declines.",
+      "Ops desk escalates the job at the 90-second mark.",
+    ],
+  },
+  {
+    id: "quality",
+    label: "Damage-free ops",
+    metric: "99.8%",
+    metricLabel: "jobs closed without claims",
+    title: "Damage-free recoveries",
+    description:
+      "Every recovery flows through a digital checklist so we document photos, torque specs, and signatures.",
+    bullets: [
+      "Operators upload hook-up and drop-off photos before closing.",
+      "Claims workflow triggers instantly if anything looks off.",
+    ],
+  },
+  {
+    id: "visibility",
+    label: "Live visibility",
+    metric: "120 mi",
+    metricLabel: "live-tracked radius",
+    title: "Customer visibility",
+    description:
+      "Live telemetry keeps families, fleets, and insurers in the loop from hook to drop.",
+    bullets: [
+      "Customer status pages refresh with ETAs every 30 seconds.",
+      "SMS, email, and portal alerts mirror the same timeline.",
+    ],
+  },
 ];
-
 const playbookSteps = [
   {
     title: "Rapid intake",
@@ -92,6 +124,8 @@ export default function Landing() {
   const [locationLabel, setLocationLabel] = useState("Locating...");
   const [hasGeoError, setHasGeoError] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
+  const [activeSpotlight, setActiveSpotlight] = useState(0);
+  const [spotlightPaused, setSpotlightPaused] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,6 +201,18 @@ export default function Landing() {
     };
   }, []);
 
+  const spotlightCount = aboutSpotlights.length;
+  useEffect(() => {
+    if (spotlightPaused || spotlightCount <= 1) return undefined;
+    if (typeof window === "undefined") return undefined;
+    const timer = window.setInterval(() => {
+      setActiveSpotlight((prev) => (prev + 1) % spotlightCount);
+    }, 6500);
+    return () => window.clearInterval(timer);
+  }, [spotlightPaused, spotlightCount, activeSpotlight]);
+
+  const activeSpotlightItem =
+    aboutSpotlights[activeSpotlight] ?? aboutSpotlights[0];
   const imageCount = galleryImages.length;
   useEffect(() => {
     if (imageCount <= 1) return undefined;
@@ -282,25 +328,59 @@ export default function Landing() {
                 <p>{copy}</p>
               </article>
             ))}
-            <div className="about-motion">
-              <div className="about-motion__track">
-                {[...aboutBadges, ...aboutBadges].map(({ icon: Icon, label }, idx) => (
-                  <span key={`${label}-${idx}`} className="about-badge">
-                    <Icon aria-hidden="true" />
-                    {label}
-                  </span>
-                ))}
+          </div>
+          <div
+            className="about-visual"
+            onMouseEnter={() => setSpotlightPaused(true)}
+            onMouseLeave={() => setSpotlightPaused(false)}
+            onFocusCapture={() => setSpotlightPaused(true)}
+            onBlurCapture={() => setSpotlightPaused(false)}
+          >
+            <div className="about-visual__pulse" aria-hidden="true" />
+            <div
+              className="about-showcase"
+              data-active={activeSpotlightItem?.id || ""}
+              aria-live="polite"
+              role="group"
+            >
+              <div
+                key={activeSpotlightItem?.id || "spotlight"}
+                className="about-showcase__metric"
+              >
+                <span className="about-showcase__metric-value">
+                  {activeSpotlightItem?.metric}
+                </span>
+                <span className="about-showcase__metric-label">
+                  {activeSpotlightItem?.metricLabel}
+                </span>
               </div>
-            </div>
-            <div className="about-visual" aria-hidden="true">
-              <div className="about-visual__road">
-                <span className="about-visual__label about-visual__label--start">Castle Rock</span>
-                <span className="about-visual__label about-visual__label--mid">I-25 Corridor</span>
-                <span className="about-visual__label about-visual__label--end">Denver Metro</span>
-                <div className="about-visual__vehicle">
-                  <PiTruckBold />
-                </div>
-                <div className="about-visual__pulse"></div>
+              <div className="about-showcase__body">
+                <h4>{activeSpotlightItem?.title}</h4>
+                <p>{activeSpotlightItem?.description}</p>
+                <ul className="about-showcase__list">
+                  {activeSpotlightItem?.bullets.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div
+                className="about-showcase__tabs"
+                role="tablist"
+                aria-label="Titan Tow Force highlights"
+              >
+                {aboutSpotlights.map((item, idx) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`about-showcase__tab ${
+                      idx === activeSpotlight ? "is-active" : ""
+                    }`}
+                    aria-pressed={idx === activeSpotlight}
+                    onClick={() => setActiveSpotlight(idx)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

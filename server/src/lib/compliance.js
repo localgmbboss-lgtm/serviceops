@@ -2,22 +2,33 @@
 import Document from "../models/Document.js";
 import Settings from "../models/Settings.js";
 
-/**
- * Returns { ok: boolean, reasons: string[], required: string[] }
- * Rules:
- *  - If Settings.requireDriverDocs is false => ok
- *  - Required doc types come from Settings.requiredDriverDocs or default ["license", "insurance"]
- *  - A driver is compliant if there is an unexpired doc for each required type
- */
+const DEFAULT_DRIVER_DOCS = ["license", "insurance"];
+const DEFAULT_VENDOR_DOCS = ["license", "insurance", "business"];
+
+const normalizeDocs = (value, fallback) => {
+  if (Array.isArray(value) && value.length) {
+    return value;
+  }
+  return fallback;
+};
+
+const lower = (value) => (value || "").toLowerCase();
+
 export async function checkDriverCompliance(driverId) {
   const settings = await Settings.findOne().lean().exec();
-  const require = !!settings?.requireDriverDocs;
-  const required =
-    Array.isArray(settings?.requiredDriverDocs) &&
-    settings.requiredDriverDocs.length
-      ? settings.requiredDriverDocs
-      : ["license", "insurance"];
-  if (!require) return { ok: true, reasons: [], required };
+  const workflow = settings?.workflow || {};
+
+  const require = Boolean(
+    workflow.requireDriverDocs ?? settings?.requireDriverDocs ?? false
+  );
+  const required = normalizeDocs(
+    workflow.requiredDriverDocs ?? settings?.requiredDriverDocs,
+    DEFAULT_DRIVER_DOCS
+  );
+
+  if (!require) {
+    return { ok: true, reasons: [], required };
+  }
 
   const docs = await Document.find({ ownerType: "driver", driverId })
     .lean()
@@ -25,39 +36,38 @@ export async function checkDriverCompliance(driverId) {
   const now = Date.now();
 
   const reasons = [];
-  required.forEach((t) => {
-    const found = docs.find(
-      (d) =>
-        (d.type || "").toLowerCase() === t.toLowerCase() &&
-        (!d.expiresAt || new Date(d.expiresAt).getTime() > now)
+  required.forEach((type) => {
+    const key = lower(type);
+    const valid = docs.find(
+      (doc) =>
+        lower(doc.type) === key &&
+        (!doc.expiresAt || new Date(doc.expiresAt).getTime() > now)
     );
-    if (!found) {
-      const had = docs.find(
-        (d) => (d.type || "").toLowerCase() === t.toLowerCase()
-      );
-      reasons.push(had ? `${t} expired/missing` : `${t} missing`);
+
+    if (!valid) {
+      const had = docs.find((doc) => lower(doc.type) === key);
+      reasons.push(had ? `${type} expired/missing` : `${type} missing`);
     }
   });
 
   return { ok: reasons.length === 0, reasons, required };
 }
 
-/**
- * Returns { ok: boolean, reasons: string[], required: string[] }
- * Rules:
- *  - If Settings.requireVendorDocs is false => ok
- *  - Required doc types come from Settings.requiredVendorDocs or default ["license", "insurance", "business"]
- *  - A vendor is compliant if there is an unexpired doc for each required type
- */
 export async function checkVendorCompliance(vendorId) {
   const settings = await Settings.findOne().lean().exec();
-  const require = !!settings?.requireVendorDocs;
-  const required =
-    Array.isArray(settings?.requiredVendorDocs) &&
-    settings.requiredVendorDocs.length
-      ? settings.requiredVendorDocs
-      : ["license", "insurance", "business"];
-  if (!require) return { ok: true, reasons: [], required };
+  const workflow = settings?.workflow || {};
+
+  const require = Boolean(
+    workflow.requireVendorDocs ?? settings?.requireVendorDocs ?? false
+  );
+  const required = normalizeDocs(
+    workflow.requiredVendorDocs ?? settings?.requiredVendorDocs,
+    DEFAULT_VENDOR_DOCS
+  );
+
+  if (!require) {
+    return { ok: true, reasons: [], required };
+  }
 
   const docs = await Document.find({ ownerType: "vendor", vendorId })
     .lean()
@@ -65,17 +75,17 @@ export async function checkVendorCompliance(vendorId) {
   const now = Date.now();
 
   const reasons = [];
-  required.forEach((t) => {
-    const found = docs.find(
-      (d) =>
-        (d.type || "").toLowerCase() === t.toLowerCase() &&
-        (!d.expiresAt || new Date(d.expiresAt).getTime() > now)
+  required.forEach((type) => {
+    const key = lower(type);
+    const valid = docs.find(
+      (doc) =>
+        lower(doc.type) === key &&
+        (!doc.expiresAt || new Date(doc.expiresAt).getTime() > now)
     );
-    if (!found) {
-      const had = docs.find(
-        (d) => (d.type || "").toLowerCase() === t.toLowerCase()
-      );
-      reasons.push(had ? `${t} expired/missing` : `${t} missing`);
+
+    if (!valid) {
+      const had = docs.find((doc) => lower(doc.type) === key);
+      reasons.push(had ? `${type} expired/missing` : `${type} missing`);
     }
   });
 
@@ -83,15 +93,17 @@ export async function checkVendorCompliance(vendorId) {
 }
 
 export async function complianceSummary({ ownerType, driverId, vendorId }) {
-  const q = { ownerType };
-  if (ownerType === "driver") q.driverId = driverId;
-  if (ownerType === "vendor") q.vendorId = vendorId;
+  const query = { ownerType };
+  if (ownerType === "driver") query.driverId = driverId;
+  if (ownerType === "vendor") query.vendorId = vendorId;
+
   const now = Date.now();
-  const docs = await Document.find(q).lean();
-  const approved = docs.filter((d) => d.status === "approved");
+  const docs = await Document.find(query).lean();
+  const approved = docs.filter((doc) => doc.status === "approved");
   const expired = approved.filter(
-    (d) => d.expiresAt && new Date(d.expiresAt).getTime() <= now
+    (doc) => doc.expiresAt && new Date(doc.expiresAt).getTime() <= now
   );
+
   return {
     total: docs.length,
     approved: approved.length,

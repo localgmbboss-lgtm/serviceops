@@ -117,79 +117,6 @@ export default function AdminDashboard() {
     return { ctx, cssW, cssH };
   }
 
-  // City trend bar chart
-  const cityCanvasRef = useRef(null);
-  useEffect(() => {
-    if (!dash?.cityTrend || !cityCanvasRef.current) return;
-    const { labels, series } = dash.cityTrend;
-    const cities = Object.keys(series).slice(0, 4);
-
-    const canvas = cityCanvasRef.current;
-    const { ctx, cssW, cssH } = sizeCanvas(canvas);
-    ctx.clearRect(0, 0, cssW, cssH);
-
-    const N = labels.length;
-    const pad = 24;
-    const gy = 20;
-    const plotW = cssW - pad * 2;
-    const plotH = cssH - gy - 24;
-
-    const maxY = Math.max(
-      1,
-      ...labels.map((_, i) =>
-        cities.reduce((s, c) => s + (series[c]?.[i] || 0), 0)
-      )
-    );
-
-    // Axes
-    ctx.strokeStyle = "#e5e7eb";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(pad, gy);
-    ctx.lineTo(pad, gy + plotH);
-    ctx.lineTo(pad + plotW, gy + plotH);
-    ctx.stroke();
-
-    // Gridlines
-    ctx.strokeStyle = "#f3f4f6";
-    ctx.setLineDash([3, 3]);
-    for (let k = 1; k <= 3; k++) {
-      const y = gy + (plotH * k) / 4;
-      ctx.beginPath();
-      ctx.moveTo(pad, y);
-      ctx.lineTo(pad + plotW, y);
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
-
-    // Stacked bars
-    const barW = (plotW / N) * 0.72;
-    const palette = ["#0f62fe", "#22c55e", "#f59e0b", "#ef4444"];
-
-    labels.forEach((_, i) => {
-      const x = pad + (i + 0.14) * (plotW / N);
-      let yBase = gy + plotH;
-
-      cities.forEach((c, idx) => {
-        const v = series[c]?.[i] ?? 0;
-        const h = (v / maxY) * plotH;
-        ctx.fillStyle = palette[idx % palette.length];
-        ctx.fillRect(x, yBase - h, barW, h);
-        yBase -= h;
-      });
-    });
-
-    // X labels
-    ctx.fillStyle = "#6b7280";
-    ctx.font = "10px system-ui, -apple-system, Segoe UI, Roboto";
-    labels.forEach((lab, i) => {
-      if (i % 3 !== 0 && i !== labels.length - 1) return;
-      const x = pad + (i + 0.5) * (plotW / N);
-      ctx.textAlign = "center";
-      ctx.fillText(lab.slice(5), x, gy + plotH + 12);
-    });
-  }, [dash, viewportW]);
-
   // Satisfaction donut chart
   const satCanvasRef = useRef(null);
   useEffect(() => {
@@ -467,6 +394,7 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 
 
 

@@ -1,4 +1,4 @@
-﻿/* AdminDashboard.css - SCOPED to .admindash to prevent bleed */
+/* AdminDashboard.css - SCOPED to .admindash to prevent bleed */
 
 /* Put design tokens on the root dashboard wrapper, not :root */
 .admindash {
@@ -380,6 +380,35 @@
 }
 
 /* Charts - CSS controls height; JS sizes canvas to clientHeight */
+.admindash .trends-card {
+  background: linear-gradient(135deg, #0f172a 0%, #111827 50%, #0b1220 100%);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+  color: #e2e8f0;
+  position: relative;
+  overflow: hidden;
+}
+
+.admindash .trends-card::before {
+  content: "";
+  position: absolute;
+  inset: 18% 45% auto -20%;
+  height: 220px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.32), rgba(59, 130, 246, 0));
+  filter: blur(0.5px);
+  pointer-events: none;
+}
+
+.admindash .trends-card .section-title {
+  color: #f8fafc;
+}
+
+.admindash .trends-card .chart-canvas {
+  --chart-h: 240px;
+  background: transparent;
+}
+
 .admindash .chart-canvas {
   width: 100%;
   height: var(--chart-h);
@@ -675,6 +704,7 @@
     justify-content: flex-start;
   }
 }
+
 
 
 

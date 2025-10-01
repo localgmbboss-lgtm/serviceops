@@ -1,0 +1,51 @@
+diff --git a/client/src/pages/Landing.jsx b/client/src/pages/Landing.jsx
+index 3b41f04..67c30b1 100644
+--- a/client/src/pages/Landing.jsx
++++ b/client/src/pages/Landing.jsx
+@@ -51,6 +51,34 @@ const aboutStats = [
+     label: "Live command",
+     detail: "Text, phone, and portal updates around the clock.",
+   },
+ ];
++const aboutSpotlights = [
++  {
++    id: "dispatch",
++    label: "Rapid dispatch",
++    metric: "2m 11s",
++    metricLabel: "first vendor acceptance",
++    title: "Rapid dispatch coverage",
++    description:
++      "Smart routing pings the closest certified truck and keeps escalating until a rig is locked in.",
++    bullets: [
++      "Bench vendors auto-notified if the closest unit declines.",
++      "Ops desk escalates the job at the 90-second mark.",
++    ],
++  },
++  {
++    id: "quality",
++    label: "Damage-free ops",
++    metric: "99.8%",
++    metricLabel: "jobs closed without claims",
++    title: "Damage-free recoveries",
++    description:
++      "Every recovery flows through a digital checklist so we document photos, torque specs, and signatures.",
++    bullets: [
++      "Operators upload hook-up and drop-off photos before closing.",
++      "Claims workflow triggers instantly if anything looks off.",
++    ],
++  },
++  {
++    id: "visibility",
++    label: "Live visibility",
++    metric: "120 mi",
++    metricLabel: "live-tracked radius",
++    title: "Customer visibility",
++    description:
++      "Live telemetry keeps families, fleets, and insurers in the loop from hook to drop.",
++    bullets: [
++      "Customer status pages refresh with ETAs every 30 seconds.",
++      "SMS, email, and portal alerts mirror the same timeline.",
++    ],
++  },
++];
+ const playbookSteps = [

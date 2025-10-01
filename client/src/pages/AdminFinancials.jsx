@@ -15,7 +15,9 @@ export default function AdminFinancials(){
       const params = new URLSearchParams();
       if(from) params.set("from", from);
       if(to) params.set("to", to);
-      const { data } = await api.get(`/api/reports/financials?${params.toString()}`);
+      const query = params.toString();
+      const url = query ? `/api/financials?${query}` : "/api/financials";
+      const { data } = await api.get(url);
       setSum(data); setErr("");
     }catch(e){
       setErr(e?.response?.data?.message || "Failed to load financials");
