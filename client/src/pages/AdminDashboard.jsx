@@ -119,6 +119,10 @@ export default function AdminDashboard() {
 
   // Satisfaction donut chart
   const satCanvasRef = useRef(null);
+
+  // <-- ADDED: city canvas ref to fix the missing-ref runtime error
+  const cityCanvasRef = useRef(null);
+
   useEffect(() => {
     if (!dash?.satisfaction || !satCanvasRef.current) return;
     const { five = 0, private: priv = 0 } = dash.satisfaction;
@@ -151,6 +155,58 @@ export default function AdminDashboard() {
     ctx.fillStyle = "#6b7280";
     ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto";
     ctx.fillText(`5* vs private`, cx, cy + 22);
+  }, [dash, viewportW]);
+
+  // Simple Jobs-by-City bar chart effect (prevents runtime errors when rendering)
+  useEffect(() => {
+    if (!cityCanvasRef.current) return;
+    const canvas = cityCanvasRef.current;
+    const { ctx, cssW, cssH } = sizeCanvas(canvas);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const data = dash?.jobsByCity || dash?.jobs_by_city || []; // tolerate different shapes
+    if (!Array.isArray(data) || data.length === 0) {
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
+      ctx.textAlign = "center";
+      ctx.fillText("No data", cssW / 2, cssH / 2);
+      return;
+    }
+
+    // Expect data items like { city: "Name", count: 12 } or { city: "X", jobs: 12 }
+    const points = data.map((d) => ({
+      label: d.city || d.name || "-",
+      value: Number(d.count ?? d.jobs ?? 0),
+    }));
+
+    const maxV = Math.max(...points.map((p) => p.value), 1);
+    const padding = 28;
+    const availableW = cssW - padding * 2;
+    const gap = 12;
+    const barWidth = Math.max(8, (availableW - gap * (points.length - 1)) / points.length);
+    const bottomY = cssH - 28;
+
+    // draw labels and bars
+    points.forEach((p, i) => {
+      const x = padding + i * (barWidth + gap);
+      const h = (p.value / maxV) * (cssH - 80);
+      // bar
+      ctx.fillStyle = "#3b82f6";
+      ctx.fillRect(x, bottomY - h, barWidth, h);
+      // value text
+      ctx.fillStyle = "#111827";
+      ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto";
+      ctx.textAlign = "center";
+      ctx.fillText(p.value.toString(), x + barWidth / 2, bottomY - h - 8);
+      // label (wrap/clip)
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto";
+      ctx.fillText(
+        p.label.length > 10 ? p.label.slice(0, 10) + "…" : p.label,
+        x + barWidth / 2,
+        bottomY + 16
+      );
+    });
   }, [dash, viewportW]);
 
   const snap = dash?.revenue?.[slice] || {
@@ -311,7 +367,8 @@ export default function AdminDashboard() {
           <div className="card-head">
             <h3 className="section-title">Expiring Documents (7 days)</h3>
             <Link to="/admin/documents" className="small link view-all">
-              View all ->
+                View all &gt;
+
             </Link>
           </div>
           <ul className="doc-list">
@@ -394,9 +451,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-
-
-
-
-
