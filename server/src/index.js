@@ -2,7 +2,9 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { createServer } from "http";
 import { connectDB } from "./lib/db.js";
+import { initRealtime } from "./realtime/index.js";
 
 import drivers from "./routes/drivers.js";
 import jobs from "./routes/jobs.js";
@@ -29,6 +31,7 @@ import vendors from "./routes/vendors.js";
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration -----------------------------------------------------
@@ -66,9 +69,11 @@ const allowedOrigins = new Set([
   ...configuredOrigins,
 ]);
 
+const allowAllOrigins = process.env.CORS_ALLOW_ALL === "true";
+
 const corsOptions = {
   origin: (origin, cb) => {
-    if (process.env.CORS_ALLOW_ALL === "true") return cb(null, true);
+    if (allowAllOrigins) return cb(null, true);
 
     const normalizedOrigin = normalizeOrigin(origin);
 
@@ -135,7 +140,14 @@ app.use((err, _req, res, _next) => {
 
 (async () => {
   await connectDB(process.env.MONGO_URI);
-  app.listen(PORT, () => {
+
+  const realtime = initRealtime(httpServer, {
+    allowedOrigins: [...allowedOrigins],
+    allowAllOrigins,
+  });
+  app.locals.io = realtime;
+
+  httpServer.listen(PORT, () => {
     const env = process.env.NODE_ENV || "development";
     console.log(`API listening on port ${PORT} (env: ${env})`);
 
@@ -149,3 +161,4 @@ app.use((err, _req, res, _next) => {
     }
   });
 })();
+

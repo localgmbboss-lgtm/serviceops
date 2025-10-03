@@ -190,7 +190,7 @@
   border-radius: 999px;
   border: none;
   background: var(--color-primary);
-  color: #111111;
+  color: #ffffff;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 14px 30px rgba(37, 99, 235, 0.18);
@@ -226,4 +226,5 @@
     flex-direction: column;
   }
 }
+
 

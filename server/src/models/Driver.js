@@ -11,9 +11,13 @@ const driverSchema = new mongoose.Schema(
     documents: { type: Object },
     lat: { type: Number },
     lng: { type: Number },
+    heading: { type: Number },
+    speedKph: { type: Number },
+    accuracy: { type: Number },
     lastSeenAt: { type: Date },
   },
   { timestamps: true }
 );
 
 export default mongoose.model("Driver", driverSchema);
+

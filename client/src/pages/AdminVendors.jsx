@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import "./AdminVendors.css";
 
@@ -12,6 +12,33 @@ const ratingFormatter = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
+
+const formatCurrency = (value) => currency.format(Number.isFinite(value) ? value : 0);
+const formatRating = (value) =>
+  ratingFormatter.format(Number.isFinite(value) ? value : 0);
+const formatPercent = (value) => `${Math.round((Number(value) || 0) * 100)}%`;
+
+const complianceSnapshot = (vendor) => {
+  const status = vendor?.complianceStatus || "pending";
+  const missing = Array.isArray(vendor?.compliance?.missing)
+    ? vendor.compliance.missing
+    : [];
+  const label = status.replace(/_/g, " ");
+  const badgeClass =
+    status === "compliant"
+      ? "badge ok"
+      : status === "non_compliant"
+      ? "badge bad"
+      : "badge warn";
+
+  return {
+    status,
+    label,
+    badgeClass,
+    missingCount: missing.length,
+    missing,
+  };
+};
 
 export default function AdminVendors() {
   const [items, setItems] = useState([]);
@@ -31,8 +58,8 @@ export default function AdminVendors() {
       setItems(response.data || []);
       setErr("");
       setPage(1);
-    } catch (e) {
-      setErr(e?.response?.data?.message || "Failed to load vendors");
+    } catch (error) {
+      setErr(error?.response?.data?.message || "Failed to load vendors");
     }
   };
 
@@ -129,37 +156,38 @@ export default function AdminVendors() {
           ? Number(form.earningsSplit) / 100
           : Number(form.earningsSplit) || 0.6,
     };
-
-    await api.post("/api/vendors", payload);
-    setForm({ name: "", phone: "", city: "", earningsSplit: "60" });
-    load();
+    try {
+      await api.post("/api/vendors", payload);
+      setForm({ name: "", phone: "", city: "", earningsSplit: "60" });
+      load();
+    } catch (error) {
+      setErr(error?.response?.data?.message || "Failed to create vendor");
+    }
   };
 
   const handlePageSizeChange = (event) => {
     setPageSize(Number(event.target.value));
-    setPage(1);
-  };
-
-  const handlePrev = () => {
-    setPage((prev) => Math.max(prev - 1, 1));
-  };
-
-  const handleNext = () => {
-    setPage((prev) => Math.min(prev + 1, pagination.totalPages));
   };
 
   const handlePageSelect = (event) => {
     setPage(Number(event.target.value));
   };
 
-  const formatCurrency = (value) => currency.format(Number.isFinite(value) ? value : 0);
-  const formatRating = (value) =>
-    ratingFormatter.format(Number.isFinite(value) ? value : 0);
-  const formatPercent = (value) => `${Math.round((value || 0) * 100)}%`;
+  const handlePrev = () => setPage((prev) => Math.max(1, prev - 1));
+  const handleNext = () =>
+    setPage((prev) =>
+      Math.min(prev + 1, Math.max(1, Math.ceil((items.length || 0) / pageSize)))
+    );
 
   return (
     <div className="avendors">
-      <header className="avendors-header">
+      {err && (
+        <div className="card alert error">
+          <p>{err}</p>
+        </div>
+      )}
+
+      <section className="avendors-header">
         <div>
           <h1 className="title">Vendors</h1>
           <p className="subtitle">
@@ -172,44 +200,18 @@ export default function AdminVendors() {
             <strong>{metrics.total}</strong>
           </div>
           <div>
-            <span className="eyebrow">Average rating</span>
-            <strong>{formatRating(metrics.avgRating)}</strong>
-          </div>
-          <div>
-            <span className="eyebrow">Compliance</span>
+            <span className="eyebrow">On-boarding compliance</span>
             <strong>{formatPercent(metrics.compliance)}</strong>
           </div>
+          <div>
+            <span className="eyebrow">Avg. rating</span>
+            <strong>
+              {Number.isFinite(metrics.avgRating)
+                ? ratingFormatter.format(metrics.avgRating)
+                : "0.00"}
+            </strong>
+          </div>
         </div>
-      </header>
-
-      <section className="avendors-metrics">
-        <article className="avendors-metric-card">
-          <span className="avendors-metric-card__label">Lifetime revenue</span>
-          <strong className="avendors-metric-card__value">
-            {formatCurrency(metrics.revenue)}
-          </strong>
-          <span className="avendors-metric-card__caption">
-            Across all completed vendor jobs
-          </span>
-        </article>
-        <article className="avendors-metric-card">
-          <span className="avendors-metric-card__label">Payout owed</span>
-          <strong className="avendors-metric-card__value">
-            {formatCurrency(metrics.payout)}
-          </strong>
-          <span className="avendors-metric-card__caption">
-            Based on current partner splits
-          </span>
-        </article>
-        <article className="avendors-metric-card">
-          <span className="avendors-metric-card__label">Jobs completed</span>
-          <strong className="avendors-metric-card__value">
-            {metrics.completed.toLocaleString()}
-          </strong>
-          <span className="avendors-metric-card__caption">
-            Successful roadside assists delivered
-          </span>
-        </article>
       </section>
 
       <form className="card form" onSubmit={submit}>
@@ -221,7 +223,7 @@ export default function AdminVendors() {
             </p>
           </div>
           <button className="btn" type="submit" disabled={!form.name.trim()}>
-            {"Save Vendor"}
+            Save vendor
           </button>
         </div>
         <div className="form-grid">
@@ -243,31 +245,24 @@ export default function AdminVendors() {
               type="number"
               min="0"
               max="100"
+              step="1"
               value={form.earningsSplit}
               onChange={set("earningsSplit")}
             />
           </label>
         </div>
-        {err && <div className="card alert error">{err}</div>}
       </form>
 
-      <div className="card avendors-table-card">
-        <div className="avendors-table-header">
-          <div>
-            <h3 className="section-title">Overview</h3>
-            <p className="section-copy">
-              Track partner health, document posture, and performance.
-            </p>
-          </div>
-        </div>
-        <div className="avendors-table-wrapper">
-          <table className="table vendors">
+      <div className="card">
+        <div className="table-wrap">
+          <table className="table">
             <thead>
               <tr>
                 <th>Name</th>
                 <th>City</th>
                 <th>Phone</th>
                 <th>Docs</th>
+                <th>Compliance</th>
                 <th>Completed</th>
                 <th>Avg Rating</th>
                 <th>Revenue</th>
@@ -278,6 +273,7 @@ export default function AdminVendors() {
               {pagination.pageItems.map((vendor) => {
                 const docs = vendor?.docs || {};
                 const stats = vendor?.stats || {};
+                const compliance = complianceSnapshot(vendor);
                 return (
                   <tr key={vendor._id}>
                     <td>{vendor.name}</td>
@@ -291,6 +287,14 @@ export default function AdminVendors() {
                         <span className="badge bad">exp {docs.expired}</span>
                       )}
                     </td>
+                    <td>
+                      <span className={compliance.badgeClass}>{compliance.label}</span>
+                      {compliance.missingCount > 0 && (
+                        <span className="badge warn">
+                          {compliance.missingCount} missing
+                        </span>
+                      )}
+                    </td>
                     <td>{(stats.completed || 0).toLocaleString()}</td>
                     <td>{formatRating(stats.avgRating)}</td>
                     <td>{formatCurrency(stats.revenue)}</td>
@@ -300,7 +304,7 @@ export default function AdminVendors() {
               })}
               {pagination.pageItems.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="muted">
+                  <td colSpan="9" className="muted">
                     No vendors
                   </td>
                 </tr>
@@ -313,12 +317,13 @@ export default function AdminVendors() {
           {pagination.pageItems.map((vendor) => {
             const docs = vendor?.docs || {};
             const stats = vendor?.stats || {};
+            const compliance = complianceSnapshot(vendor);
             return (
               <article key={vendor._id} className="avendors-mobile-card">
                 <header>
                   <h4>{vendor.name}</h4>
                   <span className="avendors-mobile-chip">
-                    {formatRating(stats.avgRating)} ?
+                    {formatRating(stats.avgRating)} ★
                   </span>
                 </header>
                 <dl>
@@ -335,6 +340,13 @@ export default function AdminVendors() {
                     <dd>
                       {docs.approved || 0}/{docs.total || 0}
                       {(docs.expired || 0) > 0 ? ` - exp ${docs.expired}` : ""}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Compliance</dt>
+                    <dd>
+                      <span className={compliance.badgeClass}>{compliance.label}</span>
+                      {compliance.missingCount > 0 ? ` - ${compliance.missingCount} missing` : ""}
                     </dd>
                   </div>
                   <div>
@@ -416,4 +428,3 @@ export default function AdminVendors() {
     </div>
   );
 }
-

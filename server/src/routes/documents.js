@@ -1,57 +1,168 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import mongoose from "mongoose";
 import Document from "../models/Document.js";
+import { refreshVendorCompliance } from "../lib/compliance.js";
 
 const router = Router();
 
-// GET /api/documents?ownerType=&driverId=&status=
+const isValidId = (value) => mongoose.isValidObjectId(value);
+
+const sanitizeStatus = (value) => {
+  if (!value) return undefined;
+  const normalized = String(value).toLowerCase();
+  return ["pending", "submitted", "verified", "rejected", "expired"].includes(
+    normalized
+  )
+    ? normalized
+    : undefined;
+};
+
+async function triggerCompliance({ ownerType, vendorId }) {
+  if (ownerType === "vendor" && vendorId && isValidId(vendorId)) {
+    try {
+      await refreshVendorCompliance(vendorId);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to refresh vendor compliance", error);
+    }
+  }
+}
+
+// GET /api/documents?ownerType=&driverId=&vendorId=&status=
 router.get("/", async (req, res, next) => {
   try {
-    const q = {};
-    if (req.query.ownerType) q.ownerType = req.query.ownerType;
-    if (req.query.status) q.status = req.query.status;
+    const query = {};
+    if (req.query.ownerType) query.ownerType = req.query.ownerType;
+    if (req.query.status) query.status = req.query.status;
     if (req.query.driverId) {
-      if (!mongoose.isValidObjectId(req.query.driverId)) return res.status(400).json({ message: "Invalid driverId" });
-      q.driverId = req.query.driverId;
+      if (!isValidId(req.query.driverId)) {
+        return res.status(400).json({ message: "Invalid driverId" });
+      }
+      query.driverId = req.query.driverId;
     }
-    const list = await Document.find(q).sort({ uploadedAt: -1 }).lean();
+    if (req.query.vendorId) {
+      if (!isValidId(req.query.vendorId)) {
+        return res.status(400).json({ message: "Invalid vendorId" });
+      }
+      query.vendorId = req.query.vendorId;
+    }
+
+    const list = await Document.find(query).sort({ uploadedAt: -1 }).lean();
     res.json(list);
-  } catch (e) { next(e); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // POST /api/documents
 router.post("/", async (req, res, next) => {
   try {
-    const { ownerType, driverId, title, kind, url, status, expiresAt, notes } = req.body;
-    if (!ownerType || !title || !kind || !url) return res.status(400).json({ message: "Missing required fields" });
-    if (ownerType === "driver" && driverId && !mongoose.isValidObjectId(driverId)) {
+    const {
+      ownerType,
+      driverId,
+      vendorId,
+      title,
+      kind,
+      requirementKey,
+      url,
+      status,
+      expiresAt,
+      notes,
+      mimeType,
+      sizeBytes,
+    } = req.body || {};
+
+    if (!ownerType || !title || !kind || !url) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (ownerType === "driver" && driverId && !isValidId(driverId)) {
       return res.status(400).json({ message: "Invalid driverId" });
     }
-    const created = await Document.create({ ownerType, driverId: driverId || null, title, kind, url, status, expiresAt, notes });
+
+    if (ownerType === "vendor" && vendorId && !isValidId(vendorId)) {
+      return res.status(400).json({ message: "Invalid vendorId" });
+    }
+
+    const payload = {
+      ownerType,
+      driverId: ownerType === "driver" ? driverId || null : null,
+      vendorId: ownerType === "vendor" ? vendorId || null : null,
+      title,
+      kind,
+      requirementKey: requirementKey || null,
+      url,
+      status: sanitizeStatus(status) || "pending",
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      notes,
+      mimeType: mimeType || "",
+      sizeBytes: Number.isFinite(Number(sizeBytes)) ? Number(sizeBytes) : null,
+    };
+
+    const created = await Document.create(payload);
+    await triggerCompliance({ ownerType, vendorId: payload.vendorId });
     res.status(201).json(created);
-  } catch (e) { next(e); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // PATCH /api/documents/:id
 router.patch("/:id", async (req, res, next) => {
   try {
-    const up = {};
-    ["title","kind","url","status","expiresAt","notes"].forEach(k => {
-      if (k in req.body) up[k] = req.body[k];
+    const updates = {};
+    [
+      "title",
+      "kind",
+      "url",
+      "requirementKey",
+      "status",
+      "expiresAt",
+      "notes",
+      "mimeType",
+      "sizeBytes",
+    ].forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, field)) {
+        if (field === "status") {
+          const normalized = sanitizeStatus(req.body[field]);
+          if (normalized) updates.status = normalized;
+          return;
+        }
+        if (field === "expiresAt") {
+          updates.expiresAt = req.body[field]
+            ? new Date(req.body[field])
+            : null;
+          return;
+        }
+        updates[field] = req.body[field];
+      }
     });
-    const doc = await Document.findByIdAndUpdate(req.params.id, up, { new: true });
+
+    const doc = await Document.findByIdAndUpdate(req.params.id, updates, {
+      new: true,
+    });
     if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    await triggerCompliance({ ownerType: doc.ownerType, vendorId: doc.vendorId });
+
     res.json(doc);
-  } catch (e) { next(e); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // DELETE /api/documents/:id
 router.delete("/:id", async (req, res, next) => {
   try {
-    const out = await Document.findByIdAndDelete(req.params.id);
-    if (!out) return res.status(404).json({ message: "Document not found" });
+    const doc = await Document.findByIdAndDelete(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    await triggerCompliance({ ownerType: doc.ownerType, vendorId: doc.vendorId });
+
     res.json({ ok: true });
-  } catch (e) { next(e); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 export default router;

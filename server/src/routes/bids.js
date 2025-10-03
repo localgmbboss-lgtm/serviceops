@@ -6,13 +6,11 @@ import Job from "../models/Jobs.js";
 import Bid from "../models/Bid.js";
 import Customer from "../models/Customer.js";
 import { notifySMS } from "../lib/notifier.js";
+import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
 
 const router = Router();
 
-const baseClient =
-  process.env.CLIENT_ORIGIN ||
-  process.env.CLIENT_URL ||
-  "http://localhost:3000";
+const defaultClientBase = getClientBaseUrl();
 
 // helpers
 const isObjId = (s) => mongoose.isValidObjectId(s);
@@ -105,7 +103,7 @@ router.post("/:vendorToken", async (req, res, next) => {
     try {
       const cust = await Customer.findById(job.customerId).lean();
       if (cust?.phone && job.customerToken) {
-        const viewLink = `${baseClient}/choose/${job.customerToken}`;
+        const viewLink = `${base}/choose/${job.customerToken}`;
         const priceLabel = Number.isFinite(pr) ? pr : 0;
         const linkSuffix = viewLink ? ` . View: ${viewLink}` : "";
         const smsMessage = isFixed

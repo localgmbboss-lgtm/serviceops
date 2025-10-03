@@ -1,4 +1,4 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import Driver from "../models/Driver.js";
 import Vendor from "../models/Vendor.js";
 import Job from "../models/Jobs.js";
@@ -166,6 +166,8 @@ r.get("/vendors/overview", async (_req, res, next) => {
         phone: v.phone,
         rating: v.rating || 0,
         docs: vs,
+        complianceStatus: v.complianceStatus || "pending",
+        compliance: v.compliance || null,
         stats: {
           completed: completed.length,
           avgRating,
@@ -182,4 +184,5 @@ r.get("/vendors/overview", async (_req, res, next) => {
 });
 
 export default r;
+
 

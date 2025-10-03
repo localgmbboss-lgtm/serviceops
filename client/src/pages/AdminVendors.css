@@ -407,3 +407,12 @@
     }
 }
 
+.avendors .badge.warn {
+    background: rgba(251, 191, 36, 0.18);
+    color: #92400e;
+}
+
+.avendors .badge.ok {
+    background: rgba(16, 185, 129, 0.18);
+    color: #047857;
+}

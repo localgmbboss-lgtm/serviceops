@@ -1,28 +1,39 @@
 /* LiveMap (scoped, modern) */
-.lm-wrap{
+.lm-wrap {
   position: relative;
 }
-.lm-map{
+.lm-map {
   width: 100%;
   height: 100%;
   min-height: 320px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
 /* Popup content */
-.lm-popup .lm-name{ font-size:14px; }
-.lm-popup .lm-city{ color:var(--muted); margin:2px 0 4px; }
-.lm-popup .lm-seen{ color:var(--muted); }
+.lm-popup .lm-name {
+  font-size: 14px;
+}
+.lm-popup .lm-city {
+  color: var(--muted);
+  margin: 2px 0 4px;
+}
+.lm-popup .lm-seen {
+  color: var(--muted);
+}
+.lm-popup .lm-meta {
+  margin-top: 4px;
+  color: var(--muted);
+}
 
 /* Legend */
-.lm-legend{
+.lm-legend {
   position: absolute;
   right: 10px;
   bottom: 10px;
-  background: #fffffffff;
+  background: #fff;
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 6px 8px;
@@ -31,20 +42,108 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 6px 18px rgba(0,0,0,.08);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
 }
-.lm-legend .dot{
-  display:inline-block;
-  width:10px; height:10px;
-  border-radius:999px;
-  margin-right:4px;
-  vertical-align:middle;
+.lm-legend .dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 4px;
+  vertical-align: middle;
 }
-.lm-legend .fresh{ background:var(--color-primary); }
-.lm-legend .stale{ background:var(--muted); }
+.lm-legend .fresh {
+  background: var(--color-primary);
+}
+.lm-legend .stale {
+  background: var(--muted);
+}
+
+/* Custom markers */
+.lm-marker {
+  position: relative;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.lm-marker__body {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  transition: transform 0.3s ease;
+}
+.lm-pin {
+  position: relative;
+  width: 30px;
+  height: 36px;
+  margin-top: 6px;
+  background: rgba(37, 99, 235, 0.95);
+  color: #fff;
+  border-radius: 12px 12px 10px 10px;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+.lm-pin__label {
+  position: relative;
+  z-index: 2;
+}
+.lm-pin__arrow {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 14px solid rgba(37, 99, 235, 0.85);
+  transform: translateX(-50%) rotate(var(--lm-heading, 0deg));
+  transform-origin: 50% 100%;
+  transition: transform 0.3s ease;
+  z-index: 1;
+}
+
+.lm-marker__body.is-stale .lm-pin {
+  background: rgba(148, 163, 184, 0.92);
+  box-shadow: 0 6px 16px rgba(148, 163, 184, 0.25);
+}
+.lm-marker__body.is-stale .lm-pin__arrow {
+  border-bottom-color: rgba(148, 163, 184, 0.85);
+}
+
+.lm-marker__body.is-offline .lm-pin {
+  background: rgba(249, 115, 22, 0.95);
+  box-shadow: 0 10px 24px rgba(234, 88, 12, 0.28);
+}
+.lm-marker__body.is-offline .lm-pin__arrow {
+  border-bottom-color: rgba(234, 88, 12, 0.85);
+}
+
+.lm-marker[data-speed]::after {
+  content: attr(data-speed);
+  position: absolute;
+  top: 42px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.85);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+}
 
 /* Nicer Leaflet controls */
-.lm-map .leaflet-control-zoom a{ border-radius: 8px !important; }
-
-
-
+.lm-map .leaflet-control-zoom a {
+  border-radius: 8px !important;
+}

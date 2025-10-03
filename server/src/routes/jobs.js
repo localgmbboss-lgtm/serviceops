@@ -5,13 +5,12 @@ import mongoose from "mongoose";
 import { completeJobWithPayment } from "../lib/jobCompletion.js";
 import Job from "../models/Jobs.js";
 import Vendor from "../models/Vendor.js"; // Changed from Driver to Vendor
-import { checkVendorCompliance } from "../lib/compliance.js"; // Changed from Driver to Vendor
 import Customer from "../models/Customer.js";
 import { notifySMS } from "../lib/notifier.js";
+import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
 const router = Router();
 
-
-
+const defaultClientBase = getClientBaseUrl();
 
 export const STATUSES = [
   "Unassigned",
@@ -29,11 +28,6 @@ const ALLOWED_NEXT = {
   Completed: [],
 };
 
-const baseClient =
-  process.env.CLIENT_ORIGIN ||
-  process.env.CLIENT_URL ||
-  "http://localhost:3000";
-
 const makeToken = () => crypto.randomBytes(16).toString("hex");
 
 const PAYMENT_METHODS = new Set([
@@ -46,13 +40,13 @@ const PAYMENT_METHODS = new Set([
 ]);
 
 // Build link payload (only includes vendor/customer links if tokens exist)
-const linkFor = (job) => ({
-  statusUrl: `${baseClient}/status/${job._id}`,
+const linkFor = (job, base = defaultClientBase) => ({
+  statusUrl: `${base}/status/${job._id}`,
   ...(job.vendorToken
-    ? { vendorLink: `${baseClient}/vendor/${job.vendorToken}` }
+    ? { vendorLink: `${base}/vendor/${job.vendorToken}` }
     : {}),
   ...(job.customerToken
-    ? { customerLink: `${baseClient}/choose/${job.customerToken}` }
+    ? { customerLink: `${base}/choose/${job.customerToken}` }
     : {}),
 });
 
@@ -330,13 +324,14 @@ router.post("/guest", async (req, res, next) => {
     job.customerToken = job.customerToken || makeToken();
     await job.save();
 
-    const trackUrl = `${baseClient}/track/guest/${job.customerToken}`;
+    const base = resolveClientBaseUrl(req);
+    const trackUrl = `${base}/track/guest/${job.customerToken}`;
     res.status(201).json({
       ok: true,
       jobId: job._id,
       jobToken: job.customerToken,
       trackUrl,
-      links: linkFor(job),
+      links: linkFor(job, base),
     });
   } catch (e) {
     next(e);
@@ -368,6 +363,8 @@ router.get("/guest/:token", async (req, res, next) => {
       });
     }
 
+    const base = resolveClientBaseUrl(req);
+
     // Format the response
     const response = {
       success: true,
@@ -395,10 +392,10 @@ router.get("/guest/:token", async (req, res, next) => {
         lastSeenAt: job.vendorId.lastSeenAt
       } : null,
       links: {
-        trackUrl: `${baseClient}/track/guest/${job.customerToken}`,
-        statusUrl: `${baseClient}/status/${job._id}`,
-        ...(job.vendorToken ? { vendorLink: `${baseClient}/vendor/${job.vendorToken}` } : {}),
-        ...(job.customerToken ? { customerLink: `${baseClient}/choose/${job.customerToken}` } : {})
+        trackUrl: `${base}/track/guest/${job.customerToken}`,
+        statusUrl: `${base}/status/${job._id}`,
+        ...(job.vendorToken ? { vendorLink: `${base}/vendor/${job.vendorToken}` } : {}),
+        ...(job.customerToken ? { customerLink: `${base}/choose/${job.customerToken}` } : {})
       }
     };
 
@@ -484,7 +481,8 @@ router.post("/:id/open-bidding", async (req, res, next) => {
 
     await job.save();
 
-    res.json(linkFor(job));
+    const base = resolveClientBaseUrl(req);
+    res.json(linkFor(job, base));
   } catch (e) {
     next(e);
   }
@@ -557,11 +555,5 @@ router.get("/:id", async (req, res, next) => {
 });
 
 export default router;
-
-
-
-
-
-
 
 

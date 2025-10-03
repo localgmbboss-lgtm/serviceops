@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import useDriverLocation from "../hooks/useDriverLocation";
 import "./DriverJobs.css";
@@ -19,21 +19,21 @@ export default function DriverJobs() {
       .get("/api/settings")
       .then((r) => {
         const intervals = r.data?.intervals || {};
-        const pushMsSetting = (() => {
-          const pushMsValue = Number(intervals.driverPushMs);
-          if (Number.isFinite(pushMsValue) && pushMsValue > 0) {
-            return pushMsValue;
-          }
-          const patchSec = Number(intervals.driverPatchSec);
-          if (Number.isFinite(patchSec) && patchSec > 0) {
-            return patchSec * 1000;
-          }
-          return null;
-        })();
-        if (Number.isFinite(pushMsSetting) && pushMsSetting >= 1000) {
-          setPushMs(pushMsSetting);
+        const pushSec = Number(
+          intervals.vendorPushSec ??
+            intervals.driverPatchSec ??
+            intervals.driverPushMs ??
+            0
+        );
+        if (Number.isFinite(pushSec) && pushSec > 0) {
+          setPushMs(pushSec * 1000);
         }
-        const pollSec = Number(intervals.pollDriversSec);
+        const pollSec = Number(
+          intervals.vendorPollSec ??
+            intervals.pollDriversSec ??
+            intervals.mapRefreshSec ??
+            0
+        );
         if (Number.isFinite(pollSec) && pollSec > 0) {
           setPollMs(Math.max(3000, pollSec * 1000));
         }
@@ -239,3 +239,4 @@ export default function DriverJobs() {
     </div>
   );
 }
+

@@ -1,5 +1,6 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import Vendor from "../models/Vendor.js";
+import { refreshVendorCompliance } from "../lib/compliance.js";
 
 const router = Router();
 
@@ -30,8 +31,17 @@ const serializeVendor = (vendor) => {
     city: v.city || "",
     services: Array.isArray(v.services) ? v.services : [],
     heavyDuty: !!v.heavyDuty,
-    earningsSplit: typeof v.earningsSplit === "number" ? v.earningsSplit : 0.6,
+    earningsSplit:
+      typeof v.earningsSplit === "number" ? v.earningsSplit : 0.6,
     active: v.active !== false,
+    complianceStatus: v.complianceStatus || "pending",
+    compliance: v.compliance || {
+      enforcement: "submission",
+      allowed: false,
+      missing: [],
+      requirements: [],
+      lastCheckedAt: null,
+    },
     createdAt: v.createdAt,
     updatedAt: v.updatedAt,
   };
@@ -61,7 +71,9 @@ router.post("/", async (req, res, next) => {
 
     const existing = await Vendor.findOne({ phone: normalizedPhone }).lean();
     if (existing) {
-      return res.status(409).json({ message: "A vendor with that phone already exists" });
+      return res
+        .status(409)
+        .json({ message: "A vendor with that phone already exists" });
     }
 
     const vendor = await Vendor.create({
@@ -70,6 +82,7 @@ router.post("/", async (req, res, next) => {
       city: city ? String(city).trim() : undefined,
       earningsSplit: sanitizeSplit(earningsSplit),
       active: true,
+      complianceStatus: "pending",
     });
 
     res.status(201).json({ vendor: serializeVendor(vendor) });
@@ -79,3 +92,7 @@ router.post("/", async (req, res, next) => {
 });
 
 export default router;
+
+
+
+

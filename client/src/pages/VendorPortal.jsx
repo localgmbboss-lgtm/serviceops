@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
@@ -42,7 +42,7 @@ const formatCurrency = (value) => {
 };
 
 export default function VendorPortal() {
-  const { token } = useParams();
+  const { vendorAcceptedToken: token } = useParams();
   const [payload, setPayload] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -446,6 +446,7 @@ export default function VendorPortal() {
     </div>
   );
 }
+
 
 
 

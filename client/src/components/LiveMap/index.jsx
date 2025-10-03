@@ -5,7 +5,7 @@ import "./styles.css";
 /**
  * LiveMap (Leaflet + OSM)
  * Props:
- *  - drivers: [{ _id?, name, city, lat, lng, lastSeenAt }]
+ *  - drivers: [{ _id?, name, city, lat, lng, lastSeenAt, heading, speedKph, available }]
  *  - center?: [lat, lng]        (default Lagos)
  *  - zoom?: number              (default 11)
  *  - autoFit?: boolean          (default true) fit map to visible drivers
@@ -21,11 +21,10 @@ export default function LiveMap({
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const layerRef = useRef(null); // parent layer for markers
-  const markersRef = useRef(new Map()); // key -> { marker, ring }
+  const layerRef = useRef(null);
+  const markersRef = useRef(new Map()); // key -> marker
   const destinationRef = useRef(null);
 
-  // Fix default marker icons (CRA/Webpack)
   useEffect(() => {
     const retina =
       "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png";
@@ -41,7 +40,6 @@ export default function LiveMap({
     });
   }, []);
 
-  // Init map once
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
 
@@ -60,7 +58,6 @@ export default function LiveMap({
     mapRef.current = map;
     layerRef.current = layer;
 
-    // Resize observer to fix 0x0 containers on route changes
     const ro = new ResizeObserver(() =>
       setTimeout(() => map.invalidateSize(), 0)
     );
@@ -68,7 +65,6 @@ export default function LiveMap({
     return () => ro.disconnect();
   }, [center, zoom]);
 
-  // Update markers on driver changes
   useEffect(() => {
     const map = mapRef.current;
     const layer = layerRef.current;
@@ -76,72 +72,80 @@ export default function LiveMap({
 
     const toNum = (v) => (v === null || v === undefined ? NaN : Number(v));
     const now = Date.now();
-    const freshColor = "#2563eb"; // blue
-    const staleColor = "#9ca3af"; // gray
 
-    // Track which keys we saw this cycle (for cleanup)
     const seen = new Set();
 
-    // Create/update markers
-    drivers.forEach((d) => {
-      const _lat = toNum(d.lat);
-      const _lng = toNum(d.lng);
-      if (!Number.isFinite(_lat) || !Number.isFinite(_lng)) return;
+    drivers.forEach((driver) => {
+      const lat = toNum(driver?.lat);
+      const lng = toNum(driver?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-      const key = String(d._id || `${d.name || "driver"}-${d.phone || ""}`);
+      const key = String(driver?._id || `${driver?.name || "driver"}-${driver?.phone || ""}`);
       seen.add(key);
 
-      // get or create marker + ring
-      let entry = markersRef.current.get(key);
-      if (!entry) {
-        const marker = L.marker([_lat, _lng]).addTo(layer);
-        const ring = L.circleMarker([_lat, _lng], {
-          radius: 6,
-          color: freshColor,
-          fillColor: freshColor,
-          fillOpacity: 0.9,
-          weight: 2,
+      let marker = markersRef.current.get(key);
+      const lastSeen = driver?.lastSeenAt ? new Date(driver.lastSeenAt) : null;
+      const isStale = !lastSeen || now - lastSeen.getTime() > staleMs;
+      const heading = toNum(driver?.heading ?? driver?.bearing);
+      const speed = toNum(driver?.speedKph ?? driver?.speed ?? driver?.velocity);
+      const available = driver?.available !== false;
+
+      if (!marker) {
+        marker = L.marker([lat, lng], {
+          icon: createDriverIcon({
+            heading,
+            stale: isStale,
+            available,
+            label: initials(driver?.name || driver?.phone),
+          }),
         }).addTo(layer);
-        entry = { marker, ring };
-        markersRef.current.set(key, entry);
+        markersRef.current.set(key, marker);
+      } else {
+        marker.setLatLng([lat, lng]);
       }
 
-      // update positions
-      entry.marker.setLatLng([_lat, _lng]);
-      entry.ring.setLatLng([_lat, _lng]);
+      updateMarkerVisual(marker, {
+        heading,
+        stale: isStale,
+        available,
+        speed,
+        label: initials(driver?.name || driver?.phone),
+      });
 
-      // freshness
-      const isStale =
-        !d.lastSeenAt || now - new Date(d.lastSeenAt).getTime() > staleMs;
-      const clr = isStale ? staleColor : freshColor;
-      entry.ring.setStyle({ color: clr, fillColor: clr });
+      const last = lastSeen ? timeAgo(lastSeen) : "-";
+      const city = driver?.city ? `<div class="lm-city">${escapeHtml(driver.city)}</div>` : "";
+      const meta = [];
+      if (Number.isFinite(speed)) {
+        meta.push(`${Math.round(speed)} km/h`);
+      }
+      if (available === false) {
+        meta.push("Unavailable");
+      }
+      const metaHtml = meta.length
+        ? `<div class="lm-meta"><small>${meta.map(escapeHtml).join(" • ")}</small></div>`
+        : "";
 
-      // popup
-      const when = d.lastSeenAt ? new Date(d.lastSeenAt) : null;
-      const last = when ? timeAgo(when) : "-";
-      entry.marker.bindPopup(`
+      marker.bindPopup(`
         <div class="lm-popup">
           <div class="lm-name"><strong>${escapeHtml(
-            d.name || "Driver"
+            driver?.name || "Driver"
           )}</strong></div>
-          <div class="lm-city">${escapeHtml(d.city || "")}</div>
+          ${city}
           <div class="lm-seen"><small>Last seen: ${last}${
         isStale ? " (stale)" : ""
       }</small></div>
+          ${metaHtml}
         </div>
       `);
     });
 
-    // Remove markers for drivers that disappeared
-    for (const [key, entry] of markersRef.current.entries()) {
+    for (const [key, marker] of markersRef.current.entries()) {
       if (!seen.has(key)) {
-        entry.marker.remove();
-        entry.ring.remove();
+        marker.remove();
         markersRef.current.delete(key);
       }
     }
 
-    // Destination marker (optional)
     const destLat = Number(destination?.lat);
     const destLng = Number(destination?.lng);
     const hasDestination =
@@ -165,11 +169,8 @@ export default function LiveMap({
       destinationRef.current = null;
     }
 
-    // Fit bounds if requested
     if (autoFit) {
-      const pts = [...markersRef.current.values()].map((e) =>
-        e.marker.getLatLng()
-      );
+      const pts = Array.from(markersRef.current.values()).map((m) => m.getLatLng());
       if (hasDestination && destinationRef.current) {
         pts.push(destinationRef.current.getLatLng());
       }
@@ -195,8 +196,6 @@ export default function LiveMap({
   );
 }
 
-/* -------- helpers -------- */
-
 function timeAgo(date) {
   const diff = Math.max(0, Date.now() - date.getTime());
   const mins = Math.floor(diff / 60000);
@@ -217,7 +216,72 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
+function initials(value) {
+  if (!value) return "DR";
+  const tokens = String(value)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!tokens.length) return "DR";
+  const chars = tokens
+    .slice(0, 2)
+    .map((token) => token[0])
+    .join("");
+  return chars.toUpperCase();
+}
 
+function createDriverIcon({ heading, label, stale, available }) {
+  const rotation = Number.isFinite(heading) ? heading : 0;
+  const classes = ["lm-marker__body"];
+  if (stale) classes.push("is-stale");
+  if (available === false) classes.push("is-offline");
+  const className = classes.join(" ");
 
+  return L.divIcon({
+    className: "lm-marker",
+    html: `
+      <div class="${className}" style="--lm-heading:${rotation}deg;">
+        <div class="lm-pin">
+          <span class="lm-pin__arrow"></span>
+          <span class="lm-pin__label">${escapeHtml(label || "DR")}</span>
+        </div>
+      </div>
+    `,
+    iconSize: [46, 46],
+    iconAnchor: [23, 30],
+  });
+}
 
+function updateMarkerVisual(marker, { heading, stale, available, speed, label }) {
+  const apply = (el) => {
+    if (!el) return;
+    const body = el.querySelector(".lm-marker__body");
+    if (body) {
+      if (stale) body.classList.add("is-stale");
+      else body.classList.remove("is-stale");
 
+      if (available === false) body.classList.add("is-offline");
+      else body.classList.remove("is-offline");
+
+      if (Number.isFinite(heading)) {
+        body.style.setProperty("--lm-heading", `${heading}deg`);
+      } else {
+        body.style.removeProperty("--lm-heading");
+      }
+      const labelNode = body.querySelector(".lm-pin__label");
+      if (labelNode) labelNode.textContent = label || "DR";
+    }
+    if (Number.isFinite(speed) && speed > 1) {
+      el.setAttribute("data-speed", `${Math.round(speed)} km/h`);
+    } else {
+      el.removeAttribute("data-speed");
+    }
+  };
+
+  const element = marker.getElement();
+  if (element) {
+    apply(element);
+  } else {
+    marker.once("add", () => apply(marker.getElement()));
+  }
+}
