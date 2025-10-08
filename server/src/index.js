@@ -24,6 +24,7 @@ import outbox from "./routes/outbox.js";
 import vendorAuth from "./routes/vendorAuth.js";
 import vendorFeed from "./routes/vendorFeed.js";
 import vendorPortal from "./routes/vendorPortal.js";
+import vendorDocuments from "./routes/vendorDocuments.js";
 import customerAuth from "./routes/customerAuth.js";
 import adminAuth from "./routes/adminAuth.js";
 import vendors from "./routes/vendors.js";
@@ -117,6 +118,7 @@ app.use("/api/feedback", feedback);
 app.use("/api/reports", reports);
 app.use("/api/financials", financials);
 app.use("/api/expenses", expenses);
+app.use("/api/vendor/documents", vendorDocuments);
 app.use("/api/vendor", vendorRouter);
 app.use("/api/admin/auth", adminAuth);
 app.use("/api/admin", admin);
@@ -161,4 +163,12 @@ app.use((err, _req, res, _next) => {
     }
   });
 })();
+
+
+
+
+
+
+
+
 

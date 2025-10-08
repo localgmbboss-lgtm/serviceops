@@ -1,7 +1,8 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
+import "./VendorPortal.css";
 
 const ALLOWED_NEXT = {
   Unassigned: ["Assigned"],
@@ -198,43 +199,60 @@ export default function VendorPortal() {
 
   const completionSummary = job.reportedPayment;
   const commission = job.commission;
+  const updatedAt = job.updatedAt || job.updated || job.completed || job.created;
+  const updatedLabel = updatedAt ? new Date(updatedAt).toLocaleString() : null;
 
   return (
-    <div className="card vendor-portal">
-      <h2>Accepted Job</h2>
+    <div className="vendor-portal">
       <div className="vp-grid">
         <div className="vp-primary">
-          <dl className="vp-details">
-            <div>
-              <dt>Service</dt>
-              <dd>{job.serviceType}</dd>
+          <div className="vp-card">
+            <div className="vp-board-header">
+              <h2 className="vp-section-title">Accepted Job</h2>
+              {updatedLabel ? (
+                <span className="vp-last-updated">Updated {updatedLabel}</span>
+              ) : null}
             </div>
-            <div>
-              <dt>Pickup</dt>
-              <dd>{job.pickupAddress}</dd>
-            </div>
-            {job.dropoffAddress && (
-              <div>
-                <dt>Drop-off</dt>
-                <dd>{job.dropoffAddress}</dd>
+            <dl className="vp-details">
+              <div className="vp-details__item">
+                <dt className="vp-details__label">Service</dt>
+                <dd className="vp-details__value">{job.serviceType || "-"}</dd>
               </div>
-            )}
-            {customer && (
-              <div>
-                <dt>Customer</dt>
-                <dd>
-                  {customer.name} - {customer.phone}
-                </dd>
+              <div className="vp-details__item">
+                <dt className="vp-details__label">Pickup</dt>
+                <dd className="vp-details__value">{job.pickupAddress}</dd>
               </div>
-            )}
-            <div>
-              <dt>Status</dt>
-              <dd>{job.status}</dd>
-            </div>
-          </dl>
+              {job.dropoffAddress ? (
+                <div className="vp-details__item">
+                  <dt className="vp-details__label">Drop-off</dt>
+                  <dd className="vp-details__value">{job.dropoffAddress}</dd>
+                </div>
+              ) : null}
+              {customer ? (
+                <div className="vp-details__item">
+                  <dt className="vp-details__label">Customer</dt>
+                  <dd className="vp-details__value">
+                    {customer.name} - {customer.phone}
+                  </dd>
+                </div>
+              ) : null}
+              {vendor ? (
+                <div className="vp-details__item">
+                  <dt className="vp-details__label">Vendor</dt>
+                  <dd className="vp-details__value">
+                    {vendor.name}{vendor.phone ? ` - ${vendor.phone}` : ""}
+                  </dd>
+                </div>
+              ) : null}
+              <div className="vp-details__item">
+                <dt className="vp-details__label">Status</dt>
+                <dd className="vp-details__value">{job.status}</dd>
+              </div>
+            </dl>
+          </div>
 
-          <section className="vp-map">
-            <h3 className="section-title">Route preview</h3>
+          <section className="vp-card vp-map">
+            <h3 className="vp-section-title">Route preview</h3>
             {pickupCoords || vendorCoords ? (
               <>
                 <GMap
@@ -245,35 +263,35 @@ export default function VendorPortal() {
                   showRoute={canShowRoute}
                 />
                 <div className="vp-map-legend">
-                  {vendor?.baseAddress && (
+                  {vendor?.baseAddress ? (
                     <div className="vp-map-row">
                       <strong>Base</strong>
                       <span>{vendor.baseAddress}</span>
                     </div>
-                  )}
-                  {job.pickupAddress && (
+                  ) : null}
+                  {job.pickupAddress ? (
                     <div className="vp-map-row">
                       <strong>Pickup</strong>
                       <span>{job.pickupAddress}</span>
                     </div>
-                  )}
-                  {job.dropoffAddress && (
+                  ) : null}
+                  {job.dropoffAddress ? (
                     <div className="vp-map-row">
                       <strong>Drop-off</strong>
                       <span>{job.dropoffAddress}</span>
                     </div>
-                  )}
+                  ) : null}
                 </div>
-                {!pickupCoords && (
+                {!pickupCoords ? (
                   <p className="muted small">
                     The pickup address is set, but we are waiting on precise GPS coordinates for routing.
                   </p>
-                )}
-                {!vendorCoords && (
+                ) : null}
+                {!vendorCoords ? (
                   <p className="muted small">
                     Add your base location in the vendor profile to unlock turn-by-turn directions.
                   </p>
-                )}
+                ) : null}
               </>
             ) : (
               <p className="muted small">
@@ -282,93 +300,90 @@ export default function VendorPortal() {
             )}
           </section>
 
-          {job.status !== "Completed" && (
-            <div className="vp-actions">
-              <div className="vp-action-buttons">
-                {nexts.includes("OnTheWay") && (
-                  <button
-                    className="btn"
-                    disabled={busy}
-                    onClick={() => setStatus("OnTheWay")}
-                  >
-                    On the way
-                  </button>
-                )}
-                {nexts.includes("Arrived") && (
-                  <button
-                    className="btn"
-                    disabled={busy}
-                    onClick={() => setStatus("Arrived")}
-                  >
-                    Arrived
-                  </button>
-                )}
-              </div>
+          <section className="vp-card">
+            <h3 className="vp-section-title">Status & actions</h3>
+            <p className="vp-section-sub">Keep the dispatcher updated as you progress through the job.</p>
+            {job.status !== "Completed" ? (
+              <div className="vp-actions">
+                <div className="vp-action-buttons">
+                  {nexts.includes("OnTheWay") ? (
+                    <button className="btn" disabled={busy} onClick={() => setStatus("OnTheWay")}>
+                      On the way
+                    </button>
+                  ) : null}
+                  {nexts.includes("Arrived") ? (
+                    <button className="btn" disabled={busy} onClick={() => setStatus("Arrived")}>
+                      Arrived
+                    </button>
+                  ) : null}
+                </div>
 
-              <div className="vp-complete">
                 <button
-                  className="btn primary"
+                  type="button"
+                  className="vp-complete-toggle"
                   disabled={completeBusy}
                   onClick={() => setCompleteOpen((prev) => !prev)}
                 >
-                  {completeOpen ? "Cancel" : "Report completion"}
+                  <span>{completeOpen ? "Hide completion form" : "Report completion"}</span>
                 </button>
-              </div>
-            </div>
-          )}
 
-          {completeOpen && (
-            <form className="vp-complete-form" onSubmit={submitCompletion}>
-              <h3>Report payment received</h3>
-              <label>
-                <span>Total collected</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={completeForm.amount}
-                  onChange={(e) =>
-                    setCompleteForm((prev) => ({ ...prev, amount: e.target.value }))
-                  }
-                  required
-                />
-              </label>
-              <label>
-                <span>Payment method</span>
-                <select
-                  value={completeForm.method}
-                  onChange={(e) =>
-                    setCompleteForm((prev) => ({ ...prev, method: e.target.value }))
-                  }
-                >
-                  {PAYMENT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Notes (optional)</span>
-                <textarea
-                  value={completeForm.note}
-                  onChange={(e) =>
-                    setCompleteForm((prev) => ({ ...prev, note: e.target.value }))
-                  }
-                  placeholder="Add any quick details (cash split, receipts, etc.)"
-                  rows={3}
-                />
-              </label>
-              {completeErr && <p className="error small">{completeErr}</p>}
-              <button className="btn primary" type="submit" disabled={completeBusy}>
-                {completeBusy ? "Submitting..." : "Submit completion"}
-              </button>
-            </form>
-          )}
+                {completeOpen ? (
+                  <form className="vp-complete-form" onSubmit={submitCompletion}>
+                    <h3 className="vp-section-title">Report payment received</h3>
+                    <label>
+                      <span>Total collected</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={completeForm.amount}
+                        onChange={(e) =>
+                          setCompleteForm((prev) => ({ ...prev, amount: e.target.value }))
+                        }
+                        required
+                      />
+                    </label>
+                    <label>
+                      <span>Payment method</span>
+                      <select
+                        value={completeForm.method}
+                        onChange={(e) =>
+                          setCompleteForm((prev) => ({ ...prev, method: e.target.value }))
+                        }
+                      >
+                        {PAYMENT_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Notes (optional)</span>
+                      <textarea
+                        value={completeForm.note}
+                        onChange={(e) =>
+                          setCompleteForm((prev) => ({ ...prev, note: e.target.value }))
+                        }
+                        placeholder="Add any quick details (cash split, receipts, etc.)"
+                        rows={3}
+                      />
+                    </label>
+                    {completeErr ? <p className="error small">{completeErr}</p> : null}
+                    <button className="btn primary" type="submit" disabled={completeBusy}>
+                      {completeBusy ? "Submitting..." : "Submit completion"}
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            ) : (
+              <p className="muted small">This job has been completed. Review the payment summary below.</p>
+            )}
+          </section>
         </div>
 
         <aside className="vp-summary">
-          <section className="vp-summary-card">
+          <section className="vp-card vp-summary-card">
             <h3 className="section-title">Latest payment report</h3>
             {completionSummary ? (
               <ul className="vp-summary-list">
@@ -388,19 +403,19 @@ export default function VendorPortal() {
                       : "-"}
                   </span>
                 </li>
-                {completionSummary.note && (
+                {completionSummary.note ? (
                   <li>
                     <strong>Notes</strong>
                     <span>{completionSummary.note}</span>
                   </li>
-                )}
+                ) : null}
               </ul>
             ) : (
               <p className="muted small">No payment reported yet.</p>
             )}
           </section>
 
-          <section className="vp-summary-card">
+          <section className="vp-card vp-summary-card">
             <h3 className="section-title">Commission</h3>
             {commission ? (
               <ul className="vp-summary-list">
@@ -418,40 +433,29 @@ export default function VendorPortal() {
                     {commission.status}
                   </span>
                 </li>
-                {commission.chargeId && (
+                {commission.chargeId ? (
                   <li>
                     <strong>Reference</strong>
                     <span>{commission.chargeId}</span>
                   </li>
-                )}
-                {commission.failureReason && (
+                ) : null}
+                {commission.failureReason ? (
                   <li>
                     <strong>Notice</strong>
                     <span className="warning-text">{commission.failureReason}</span>
                   </li>
-                )}
+                ) : null}
               </ul>
             ) : (
               <p className="muted small">Commission will calculate when you report payment.</p>
             )}
 
-            {job.flags?.underReport && (
-              <p className="warning-text small">
-                 Report flagged for review - {job.flags.reason}
-              </p>
-            )}
+            {job.flags?.underReport ? (
+              <p className="warning-text small">Report flagged for review - {job.flags.reason}</p>
+            ) : null}
           </section>
         </aside>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

@@ -55,20 +55,16 @@ export default function PublicCustomerChoose() {
     try {
       setSelecting(id);
       const { data } = await api.post(`/api/bids/${id}/select`);
-      const token = customerToken;
-      if (token) {
-        nav(`/track/guest/${token}`);
-        return;
-      }
       if (data?.statusUrl) {
         window.location.assign(data.statusUrl);
-      } else if (data?.jobId) {
-        nav(`/status/${data.jobId}`);
-      } else if (jobId) {
-        nav(`/status/${jobId}`);
-      } else {
-        throw new Error("No status link returned.");
+        return;
       }
+      const resolvedJobId = data?.jobId || jobId;
+      if (resolvedJobId) {
+        nav(`/status/${resolvedJobId}`);
+        return;
+      }
+      nav("/customer/login");
     } catch (e) {
       setErr(
         e?.response?.data?.message || e?.message || "Failed to select bid"

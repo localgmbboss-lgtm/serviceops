@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { API_BASE_URL } from "../config/env";
+import { api } from "../lib/api";
 
 const LiveDriversContext = createContext({
   drivers: [],
@@ -13,6 +14,55 @@ const LiveDriversContext = createContext({
   requestSnapshot: () => Promise.resolve({ ok: false }),
 });
 
+const FALLBACK_REALTIME_URL = "http://localhost:5000";
+const hasWindow = typeof window !== "undefined";
+const POLL_INTERVAL_MS = 15000;
+
+const trimTrailingSlash = (value) => {
+  if (!value) return "";
+  return String(value).replace(/\/+$/, "");
+};
+
+const resolveRealtimeOrigin = () => {
+  const candidate = trimTrailingSlash(API_BASE_URL);
+  if (candidate && /^https?:\/\//i.test(candidate)) {
+    return candidate;
+  }
+  if (hasWindow) {
+    if (candidate && candidate.startsWith("/")) {
+      return trimTrailingSlash(`${window.location.origin}${candidate}`);
+    }
+    if (window.location?.origin) {
+      return trimTrailingSlash(window.location.origin);
+    }
+  }
+  return FALLBACK_REALTIME_URL;
+};
+
+const isLocalOrigin = (value) => {
+  try {
+    const url = new URL(value);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+};
+
+const createSocket = () => {
+  const origin = resolveRealtimeOrigin();
+  const preferWebsocket = isLocalOrigin(origin);
+  const transports = preferWebsocket ? ["polling", "websocket"] : ["polling"];
+  const socket = io(origin, {
+    path: "/socket.io",
+    transports,
+    withCredentials: true,
+    autoConnect: false,
+    upgrade: preferWebsocket,
+  });
+  socket.__preferWebsocket = preferWebsocket;
+  socket.__forcedPolling = !preferWebsocket;
+  return socket;
+};
 const sanitizeDrivers = (list) => {
   if (!Array.isArray(list)) return [];
 
@@ -51,6 +101,7 @@ export function LiveDriversProvider({ children }) {
   const lastUpdatedAtRef = useRef(null);
   const driversRef = useRef(new Map());
   const socketRef = useRef(null);
+  const pollTimerRef = useRef(null);
 
   const applySnapshot = useCallback((list) => {
     const sanitized = sanitizeDrivers(list);
@@ -101,38 +152,82 @@ export function LiveDriversProvider({ children }) {
     }
   }, []);
 
+  const fetchDriversSnapshot = useCallback(async () => {
+    try {
+      const { data } = await api.get("/api/drivers");
+      applySnapshot(data);
+      setError("");
+      return { ok: true, drivers: sanitizeDrivers(data) };
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Unable to load drivers";
+      setError(message);
+      return { ok: false, error: message };
+    }
+  }, [applySnapshot]);
+
+  const startPolling = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (pollTimerRef.current) return;
+    fetchDriversSnapshot();
+    pollTimerRef.current = window.setInterval(
+      fetchDriversSnapshot,
+      POLL_INTERVAL_MS
+    );
+  }, [fetchDriversSnapshot]);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current && typeof window !== "undefined") {
+      window.clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
   const requestSnapshot = useCallback(() => {
     const socket = socketRef.current;
-    if (!socket) {
-      return Promise.resolve({ ok: false, error: "Socket not ready" });
-    }
-    if (!socket.connected) {
-      socket.connect();
-    }
-    return new Promise((resolve) => {
-      socket.emit("drivers:requestSnapshot", (response) => {
-        if (response?.ok && Array.isArray(response.drivers)) {
-          applySnapshot(response.drivers);
-          resolve({ ok: true, drivers: sanitizeDrivers(response.drivers) });
-        } else {
-          const err = response?.error || "Unable to refresh drivers";
-          if (err) setError(err);
-          resolve({ ok: false, error: err });
-        }
+    if (socket?.connected) {
+      return new Promise((resolve) => {
+        socket.emit("drivers:requestSnapshot", (response) => {
+          if (response?.ok && Array.isArray(response.drivers)) {
+            applySnapshot(response.drivers);
+            resolve({ ok: true, drivers: sanitizeDrivers(response.drivers) });
+          } else {
+            const err = response?.error || "Unable to refresh drivers";
+            if (err) setError(err);
+            resolve({ ok: false, error: err });
+          }
+        });
       });
-    });
-  }, [applySnapshot]);
+    }
+
+    if (socket) {
+      socket.connect();
+      if (!socket.__forcedPolling) {
+        return new Promise((resolve) => {
+          socket.emit("drivers:requestSnapshot", (response) => {
+            if (response?.ok && Array.isArray(response.drivers)) {
+              applySnapshot(response.drivers);
+              resolve({ ok: true, drivers: sanitizeDrivers(response.drivers) });
+            } else {
+              const err = response?.error || "Unable to refresh drivers";
+              if (err) setError(err);
+              resolve({ ok: false, error: err });
+            }
+          });
+        });
+      }
+    }
+
+    return fetchDriversSnapshot();
+  }, [applySnapshot, fetchDriversSnapshot]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     if (!socketRef.current) {
-      socketRef.current = io(API_BASE_URL, {
-        path: "/socket.io",
-        transports: ["websocket", "polling"],
-        withCredentials: true,
-        autoConnect: false,
-      });
+      socketRef.current = createSocket();
     }
 
     const socket = socketRef.current;
@@ -140,11 +235,13 @@ export function LiveDriversProvider({ children }) {
     const handleConnect = () => {
       setStatus("connected");
       setError("");
+      stopPolling();
       requestSnapshot();
     };
 
     const handleDisconnect = () => {
       setStatus("disconnected");
+      startPolling();
     };
 
     const handleConnecting = () => {
@@ -152,6 +249,19 @@ export function LiveDriversProvider({ children }) {
     };
 
     const handleConnectError = (err) => {
+      const socket = socketRef.current;
+      if (socket && socket.__preferWebsocket && !socket.__forcedPolling) {
+        socket.__forcedPolling = true;
+        if (socket.io?.opts) {
+          socket.io.opts.transports = ["polling"];
+          socket.io.opts.upgrade = false;
+        }
+        setStatus("connecting");
+        startPolling();
+        socket.connect();
+        return;
+      }
+      startPolling();
       setStatus("error");
       setError(err?.message || "Socket error");
     };
@@ -191,8 +301,21 @@ export function LiveDriversProvider({ children }) {
       socket.off("drivers:update", handleUpdate);
       socket.off("drivers:remove", handleRemove);
       socket.off("drivers:error", handleConnectError);
+      stopPolling();
     };
-  }, [applySnapshot, applyUpdate, applyRemoval, requestSnapshot]);
+  }, [applySnapshot, applyUpdate, applyRemoval, requestSnapshot, startPolling, stopPolling]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    if (status === "connected") {
+      stopPolling();
+    } else {
+      startPolling();
+    }
+    return () => {
+      stopPolling();
+    };
+  }, [status, startPolling, stopPolling]);
 
   const value = useMemo(
     () => ({
@@ -216,4 +339,7 @@ export function LiveDriversProvider({ children }) {
 }
 
 export const useLiveDrivers = () => useContext(LiveDriversContext);
+
+
+
 

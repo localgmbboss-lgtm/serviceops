@@ -1,4 +1,4 @@
-﻿import Document from "../models/Document.js";
+import Document from "../models/Document.js";
 import Settings from "../models/Settings.js";
 import Vendor from "../models/Vendor.js";
 
@@ -198,6 +198,8 @@ export async function evaluateVendorCompliance(vendorId, options = {}) {
             url: r.document.url,
             expiresAt: r.document.expiresAt,
             uploadedAt: r.document.uploadedAt,
+            notes: r.document.notes || "",
+            metadata: r.document.metadata || null,
           }
         : null,
     })),
@@ -251,3 +253,7 @@ export async function complianceSummary({ ownerType, vendorId, driverId }) {
 
   return { ...totals, approved: totals.verified };
 }
+
+
+
+

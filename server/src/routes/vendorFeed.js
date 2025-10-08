@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import Job from "../models/Jobs.js";
 import Bid from "../models/Bid.js";
 import Vendor from "../models/Vendor.js";
+import { refreshVendorCompliance } from "../lib/compliance.js";
 import { requireVendorAuth } from "./vendorAuth.js";
 
 const router = Router();
@@ -48,9 +49,38 @@ const distanceKm = (lat1, lng1, lat2, lng2) => {
   return EARTH_RADIUS_KM * c;
 };
 
+async function loadVendorWithCompliance(vendorId) {
+  if (!vendorId) return null;
+  const vendor = await Vendor.findById(vendorId).lean();
+  if (!vendor) return null;
+
+  if (vendor?.compliance?.allowed || vendor?.complianceStatus === "compliant") {
+    return vendor;
+  }
+
+  try {
+    await refreshVendorCompliance(vendor._id);
+    const refreshed = await Vendor.findById(vendorId).lean();
+    return refreshed || vendor;
+  } catch (error) {
+    return vendor;
+  }
+}
 router.get("/open", requireVendorAuth, async (req, res, next) => {
-  const v = await Vendor.findById(req.vendorId).lean();
-  if (!v) return res.status(401).json({ message: "Vendor not found" });
+  const vendor = await loadVendorWithCompliance(req.vendorId);
+  if (!vendor) return res.status(401).json({ message: "Vendor not found" });
+
+  if (!vendor.compliance?.allowed) {
+    return res.status(403).json({
+      message: "Submit required compliance documents to receive jobs.",
+      complianceStatus: vendor.complianceStatus || "pending",
+      compliance: vendor.compliance || {
+        allowed: false,
+        enforcement: "submission",
+        missing: [],
+      },
+    });
+  }
 
   const find = { biddingOpen: true, status: { $ne: "Completed" } };
   const jobs = await Job.find(find).sort({ created: -1 }).limit(50).lean();
@@ -59,8 +89,8 @@ router.get("/open", requireVendorAuth, async (req, res, next) => {
     {
       jobId: { $in: jobs.map((j) => j._id) },
       $or: [
-        { vendorId: v._id },
-        ...(v.phone ? [{ vendorPhone: v.phone }] : []),
+        { vendorId: vendor._id },
+        ...(vendor.phone ? [{ vendorPhone: vendor.phone }] : []),
       ],
     },
     "jobId"
@@ -68,9 +98,14 @@ router.get("/open", requireVendorAuth, async (req, res, next) => {
   const bidOn = new Set(myBids.map((b) => String(b.jobId)));
 
   const avgSpeedKmh = 55;
+  const vendorLat = Number.isFinite(vendor.lat) ? vendor.lat : null;
+  const vendorLng = Number.isFinite(vendor.lng) ? vendor.lng : null;
 
   const jobsWithDistance = jobs.map((j) => {
-    const distKm = distanceKm(v.lat, v.lng, j.pickupLat, j.pickupLng);
+    const distKm =
+      vendorLat === null || vendorLng === null
+        ? null
+        : distanceKm(vendorLat, vendorLng, j.pickupLat, j.pickupLng);
     const suggestedEtaMinutes =
       distKm === null
         ? null
@@ -109,8 +144,20 @@ router.post("/bid", requireVendorAuth, async (req, res, next) => {
   if (!job || !job.biddingOpen)
     return res.status(404).json({ message: "Bidding closed" });
 
-  const v = await Vendor.findById(req.vendorId).lean();
-  if (!v) return res.status(401).json({ message: "Vendor not found" });
+  const vendor = await loadVendorWithCompliance(req.vendorId);
+  if (!vendor) return res.status(401).json({ message: "Vendor not found" });
+
+  if (!vendor.compliance?.allowed) {
+    return res.status(403).json({
+      message: "Submit required compliance documents before bidding.",
+      complianceStatus: vendor.complianceStatus || "pending",
+      compliance: vendor.compliance || {
+        allowed: false,
+        enforcement: "submission",
+        missing: [],
+      },
+    });
+  }
 
   const isFixed = job.bidMode === "fixed";
   const eta = clamp(toInt(etaMinutes), 1, 720);
@@ -133,16 +180,16 @@ router.post("/bid", requireVendorAuth, async (req, res, next) => {
     {
       jobId: job._id,
       $or: [
-        { vendorId: v._id },
-        ...(v.phone ? [{ vendorPhone: v.phone }] : []),
+        { vendorId: vendor._id },
+        ...(vendor.phone ? [{ vendorPhone: vendor.phone }] : []),
       ],
     },
     {
       $set: {
         jobId: job._id,
-        vendorId: v._id,
-        vendorName: v.name,
-        vendorPhone: v.phone || null,
+        vendorId: vendor._id,
+        vendorName: vendor.name,
+        vendorPhone: vendor.phone || null,
         etaMinutes: eta,
         price: pr,
       },
@@ -161,15 +208,21 @@ router.post("/bid", requireVendorAuth, async (req, res, next) => {
 });
 
 router.get("/assigned", requireVendorAuth, async (req, res, next) => {
-  const v = await Vendor.findById(req.vendorId).lean();
-  if (!v) return res.status(401).json({ message: "Vendor not found" });
+  const vendor = await loadVendorWithCompliance(req.vendorId);
+  if (!vendor) return res.status(401).json({ message: "Vendor not found" });
 
   const jobs = await Job.find({
-    $or: [{ vendorId: v._id }, ...(v.phone ? [{ vendorPhone: v.phone }] : [])],
+    $or: [
+      { vendorId: vendor._id },
+      ...(vendor.phone ? [{ vendorPhone: vendor.phone }] : []),
+    ],
   })
     .sort({ created: -1 })
     .limit(100)
     .lean();
+
+  const vendorLat = Number.isFinite(vendor.lat) ? vendor.lat : null;
+  const vendorLng = Number.isFinite(vendor.lng) ? vendor.lng : null;
 
   const jobsWithDistance = jobs.map((j) => ({
     _id: j._id,
@@ -188,7 +241,10 @@ router.get("/assigned", requireVendorAuth, async (req, res, next) => {
     created: j.created,
     guestRequest: !!j.guestRequest,
     canBid: false,
-    distanceKm: distanceKm(v.lat, v.lng, j.pickupLat, j.pickupLng),
+    distanceKm:
+      vendorLat === null || vendorLng === null
+        ? null
+        : distanceKm(vendorLat, vendorLng, j.pickupLat, j.pickupLng),
   }));
 
   res.json(jobsWithDistance);
@@ -226,4 +282,3 @@ router.patch(
 );
 
 export default router;
-

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  PiLightningBold,
   PiSteeringWheelBold,
   PiWrenchBold,
   PiClockBold,
@@ -23,6 +22,8 @@ const DEFAULT_LOCATION_LABEL = "ServiceOps coverage area";
 const aboutParagraphs = [
   "Rapid, damage-free recoveries for passenger, fleet, and specialty vehicles.",
   "Transparent pricing, live updates, and digital paperwork every step of the way.",
+  "Same-day vendor payouts with digital invoicing and status tracking that closes every loop.",
+  "Dedicated escalation desk and recovery specialists on-call whenever a job needs extra muscle.",
 ];
 
 const aboutHighlights = [
@@ -267,8 +268,8 @@ export default function Landing() {
           </div>
 
           <div className="hero-actions">
-            <Link className="hero-action hero-action--primary" to="/guest/request">
-              See live pricing
+            <Link className="hero-action hero-action--primary" to="/customer/login">
+              Sign in to your workspace
             </Link>
             <Link className="hero-action hero-action--ghost" to="/vendor/login">
               Join the vendor network
@@ -467,16 +468,6 @@ export default function Landing() {
             Claim nearby jobs, share live ETAs, and keep your payouts organized.
           </p>
         </Link>
-
-        <Link className="entry card" to="/guest/request">
-          <div className="entry-icon" aria-hidden="true">
-            <PiLightningBold />
-          </div>
-          <h3>Quick guest request</h3>
-          <p className="muted">
-            Locked out or stranded? Submit your details and track the truck on the way.
-          </p>
-        </Link>
       </section>
 
       <section className="features card">
@@ -507,15 +498,15 @@ export default function Landing() {
         <div className="final-left">
           <h2>Need a truck right now?</h2>
           <p className="muted">
-            Start a request online or call 303-900-5503 for direct dispatch with Titan Tow Force.
+            Sign in to your customer workspace or call 303-900-5503 for direct dispatch with Titan Tow Force.
           </p>
         </div>
         <div className="final-right">
           <a className="btn ghost" href="tel:+13039005503">
             Call 303-900-5503
           </a>
-          <Link className="btn primary" to="/guest/request">
-            Start a request
+          <Link className="btn primary" to="/customer/login">
+            Sign in to request service
           </Link>
         </div>
       </section>

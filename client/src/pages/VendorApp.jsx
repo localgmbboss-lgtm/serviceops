@@ -3,31 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { vendorApi } from "../lib/vendorApi";
 import { useNotifications } from "../contexts/NotificationsContext";
 import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
-import GMap from "../components/GMap";
 import "./VendorApp.css";
 
 const KM_TO_MI = 0.621371;
 const AVERAGE_SPEED_MPH = 34; // blended city/highway assumption
-const currencyFormatterCache = new Map();
-const formatCurrency = (value, currency = "USD") => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return null;
-  const key = currency || "USD";
-  if (!currencyFormatterCache.has(key)) {
-    try {
-      currencyFormatterCache.set(
-        key,
-        new Intl.NumberFormat("en-US", { style: "currency", currency: key })
-      );
-    } catch (err) {
-      currencyFormatterCache.set(
-        key,
-        new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
-      );
-    }
-  }
-  return currencyFormatterCache.get(key).format(num);
-};
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const num = typeof value === "number" ? value : Number(value);
@@ -60,20 +39,6 @@ const derivePickupCoordinates = (job) => {
     toFiniteNumber(job?.pickup?.lng) ??
     toFiniteNumber(job?.coordinates?.lng) ??
     toFiniteNumber(job?.vehicleLocation?.lng);
-  return lat !== null && lng !== null ? { lat, lng } : null;
-};
-
-const deriveDropoffCoordinates = (job) => {
-  const lat =
-    toFiniteNumber(job?.dropoffLat) ??
-    toFiniteNumber(job?.dropoff?.lat) ??
-    toFiniteNumber(job?.dropoffLocation?.lat) ??
-    toFiniteNumber(job?.destination?.lat);
-  const lng =
-    toFiniteNumber(job?.dropoffLng) ??
-    toFiniteNumber(job?.dropoff?.lng) ??
-    toFiniteNumber(job?.dropoffLocation?.lng) ??
-    toFiniteNumber(job?.destination?.lng);
   return lat !== null && lng !== null ? { lat, lng } : null;
 };
 
@@ -707,11 +672,6 @@ export default function VendorApp() {
                         : null,
                       noteText ? { label: "Notes", value: noteText } : null,
                     ].filter(Boolean);
-                    const statusLabel =
-                      (job.status && String(job.status).trim()) || "Unassigned";
-                    const statusClass = statusLabel
-                      .toLowerCase()
-                      .replace(/\s+/g, "");
                     return (
                       <li
                         key={job._id}
@@ -889,19 +849,6 @@ export default function VendorApp() {
                       .join(" / ");
                     const travelMinutes = estimateTravelMinutes(job.distanceKm);
                     const pickupCoords = derivePickupCoordinates(job);
-                    const dropoffCoords = deriveDropoffCoordinates(job);
-                    const routeLandmarks = dropoffCoords
-                      ? [
-                          {
-                            key: `${job._id}-dropoff`,
-                            label: "Dropoff",
-                            position: dropoffCoords,
-                            color: "#2563eb",
-                            textColor: "#ffffff",
-                          },
-                        ]
-                      : [];
-                    const hasRoute = Boolean(vendorCoordinates && pickupCoords);
                     const routeFallbackCopy = !vendorCoordinates
                       ? "Add your base location in your vendor profile to unlock turn-by-turn directions."
                       : "Waiting on the customer to share a precise pickup coordinate.";
@@ -912,8 +859,6 @@ export default function VendorApp() {
                             : ""
                         }&destination=${pickupCoords.lat},${pickupCoords.lng}`
                       : null;
-                    const vendorAvatar =
-                      me?.photoUrl || me?.avatarUrl || me?.logoUrl || null;
                     const detailRows = [
                       contactName
                         ? { label: "Contact", value: contactName }
@@ -999,7 +944,7 @@ export default function VendorApp() {
                                     }}
                                   >
                                     Get directions
-                                    <span aria-hidden="true">→</span>
+                                    <span aria-hidden="true">&rarr;</span>
                                   </a>
                                 </div>
                               </div>

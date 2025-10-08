@@ -38,8 +38,6 @@ import CustomerHome from "./pages/CustomerHome";
 import PublicVendorBid from "./pages/PublicVendorBid";
 import PublicCustomerChoose from "./pages/PublicCustomerChoose";
 import VendorPortal from "./pages/VendorPortal";
-import GuestRequest from "./pages/GuestRequest";
-import GuestJobTracker from "./pages/GuestJobTracker";
 // Optional self-serve intake
 import CustomerIntake from "./pages/CustomerIntake";
 import NotificationsCenter from "./pages/NotificationsCenter";
@@ -65,11 +63,6 @@ export default function App() {
               <Route
                 path="/choose/:customerToken"
                 element={<PublicCustomerChoose />}
-              />
-              <Route path="/guest/request" element={<GuestRequest />} />
-              <Route
-                path="/track/guest/:jobToken"
-                element={<GuestJobTracker />}
               />
               <Route
                 path="/vendor/:vendorAcceptedToken"

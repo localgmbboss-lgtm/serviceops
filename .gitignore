@@ -40,3 +40,4 @@ Thumbs.db
 *.temp
 client/tmp*
 server/tmp*
+server/uploads/

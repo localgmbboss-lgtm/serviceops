@@ -1,4 +1,4 @@
-﻿import mongoose from "mongoose";
+import mongoose from "mongoose";
 
 const STATUS_VALUES = ["pending", "submitted", "verified", "rejected", "expired"];
 
@@ -34,6 +34,7 @@ const DocumentSchema = new mongoose.Schema(
     },
     expiresAt: { type: Date, default: null },
     notes: { type: String, default: "" },
+    metadata: { type: mongoose.Schema.Types.Mixed, default: null },
     uploadedAt: { type: Date, default: () => new Date() },
     reviewedAt: { type: Date, default: null },
     reviewedBy: { type: String, default: "" },
@@ -46,3 +47,4 @@ DocumentSchema.index({ ownerType: 1, driverId: 1, requirementKey: 1 });
 DocumentSchema.index({ ownerType: 1, status: 1 });
 
 export default mongoose.model("Document", DocumentSchema);
+

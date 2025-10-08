@@ -164,6 +164,7 @@ h3 {
   min-height: 56px;
   padding: 8px 16px;
   gap: 10px;
+  justify-content: space-between;
 }
 .topbar--authed .brand-hub {
   gap: 4px;
@@ -195,7 +196,6 @@ h3 {
   position: relative;
   width: 42px;
   height: 42px;
-  margin-right: 6px;
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.14);
   background: #ffffff;
@@ -267,9 +267,6 @@ h3 {
 @media (max-width: 900px) {
   .topbar--authed .inner {
     padding: 8px 14px;
-  }
-  .topbar-notify {
-    margin-right: 0;
   }
 }
 @media (max-width: 640px) {
@@ -412,6 +409,19 @@ h3 {
 .topbar .inner::-webkit-scrollbar {
   display: none;
 }
+.topbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+  flex-wrap: nowrap;
+}
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
 .brand {
   margin: 0;
   color: #0f172a;
@@ -442,7 +452,6 @@ h3 {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-left: auto;
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;

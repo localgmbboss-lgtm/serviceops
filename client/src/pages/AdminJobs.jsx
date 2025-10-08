@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { api } from "../lib/api";
 import JobTable from "../components/JobTable";
 import JobCreate from "../components/JobCreate";
@@ -124,10 +124,11 @@ export default function AdminJobs() {
   };
 
   const copySelfServeLink = async () => {
-    const origin = (typeof window !== "undefined" && window.location?.origin)
-      || "https://serviceops.app";
-    const link = `${origin.replace(/\/$/, "")}/guest/request`;
-    await copy(link, "Guest request link");
+    const origin =
+      (typeof window !== "undefined" && window.location?.origin) ||
+      "https://serviceops.app";
+    const link = `${origin.replace(/\/$/, "")}/customer/login`;
+    await copy(link, "Customer portal link");
   };
 
   const onOpenBidding = async (jobId) => {
@@ -287,7 +288,7 @@ export default function AdminJobs() {
                 className="admin-jobs-dropdown-item"
                 onClick={copySelfServeLink}
               >
-                Copy self-serve link
+                Copy customer login link
               </button>
             </div>
           </div>
@@ -317,33 +318,59 @@ export default function AdminJobs() {
               </span>
             </button>
           ))}
-          <div className="admin-jobs-last-updated">
-            {last && (
-              <span className="admin-jobs-muted admin-jobs-small">
-                Updated {last.toLocaleTimeString()}
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
       {/* Board */}
       <section className="admin-jobs-board-section">
         <div className="admin-jobs-card admin-jobs-board-card">
-          {view === "table" ? (
-            <div className="admin-jobs-scroll-x">
-              <JobTable
-                jobs={filteredJobs}
-                drivers={[]}
-                onUpdateJob={onUpdateJob}
-                soloMode={soloMode}
-                onOpenBidding={onOpenBidding}
-                onShowLinks={onShowLinks}
-              />
+          <div className="admin-jobs-board-header">
+            <div className="admin-jobs-tabs" role="tablist" aria-label="Board view">
+              <button
+                className={`admin-jobs-tab ${
+                  view === "table" ? "admin-jobs-tab-active" : ""
+                }`}
+                onClick={() => setView("table")}
+                aria-selected={view === "table"}
+                role="tab"
+              >
+                <span className="admin-jobs-tab-text">Table</span>
+              </button>
+              <button
+                className={`admin-jobs-tab ${
+                  view === "kanban" ? "admin-jobs-tab-active" : ""
+                }`}
+                onClick={() => setView("kanban")}
+                aria-selected={view === "kanban"}
+                role="tab"
+              >
+                <span className="admin-jobs-tab-text">Kanban</span>
+              </button>
             </div>
-          ) : (
-            <Kanban jobs={filteredJobs} onUpdateJob={onUpdateJob} />
-          )}
+            <div className="admin-jobs-last-updated">
+              {last && (
+                <span className="admin-jobs-muted admin-jobs-small">
+                  Updated {last.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="admin-jobs-board-body">
+            {view === "table" ? (
+              <div className="admin-jobs-scroll-x">
+                <JobTable
+                  jobs={filteredJobs}
+                  drivers={[]}
+                  onUpdateJob={onUpdateJob}
+                  soloMode={soloMode}
+                  onOpenBidding={onOpenBidding}
+                  onShowLinks={onShowLinks}
+                />
+              </div>
+            ) : (
+              <Kanban jobs={filteredJobs} onUpdateJob={onUpdateJob} />
+            )}
+          </div>
         </div>
       </section>
 
@@ -444,8 +471,3 @@ export default function AdminJobs() {
     </div>
   );
 }
-
-
-
-
-

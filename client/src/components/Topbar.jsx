@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationsContext";
@@ -9,6 +9,8 @@ export default function Topbar() {
   const { user, logout, isAdmin, isVendor, isDriver, isCustomer } = useAuth();
   const { unreadCount, markAllRead } = useNotifications();
   const [menuOpen, setMenuOpen] = useState(false);
+  const navRef = useRef(null);
+  const menuToggleRef = useRef(null);
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
@@ -61,6 +63,31 @@ export default function Topbar() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuOpen, closeMenu]);
 
+  useEffect(() => {
+    if (!menuOpen || typeof document === "undefined") {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      const navEl = navRef.current;
+      const toggleEl = menuToggleRef.current;
+      if (
+        (navEl && navEl.contains(event.target)) ||
+        (toggleEl && toggleEl.contains(event.target))
+      ) {
+        return;
+      }
+      closeMenu();
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [menuOpen, closeMenu]);
+
   const roleLabel = useMemo(() => {
     if (isAdmin) return "Admin";
     if (isVendor) return "Vendor";
@@ -105,10 +132,8 @@ export default function Topbar() {
 
   const guestLinks = useMemo(
     () => [
-      { to: "/guest/request", label: "Request service" },
       { to: "/customer/login", label: "Customer login" },
       { to: "/vendor/login", label: "Vendor login" },
-      { to: "/admin/login", label: "Admin login" },
     ],
     []
   );
@@ -130,40 +155,14 @@ export default function Topbar() {
           ) : null}
         </div>
 
-        {user ? (
-          <button
-            type="button"
-            className={"topbar-notify" + (unreadCount > 0 ? " has-unread" : "")}
-            onClick={handleNotificationsClick}
-            aria-label={notificationsLabel}
+        <div className="topbar-right">
+          <nav
+            id="mainnav"
+            className={"nav" + (menuOpen ? " nav--open" : "")}
+            aria-label="Primary"
+            ref={navRef}
           >
-            <span className="topbar-notify__icon" aria-hidden="true" />
-            {unreadCount > 0 ? (
-              <span className="topbar-notify__badge">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            ) : null}
-          </button>
-        ) : null}
-
-        <button
-          type="button"
-          className={"topbar-menu-toggle" + (menuOpen ? " is-active" : "")}
-          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-          aria-expanded={menuOpen}
-          aria-controls="mainnav"
-          onClick={() => setMenuOpen((prev) => !prev)}
-        >
-          <span />
-          <span />
-          <span />
-        </button>
-        <nav
-          id="mainnav"
-          className={"nav" + (menuOpen ? " nav--open" : "")}
-          aria-label="Primary"
-        >
-          {user ? (
+            {user ? (
             <>
               {isAdmin && (
                 <>
@@ -314,7 +313,40 @@ export default function Topbar() {
               ))}
             </>
           )}
-        </nav>
+          </nav>
+
+          <div className="topbar-actions">
+            {user ? (
+              <button
+                type="button"
+                className={"topbar-notify" + (unreadCount > 0 ? " has-unread" : "")}
+                onClick={handleNotificationsClick}
+                aria-label={notificationsLabel}
+              >
+                <span className="topbar-notify__icon" aria-hidden="true" />
+                {unreadCount > 0 ? (
+                  <span className="topbar-notify__badge">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              className={"topbar-menu-toggle" + (menuOpen ? " is-active" : "")}
+              aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+              aria-expanded={menuOpen}
+              aria-controls="mainnav"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              ref={menuToggleRef}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+          </div>
+        </div>
       </div>
       <div
         className={"nav-backdrop" + (menuOpen ? " nav-backdrop--visible" : "")}
