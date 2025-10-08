@@ -80,7 +80,9 @@ export default function CustomerHome() {
       if (!prevJob) {
         if (!isInitial) {
           publish({
-            title: job.serviceType ? `${job.serviceType} request logged` : "New service request",
+            title: job.serviceType
+              ? `${job.serviceType} request logged`
+              : "New service request",
             body: "We received your request and will keep you posted as providers respond.",
             severity: "info",
             meta: {
@@ -112,7 +114,8 @@ export default function CustomerHome() {
             route: `/status/${job._id}`,
           },
           dedupeKey: `customer:job:${job._id}:status:${job.status}`,
-          createdAt: job.updatedAt || job.completedAt || new Date().toISOString(),
+          createdAt:
+            job.updatedAt || job.completedAt || new Date().toISOString(),
         });
       }
     });
@@ -431,5 +434,3 @@ function JobCard({ job, isCompleted = false }) {
     </div>
   );
 }
-
-
