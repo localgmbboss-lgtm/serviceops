@@ -1,8 +1,8 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import Customer from "../models/Customer.js";
-import Job from "../models/Jobs.js"; // 
-import Driver from "../models/Driver.js";
+import Job from "../models/Jobs.js";
+import Vendor from "../models/Vendor.js";
 import { requireFields } from "../lib/validate.js";
 
 const router = Router();
@@ -97,9 +97,33 @@ router.get("/:id/status", async (req, res, next) => {
 
     if (!job) return res.status(404).json({ message: "Status not found" });
 
-    const driver = job.driverId
-      ? await Driver.findById(job.driverId).lean()
-      : null;
+    const vendorDoc =
+      job.vendorId ? await Vendor.findById(job.vendorId).lean() : null;
+
+    let vendor = null;
+    if (vendorDoc) {
+      vendor = {
+        _id: vendorDoc._id,
+        name: vendorDoc.name,
+        city: vendorDoc.city,
+        phone: vendorDoc.phone,
+        lat: vendorDoc.lat ?? null,
+        lng: vendorDoc.lng ?? null,
+        lastSeenAt: vendorDoc.lastSeenAt || vendorDoc.updatedAt || null,
+        active: vendorDoc.active !== false,
+      };
+    } else if (job.vendorName || job.vendorPhone) {
+      vendor = {
+        _id: job.vendorId || null,
+        name: job.vendorName || "Vendor",
+        city: job.vendorCity || job.vendorRegion || "",
+        phone: job.vendorPhone || "",
+        lat: job.vendorLat ?? null,
+        lng: job.vendorLng ?? null,
+        lastSeenAt: job.updatedAt || job.assignedAt || job.created,
+        active: true,
+      };
+    }
 
     // minimal, stable shape for CustomerDashboard
     res.json({
@@ -117,17 +141,7 @@ router.get("/:id/status", async (req, res, next) => {
         created: job.created,
         completed: job.completed || null,
       },
-      driver: driver
-        ? {
-            _id: driver._id,
-            name: driver.name,
-            city: driver.city,
-            phone: driver.phone,
-            lat: driver.lat,
-            lng: driver.lng,
-            lastSeenAt: driver.lastSeenAt,
-          }
-        : null,
+      vendor,
     });
   } catch (e) {
     next(e);

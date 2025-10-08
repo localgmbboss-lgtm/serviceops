@@ -55,7 +55,6 @@ export function AuthProvider({ children }) {
       loading: false,
       isAdmin: role === "admin",
       isVendor: role === "vendor",
-      isDriver: role === "driver",
       isCustomer: role === "customer",
     };
   }, [user, token]);

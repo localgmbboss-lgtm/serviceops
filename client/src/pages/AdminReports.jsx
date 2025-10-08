@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import KPIBlock from "../components/KPIBlock";
 import "./AdminReports.css";
 
-const DRIVERS_PER_PAGE = 4;
+const VENDORS_PER_PAGE = 4;
 
 const SERVICES = [
   "Towing service",
@@ -35,7 +35,7 @@ export default function AdminReports() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [driverPage, setDriverPage] = useState(1);
+  const [vendorPage, setVendorPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,7 +45,7 @@ export default function AdminReports() {
         params: { from, to, service, city },
       });
       setData(data);
-      setDriverPage(1);
+      setVendorPage(1);
     } catch (e) {
       setErr(e?.response?.data?.message || "Failed to load reports");
     } finally {
@@ -61,9 +61,9 @@ export default function AdminReports() {
     if (!data) return;
     const total = Math.max(
       1,
-      Math.ceil((data.topDrivers?.length || 0) / DRIVERS_PER_PAGE)
+      Math.ceil((data.topVendors?.length || 0) / VENDORS_PER_PAGE)
     );
-    setDriverPage((prev) => Math.min(prev, total));
+    setVendorPage((prev) => Math.min(prev, total));
   }, [data]);
 
   const resetFilters = () => {
@@ -102,12 +102,12 @@ export default function AdminReports() {
     const topService = Object.entries(data.byService || {}).sort(
       (a, b) => b[1] - a[1]
     )[0]?.[0];
-    const td = data.topDrivers?.[0];
+    const td = data.topVendors?.[0];
     return [
       topCity ? `Most jobs by city: ${topCity}` : null,
       topService ? `Most requested service: ${topService}` : null,
       td
-        ? `Top driver: ${td.name || "N/A"} (${td.jobs} jobs, $${Math.round(
+        ? `Top vendor: ${td.name || "N/A"} (${td.jobs} jobs, $${Math.round(
             td.revenue
           )})`
         : null,
@@ -119,24 +119,24 @@ export default function AdminReports() {
     ].filter(Boolean);
   }, [data]);
 
-  const driverCount = data?.topDrivers?.length || 0;
-  const totalDriverPages = Math.max(
+  const vendorCount = data?.topVendors?.length || 0;
+  const totalVendorPages = Math.max(
     1,
-    Math.ceil(driverCount / DRIVERS_PER_PAGE)
+    Math.ceil(vendorCount / VENDORS_PER_PAGE)
   );
-  const pagedDrivers = useMemo(() => {
-    if (!data?.topDrivers) return [];
-    const start = (driverPage - 1) * DRIVERS_PER_PAGE;
-    return data.topDrivers.slice(start, start + DRIVERS_PER_PAGE);
-  }, [data, driverPage]);
-  const showingStart = driverCount === 0
+  const pagedVendors = useMemo(() => {
+    if (!data?.topVendors) return [];
+    const start = (vendorPage - 1) * VENDORS_PER_PAGE;
+    return data.topVendors.slice(start, start + VENDORS_PER_PAGE);
+  }, [data, vendorPage]);
+  const showingStart = vendorCount === 0
     ? 0
-    : (driverPage - 1) * DRIVERS_PER_PAGE + 1;
-  const showingEnd = driverCount === 0
+    : (vendorPage - 1) * VENDORS_PER_PAGE + 1;
+  const showingEnd = vendorCount === 0
     ? 0
-    : Math.min(driverPage * DRIVERS_PER_PAGE, driverCount);
-  const canPrev = driverPage > 1;
-  const canNext = driverPage < totalDriverPages;
+    : Math.min(vendorPage * VENDORS_PER_PAGE, vendorCount);
+  const canPrev = vendorPage > 1;
+  const canNext = vendorPage < totalVendorPages;
 
   return (
     <div className="reports-page">
@@ -263,7 +263,7 @@ export default function AdminReports() {
           </section>
 
           <section className="card">
-            <h3 className="section-title">Top Drivers</h3>
+            <h3 className="section-title">Top Vendors</h3>
             <div className="table-wrap">
               <table className="table rtable">
                 <thead>
@@ -275,15 +275,15 @@ export default function AdminReports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedDrivers.map((d) => (
-                    <tr key={d.driverId || d.name}>
+                  {pagedVendors.map((d) => (
+                    <tr key={d.vendorId || d.name}>
                       <td>{d.name || "N/A"}</td>
                       <td>{d.city || "N/A"}</td>
                       <td>{d.jobs}</td>
                       <td>{Math.round(d.revenue)}</td>
                     </tr>
                   ))}
-                  {driverCount === 0 && (
+                  {vendorCount === 0 && (
                     <tr>
                       <td colSpan="4" className="muted">
                         No data
@@ -293,17 +293,17 @@ export default function AdminReports() {
                 </tbody>
               </table>
             </div>
-            {driverCount > 0 && (
+            {vendorCount > 0 && (
               <div className="pager">
                 <span className="pager-meta">
-                  Showing {showingStart}-{showingEnd} of {driverCount}
+                  Showing {showingStart}-{showingEnd} of {vendorCount}
                 </span>
-                {driverCount > DRIVERS_PER_PAGE && (
+                {vendorCount > VENDORS_PER_PAGE && (
                   <div className="pager-controls">
                     <button
                       type="button"
                       className="pager-btn"
-                      onClick={() => setDriverPage((prev) => Math.max(1, prev - 1))}
+                      onClick={() => setVendorPage((prev) => Math.max(1, prev - 1))}
                       disabled={!canPrev}
                     >
                       &lt; Prev
@@ -311,7 +311,7 @@ export default function AdminReports() {
                     <button
                       type="button"
                       className="pager-btn"
-                      onClick={() => setDriverPage((prev) => Math.min(totalDriverPages, prev + 1))}
+                      onClick={() => setVendorPage((prev) => Math.min(totalVendorPages, prev + 1))}
                       disabled={!canNext}
                     >
                       Next &gt;

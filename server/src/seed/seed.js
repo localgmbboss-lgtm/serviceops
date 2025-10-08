@@ -1,62 +1,74 @@
-import 'dotenv/config';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { connectDB } from '../lib/db.js';
-import Customer from '../models/Customer.js';
-import Driver from '../models/Driver.js';
-import Job from '../models/Jobs.js';
-
+import "dotenv/config";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { connectDB } from "../lib/db.js";
+import Customer from "../models/Customer.js";
+import Vendor from "../models/Vendor.js";
+import Job from "../models/Jobs.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const read = (p) => JSON.parse(fs.readFileSync(path.join(__dirname, 'data', p), 'utf-8'));
 
+const readJson = (filename) => {
+  const filePath = path.join(__dirname, "data", filename);
+  if (!fs.existsSync(filePath)) return [];
+  const raw = fs.readFileSync(filePath, "utf-8");
+  return JSON.parse(raw);
+};
 
 (async () => {
-try {
-await connectDB(process.env.MONGO_URI);
+  try {
+    await connectDB(process.env.MONGO_URI);
 
+    const customers = readJson("customers.json");
+    const vendors =
+      readJson("vendors.json").length > 0
+        ? readJson("vendors.json")
+        : readJson("drivers.json");
 
-const customers = read('customer.json');
-const drivers = read('drivers.json');
+    await Promise.all([
+      Customer.deleteMany({}),
+      Vendor.deleteMany({}),
+      Job.deleteMany({}),
+    ]);
 
+    const createdCustomers = await Customer.insertMany(customers);
+    const createdVendors = await Vendor.insertMany(
+      vendors.map((vendor) => ({
+        ...vendor,
+        active: true,
+        complianceStatus: vendor.complianceStatus || "pending",
+      }))
+    );
 
-await Promise.all([
-Customer.deleteMany({}),
-Driver.deleteMany({}),
-Job.deleteMany({}),
-]);
+    if (createdCustomers.length && createdVendors.length) {
+      await Job.insertMany([
+        {
+          customerId: createdCustomers[0]._id,
+          vendorId: createdVendors[0]._id,
+          vendorName: createdVendors[0].name,
+          vendorPhone: createdVendors[0].phone,
+          status: "Assigned",
+          quotedPrice: 15000,
+          pickupAddress: "Ikeja City Mall, Lagos",
+          serviceType: "delivery",
+          notes: "Fragile items",
+        },
+        {
+          customerId: createdCustomers[1]?._id || createdCustomers[0]._id,
+          status: "Unassigned",
+          quotedPrice: 22000,
+          pickupAddress: "Abuja Central Business District",
+          serviceType: "installation",
+        },
+      ]);
+    }
 
-
-const createdCustomers = await Customer.insertMany(customers);
-const createdDrivers = await Driver.insertMany(drivers);
-
-
-await Job.insertMany([
-{
-customerId: createdCustomers[0]._id,
-driverId: createdDrivers[0]._id,
-status: 'Assigned',
-quotedPrice: 15000,
-pickupAddress: 'Ikeja City Mall, Lagos',
-serviceType: 'delivery',
-notes: 'Fragile items',
-},
-{
-customerId: createdCustomers[1]._id,
-status: 'Unassigned',
-quotedPrice: 22000,
-pickupAddress: 'Abuja Central Business District',
-serviceType: 'installation',
-},
-]);
-
-
-console.log(' Seed complete');
-process.exit(0);
-} catch (e) {
-console.error(e);
-process.exit(1);
-}
+    console.log("Seed complete");
+    process.exit(0);
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
 })();

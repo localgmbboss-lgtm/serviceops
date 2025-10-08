@@ -7,6 +7,8 @@ import {
   PiShieldCheckBold,
   PiHeadsetBold,
   PiPhoneCallBold,
+  PiStarBold,
+  PiToolboxBold,
 } from "react-icons/pi";
 import { loadGoogleMaps } from "../lib/loadGoogleMaps";
 import img1 from "../images/img1.jpg";
@@ -50,6 +52,24 @@ const aboutStats = [
     value: "24/7",
     label: "Live command",
     detail: "Text, phone, and portal updates around the clock.",
+  },
+];
+
+const readinessHighlights = [
+  {
+    icon: PiToolboxBold,
+    title: "Fully equipped rigs",
+    body: "Wheel lifts, dollies, winch lines, and battery packs loaded for every call.",
+  },
+  {
+    icon: PiStarBold,
+    title: "QA checklists",
+    body: "Hook-up, photo, and torque confirmations logged before the ticket closes.",
+  },
+  {
+    icon: PiShieldCheckBold,
+    title: "Safety-first culture",
+    body: "Night visibility kits and securement training refreshed every quarter.",
   },
 ];
 const aboutSpotlights = [
@@ -416,6 +436,23 @@ export default function Landing() {
                 </li>
               ))}
             </ol>
+          </div>
+
+          <div className="panel-readiness">
+            <h4>Operator readiness</h4>
+            <ul className="panel-readiness__list">
+              {readinessHighlights.map(({ icon: IconPart, title, body }) => (
+                <li key={title} className="panel-readiness__item">
+                  <span className="panel-readiness__icon" aria-hidden="true">
+                    <IconPart />
+                  </span>
+                  <div>
+                    <strong>{title}</strong>
+                    <p>{body}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className="panel-contact">

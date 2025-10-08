@@ -70,10 +70,9 @@ const SettingsSchema = new mongoose.Schema(
 
     // 2) Workflow toggles (feature flags)
     workflow: {
-      requireDriverDocs: { type: Boolean, default: false },
       requireVendorDocs: { type: Boolean, default: true },
       showBusinessDocs: { type: Boolean, default: true },
-      showLiveDriverMap: { type: Boolean, default: true },
+      showLiveVendorMap: { type: Boolean, default: true },
       advancedJobWorkflow: { type: Boolean, default: false },
       enableCustomerPaymentScreen: { type: Boolean, default: false },
       enableReviewFunnel: { type: Boolean, default: true },
@@ -92,8 +91,6 @@ const SettingsSchema = new mongoose.Schema(
 
     // 4) Intervals (polling, etc.)
     intervals: {
-      pollDriversSec: { type: Number, default: 7 },
-      driverPatchSec: { type: Number, default: 15 },
       mapRefreshSec: { type: Number, default: 7 },
       vendorPollSec: { type: Number, default: 7 },
       vendorPushSec: { type: Number, default: 15 },

@@ -2,13 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { copyText } from "../utils/clipboard";
-import { deriveCustomerCoordinates, deriveDriverCoordinates, deriveDropoffCoordinates } from "../utils/geo";
+import {
+  deriveCustomerCoordinates,
+  deriveDriverCoordinates,
+  deriveDropoffCoordinates,
+} from "../utils/geo";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
 import { useNotifications } from "../contexts/NotificationsContext";
-import { LuCar, LuFlag, LuMapPin, LuSearch, LuTruck, LuUserCheck } from "react-icons/lu";
+import {
+  LuCar,
+  LuFlag,
+  LuMapPin,
+  LuSearch,
+  LuTruck,
+  LuUserCheck,
+} from "react-icons/lu";
 import "./CustomerDashboard.css";
 
 const STAGES = ["Unassigned", "Assigned", "OnTheWay", "Arrived", "Completed"];
@@ -31,7 +42,11 @@ const stageMeta = {
 
 export default function CustomerDashboard() {
   const { id } = useParams();
-  const [state, setState] = useState({ customer: null, job: null, driver: null });
+  const [state, setState] = useState({
+    customer: null,
+    job: null,
+    driver: null,
+  });
   const [history, setHistory] = useState([]);
   const [err, setErr] = useState("");
   const historyRef = useRef(null);
@@ -89,10 +104,14 @@ export default function CustomerDashboard() {
   const nextIndex = Math.min(activeIndex + 1, STAGES.length - 1);
   const nextStage = STAGES[nextIndex];
   const isFinalStage = nextIndex === activeIndex;
-  const nextCopy = isFinalStage ? "All wrapped" : stageMeta[nextStage]?.title || nextStage;
+  const nextCopy = isFinalStage
+    ? "All wrapped"
+    : stageMeta[nextStage]?.title || nextStage;
   const currentTitle = stageMeta[currentStage]?.title || currentStage;
 
-  const jobNumber = job?._id ? `#${job._id.slice(-6).toUpperCase()}` : "Pending";
+  const jobNumber = job?._id
+    ? `#${job._id.slice(-6).toUpperCase()}`
+    : "Pending";
   const etaText = job?.estimatedDuration || "Calculating";
 
   useEffect(() => {
@@ -100,7 +119,10 @@ export default function CustomerDashboard() {
     const previousStatus = previousStatusRef.current;
     const shouldAnnounceInitial =
       !previousStatus && ["Assigned", "OnTheWay"].includes(job.status);
-    if ((previousStatus && job.status !== previousStatus) || shouldAnnounceInitial) {
+    if (
+      (previousStatus && job.status !== previousStatus) ||
+      shouldAnnounceInitial
+    ) {
       const statusTitle = stageMeta[job.status]?.title || job.status;
       let body = statusMessage[job.status] || `Your job is now ${statusTitle}.`;
       if (job.status === "OnTheWay" && etaText) {
@@ -110,7 +132,12 @@ export default function CustomerDashboard() {
         title: statusTitle,
         body,
         severity: "info",
-        meta: { jobId: job._id, stage: job.status, stageLabel: statusTitle, role: "customer" },
+        meta: {
+          jobId: job._id,
+          stage: job.status,
+          stageLabel: statusTitle,
+          role: "customer",
+        },
         dedupeKey: `customer-job-${job._id}-${job.status}`,
       });
     }
@@ -135,7 +162,11 @@ export default function CustomerDashboard() {
           ? `${driver.name} is on the way.`
           : "A driver has been assigned to your service.",
         severity: "success",
-        meta: { jobId: job._id, driver: driver?.name || currentDriverKey, role: "customer" },
+        meta: {
+          jobId: job._id,
+          driver: driver?.name || currentDriverKey,
+          role: "customer",
+        },
         dedupeKey: `customer-driver-${job._id}-${currentDriverKey}`,
       });
     }
@@ -156,11 +187,21 @@ export default function CustomerDashboard() {
     job?.destinationAddress ||
     (typeof job?.destination === "string" ? job.destination : null);
 
-  const customerCoordinates = useMemo(() => deriveCustomerCoordinates(job), [job]);
-  const dropoffCoordinates = useMemo(() => deriveDropoffCoordinates(job), [job]);
+  const customerCoordinates = useMemo(
+    () => deriveCustomerCoordinates(job),
+    [job]
+  );
+  const dropoffCoordinates = useMemo(
+    () => deriveDropoffCoordinates(job),
+    [job]
+  );
 
   const customerAvatar =
-    customer?.avatarUrl || customer?.photoUrl || customer?.photo || customer?.image || null;
+    customer?.avatarUrl ||
+    customer?.photoUrl ||
+    customer?.photo ||
+    customer?.image ||
+    null;
   const routeDestination = useMemo(() => {
     if (customerCoordinates) {
       return {
@@ -184,7 +225,13 @@ export default function CustomerDashboard() {
       };
     }
     return null;
-  }, [customerCoordinates, dropoffCoordinates, pickupAddress, dropoffAddress, customerAvatar]);
+  }, [
+    customerCoordinates,
+    dropoffCoordinates,
+    pickupAddress,
+    dropoffAddress,
+    customerAvatar,
+  ]);
 
   const mapLandmarks = useMemo(() => {
     if (!dropoffCoordinates || !customerCoordinates) return [];
@@ -210,7 +257,12 @@ export default function CustomerDashboard() {
         lat: coords.lat,
         lng: coords.lng,
         label: driver?.label || "DRV",
-        avatarUrl: driver?.avatarUrl || driver?.photoUrl || driver?.photo || driver?.image || null,
+        avatarUrl:
+          driver?.avatarUrl ||
+          driver?.photoUrl ||
+          driver?.photo ||
+          driver?.image ||
+          null,
         title: driver?.name ? `${driver.name}` : "Driver",
         color: "#2563eb",
         textColor: "#ffffff",
@@ -231,7 +283,8 @@ export default function CustomerDashboard() {
     return fallbackDestination || null;
   }, [driverMarkers, routeDestination, fallbackDestination]);
 
-  const canShowRoute = driverMarkers.length > 0 && Boolean(routeDestination?.position);
+  const canShowRoute =
+    driverMarkers.length > 0 && Boolean(routeDestination?.position);
   const copyStatusLink = async () => {
     if (!job?._id) return;
     const url = `${window.location.origin}/status/${job._id}`;
@@ -304,14 +357,18 @@ export default function CustomerDashboard() {
   if (err)
     return (
       <div className="custdash">
-        <div className="card"><p className="error">{err}</p></div>
+        <div className="card">
+          <p className="error">{err}</p>
+        </div>
       </div>
     );
 
   if (!customer)
     return (
       <div className="custdash">
-        <div className="card"><p>Loading...</p></div>
+        <div className="card">
+          <p>Loading...</p>
+        </div>
       </div>
     );
 
@@ -325,26 +382,41 @@ export default function CustomerDashboard() {
               <h2>Hi {customer.name}, we're lining everything up</h2>
             </div>
             <div className="custdash-hero__status">
-              <span className={`custdash-status-chip ${currentStage.toLowerCase()}`}>
+              <span
+                className={`custdash-status-chip ${currentStage.toLowerCase()}`}
+              >
                 {currentTitle}
               </span>
-              <p className="custdash-status-line">{statusMessage[currentStage]}</p>
+              <p className="custdash-status-line">
+                {statusMessage[currentStage]}
+              </p>
               <span className="custdash-job-id">Job {jobNumber}</span>
             </div>
           </header>
 
           <div className="custdash-hero__content">
-            <div className="custdash-tracker" role="region" aria-label="Job progress">
-              <span className="custdash-pill custdash-pill--current">{currentTitle}</span>
+            <div
+              className="custdash-tracker"
+              role="region"
+              aria-label="Job progress"
+            >
+              <span className="custdash-pill custdash-pill--current">
+                {currentTitle}
+              </span>
               <div className="custdash-mini-road" aria-hidden="true">
                 <div className="custdash-mini-road__lane">
                   <div className="custdash-mini-road__stripes" />
-                  <div className="custdash-mini-road__vehicle" style={{ left: vehicleLeft }}>
+                  <div
+                    className="custdash-mini-road__vehicle"
+                    style={{ left: vehicleLeft }}
+                  >
                     <LuTruck />
                   </div>
                 </div>
               </div>
-              <span className="custdash-pill custdash-pill--next">{isFinalStage ? "All wrapped" : nextCopy}</span>
+              <span className="custdash-pill custdash-pill--next">
+                {isFinalStage ? "All wrapped" : nextCopy}
+              </span>
             </div>
           </div>
 
@@ -384,11 +456,16 @@ export default function CustomerDashboard() {
                   <LiveMap
                     drivers={driverMarkers}
                     autoFit
-                    center={mapCenter ? [mapCenter.lat, mapCenter.lng] : [6.5244, 3.3792]}
+                    center={
+                      mapCenter
+                        ? [mapCenter.lat, mapCenter.lng]
+                        : [6.5244, 3.3792]
+                    }
                     destination={fallbackDestination}
                   />
                   <p className="muted tiny">
-                    Live route view requires a Google Maps API key. Showing driver position only.
+                    Live route view requires a Google Maps API key. Showing
+                    driver position only.
                   </p>
                 </>
               )}
@@ -398,7 +475,9 @@ export default function CustomerDashboard() {
           <section className="card custdash-driver">
             <header className="custdash-driver__header">
               <div className="custdash-driver__identity">
-                <span className="custdash-driver__avatar">{driverInitials}</span>
+                <span className="custdash-driver__avatar">
+                  {driverInitials}
+                </span>
                 <div>
                   <h3>{driver ? driver.name : "Driver to be assigned"}</h3>
                   <p className="custdash-driver__subtitle">{driverSubtitle}</p>
@@ -412,7 +491,9 @@ export default function CustomerDashboard() {
             </header>
 
             <div className="custdash-driver__status">
-              <span className={`custdash-status-chip ${currentStage.toLowerCase()}`}>
+              <span
+                className={`custdash-status-chip ${currentStage.toLowerCase()}`}
+              >
                 {currentTitle}
               </span>
               <span className="custdash-driver__status-note">
@@ -425,9 +506,9 @@ export default function CustomerDashboard() {
                 <span className="label">Vehicle</span>
                 <p>
                   {driver?.vehicleMake || driver?.vehicleModel
-                    ? `${driver?.vehicleColor || ""} ${driver?.vehicleMake || ""} ${
-                        driver?.vehicleModel || ""
-                      }`
+                    ? `${driver?.vehicleColor || ""} ${
+                        driver?.vehicleMake || ""
+                      } ${driver?.vehicleModel || ""}`
                         .trim()
                         .replace(/\s+/g, " ")
                     : "We'll share vehicle details when assigned."}
@@ -478,7 +559,9 @@ export default function CustomerDashboard() {
                 </span>
                 <span className="custdash-action__text">
                   <span className="custdash-action__label">{tile.label}</span>
-                  <span className="custdash-action__caption">{tile.caption}</span>
+                  <span className="custdash-action__caption">
+                    {tile.caption}
+                  </span>
                 </span>
               </button>
             ))}
@@ -504,7 +587,9 @@ export default function CustomerDashboard() {
                     <strong>{item.serviceType || "Service"}</strong>
                     <p>{item.pickupAddress}</p>
                   </div>
-                  <span className={`custdash-status-chip ${item.status.toLowerCase()}`}>
+                  <span
+                    className={`custdash-status-chip ${item.status.toLowerCase()}`}
+                  >
                     {item.status}
                   </span>
                 </li>
@@ -516,11 +601,3 @@ export default function CustomerDashboard() {
     </div>
   );
 }
-
-
-
-
-
-
-
-

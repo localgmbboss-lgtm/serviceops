@@ -1,24 +1,18 @@
 import { Server } from "socket.io";
 import mongoose from "mongoose";
-import Driver from "../models/Driver.js";
+import Vendor from "../models/Vendor.js";
 
 let ioInstance = null;
 let allowAllOrigins = false;
 let allowedOriginSet = new Set();
 
-const DRIVER_ROOM = "drivers/live";
+const VENDOR_ROOM = "vendors/live";
 const SOCKET_METHODS = ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"];
 
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const num = typeof value === "number" ? value : Number(value);
   return Number.isFinite(num) ? num : null;
-};
-
-const toIsoString = (value) => {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
 const toBoolean = (value) => {
@@ -32,7 +26,13 @@ const toBoolean = (value) => {
   return Boolean(value);
 };
 
-const sanitizeDriver = (input) => {
+const toIsoString = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const sanitizeVendor = (input) => {
   if (!input) return null;
   const src = typeof input.toObject === "function" ? input.toObject() : input;
   const id = src?._id ? String(src._id) : null;
@@ -43,26 +43,24 @@ const sanitizeDriver = (input) => {
     name: src?.name || "",
     phone: src?.phone || "",
     city: src?.city || "",
-    available: toBoolean(src?.available),
     lat: toFiniteNumber(src?.lat),
     lng: toFiniteNumber(src?.lng),
-    heading: toFiniteNumber(src?.heading) ?? toFiniteNumber(src?.bearing),
-    speedKph: toFiniteNumber(src?.speedKph ?? src?.speed ?? src?.velocity),
-    accuracy: toFiniteNumber(src?.accuracy),
-    lastSeenAt: toIsoString(src?.lastSeenAt),
+    lastSeenAt: toIsoString(src?.lastSeenAt || src?.updatedAt),
+    updatesPaused: toBoolean(src?.updatesPaused),
+    active: src?.active !== false,
     updatedAt: toIsoString(src?.updatedAt),
     createdAt: toIsoString(src?.createdAt),
   };
 };
 
-const fetchDriverSnapshot = async () => {
-  const drivers = await Driver.find().lean({ virtuals: false });
-  return drivers.map(sanitizeDriver).filter(Boolean);
+const fetchVendorSnapshot = async () => {
+  const vendors = await Vendor.find().lean({ virtuals: false });
+  return vendors.map(sanitizeVendor).filter(Boolean);
 };
 
 const isAllowedOrigin = (origin) => {
   if (allowAllOrigins) return true;
-  if (!origin) return true; // same-site / mobile clients
+  if (!origin) return true;
   const candidate = origin.trim().replace(/\/$/, "");
   return allowedOriginSet.has(candidate);
 };
@@ -95,41 +93,39 @@ export const initRealtime = (httpServer, options = {}) => {
   });
 
   ioInstance.on("connection", async (socket) => {
-    socket.join(DRIVER_ROOM);
+    socket.join(VENDOR_ROOM);
 
     try {
-      const snapshot = await fetchDriverSnapshot();
-      socket.emit("drivers:snapshot", snapshot);
+      const snapshot = await fetchVendorSnapshot();
+      socket.emit("vendors:snapshot", snapshot);
     } catch (error) {
-      console.error("Failed to emit initial driver snapshot", error);
+      console.error("Failed to emit initial vendor snapshot", error);
     }
 
-    socket.on("drivers:requestSnapshot", async (ack) => {
+    socket.on("vendors:requestSnapshot", async (ack) => {
       try {
-        const snapshot = await fetchDriverSnapshot();
+        const snapshot = await fetchVendorSnapshot();
         if (typeof ack === "function") {
-          ack({ ok: true, drivers: snapshot });
+          ack({ ok: true, vendors: snapshot });
         } else {
-          socket.emit("drivers:snapshot", snapshot);
+          socket.emit("vendors:snapshot", snapshot);
         }
       } catch (error) {
-        console.error("drivers:requestSnapshot failed", error);
+        console.error("vendors:requestSnapshot failed", error);
         if (typeof ack === "function") {
           ack({ ok: false, error: error.message });
         } else {
-          socket.emit("drivers:error", {
-            message: "Unable to load drivers",
-          });
+          socket.emit("vendors:error", { message: "Unable to load vendors" });
         }
       }
     });
 
-    socket.on("driver:location", async (payload = {}, ack) => {
-      const { driverId, lat, lng, heading, speedKph, speed, accuracy, available } = payload;
-      const id = typeof driverId === "string" ? driverId : String(driverId || "");
+    socket.on("vendor:location", async (payload = {}, ack) => {
+      const { vendorId, lat, lng } = payload;
+      const id = typeof vendorId === "string" ? vendorId : String(vendorId || "");
       if (!mongoose.Types.ObjectId.isValid(id)) {
         if (typeof ack === "function") {
-          ack({ ok: false, error: "Invalid driverId" });
+          ack({ ok: false, error: "Invalid vendorId" });
         }
         return;
       }
@@ -149,78 +145,74 @@ export const initRealtime = (httpServer, options = {}) => {
         lastSeenAt: new Date(),
       };
 
-      const numericHeading = toFiniteNumber(heading);
-      if (Number.isFinite(numericHeading)) update.heading = numericHeading;
-
-      const numericSpeed = toFiniteNumber(speedKph ?? speed);
-      if (Number.isFinite(numericSpeed)) update.speedKph = numericSpeed;
-
-      const numericAccuracy = toFiniteNumber(accuracy);
-      if (Number.isFinite(numericAccuracy)) update.accuracy = numericAccuracy;
-
-      if (available !== undefined) {
-        update.available = toBoolean(available);
-      }
-
       try {
-        const driver = await Driver.findByIdAndUpdate(
+        const vendor = await Vendor.findByIdAndUpdate(
           id,
           { $set: update },
           { new: true, lean: true }
         );
 
-        if (!driver) {
+        if (!vendor) {
           if (typeof ack === "function") {
-            ack({ ok: false, error: "Driver not found" });
+            ack({ ok: false, error: "Vendor not found" });
           }
           return;
         }
 
-        const sanitized = sanitizeDriver(driver);
-        broadcastDriverUpdate(sanitized);
+        const sanitized = sanitizeVendor(vendor);
+        broadcastVendorUpdate(sanitized);
 
         if (typeof ack === "function") {
-          ack({ ok: true, driver: sanitized });
+          ack({ ok: true, vendor: sanitized });
         }
       } catch (error) {
-        console.error("driver:location update failed", error);
+        console.error("vendor:location update failed", error);
         if (typeof ack === "function") {
           ack({ ok: false, error: error.message });
         }
       }
     });
 
-    socket.on("driver:availability", async (payload = {}, ack) => {
-      const { driverId, available } = payload;
-      const id = typeof driverId === "string" ? driverId : String(driverId || "");
+    socket.on("vendor:toggle", async (payload = {}, ack) => {
+      const { vendorId, active, updatesPaused } = payload;
+      const id = typeof vendorId === "string" ? vendorId : String(vendorId || "");
       if (!mongoose.Types.ObjectId.isValid(id)) {
         if (typeof ack === "function") {
-          ack({ ok: false, error: "Invalid driverId" });
+          ack({ ok: false, error: "Invalid vendorId" });
         }
         return;
       }
 
+      const update = {};
+      if (active !== undefined) update.active = toBoolean(active);
+      if (updatesPaused !== undefined) update.updatesPaused = toBoolean(updatesPaused);
+
+      if (!Object.keys(update).length) {
+        if (typeof ack === "function") ack({ ok: true });
+        return;
+      }
+
       try {
-        const driver = await Driver.findByIdAndUpdate(
+        const vendor = await Vendor.findByIdAndUpdate(
           id,
-          { $set: { available: toBoolean(available) } },
+          { $set: update },
           { new: true, lean: true }
         );
 
-        if (!driver) {
+        if (!vendor) {
           if (typeof ack === "function") {
-            ack({ ok: false, error: "Driver not found" });
+            ack({ ok: false, error: "Vendor not found" });
           }
           return;
         }
 
-        const sanitized = sanitizeDriver(driver);
-        broadcastDriverUpdate(sanitized);
+        const sanitized = sanitizeVendor(vendor);
+        broadcastVendorUpdate(sanitized);
         if (typeof ack === "function") {
-          ack({ ok: true, driver: sanitized });
+          ack({ ok: true, vendor: sanitized });
         }
       } catch (error) {
-        console.error("driver:availability update failed", error);
+        console.error("vendor:toggle update failed", error);
         if (typeof ack === "function") {
           ack({ ok: false, error: error.message });
         }
@@ -233,31 +225,31 @@ export const initRealtime = (httpServer, options = {}) => {
 
 export const getIo = () => ioInstance;
 
-export const broadcastDriverSnapshot = async () => {
+export const broadcastVendorSnapshot = async () => {
   if (!ioInstance) return;
   try {
-    const snapshot = await fetchDriverSnapshot();
-    ioInstance.to(DRIVER_ROOM).emit("drivers:snapshot", snapshot);
+    const snapshot = await fetchVendorSnapshot();
+    ioInstance.to(VENDOR_ROOM).emit("vendors:snapshot", snapshot);
   } catch (error) {
-    console.error("broadcastDriverSnapshot failed", error);
+    console.error("broadcastVendorSnapshot failed", error);
   }
 };
 
-export const broadcastDriverUpdate = (driverLike) => {
+export const broadcastVendorUpdate = (vendorLike) => {
   if (!ioInstance) return;
-  const driver = sanitizeDriver(driverLike);
-  if (!driver) return;
-  ioInstance.to(DRIVER_ROOM).emit("drivers:update", [driver]);
+  const vendor = sanitizeVendor(vendorLike);
+  if (!vendor) return;
+  ioInstance.to(VENDOR_ROOM).emit("vendors:update", [vendor]);
 };
 
-export const broadcastDriverRemoval = (driverId) => {
+export const broadcastVendorRemoval = (vendorId) => {
   if (!ioInstance) return;
-  const id = typeof driverId === "string" ? driverId : String(driverId || "");
+  const id = typeof vendorId === "string" ? vendorId : String(vendorId || "");
   if (!id) return;
-  ioInstance.to(DRIVER_ROOM).emit("drivers:remove", { ids: [id] });
+  ioInstance.to(VENDOR_ROOM).emit("vendors:remove", { ids: [id] });
 };
 
-export const withDriverSnapshot = async (callback) => {
-  const snapshot = await fetchDriverSnapshot();
+export const withVendorSnapshot = async (callback) => {
+  const snapshot = await fetchVendorSnapshot();
   return callback(snapshot);
 };

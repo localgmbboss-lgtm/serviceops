@@ -1,7 +1,10 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import Settings from "../models/Settings.js";
 import Vendor from "../models/Vendor.js";
-import { getVendorComplianceConfig, refreshVendorCompliance } from "../lib/compliance.js";
+import {
+  getVendorComplianceConfig,
+  refreshVendorCompliance,
+} from "../lib/compliance.js";
 
 const router = Router();
 
@@ -37,14 +40,9 @@ const allowedEnforcements = new Set(["off", "submission", "verified"]);
 const serializeSettings = (settingsDoc) => {
   const settings = settingsDoc.toObject({ virtuals: false });
   const intervals = settings.intervals || {};
-  const vendorPollSec = toNumber(
-    intervals.vendorPollSec,
-    toNumber(intervals.pollDriversSec, 7)
-  );
-  const vendorPushSec = toNumber(
-    intervals.vendorPushSec,
-    toNumber(intervals.driverPatchSec, 15)
-  );
+
+  const vendorPollSec = toNumber(intervals.vendorPollSec, 7);
+  const vendorPushSec = toNumber(intervals.vendorPushSec, 15);
   const mapRefreshSec = toNumber(intervals.mapRefreshSec, 7);
 
   const compliance = settings.compliance || {};
@@ -61,8 +59,7 @@ const serializeSettings = (settingsDoc) => {
     compliance: {
       vendor: {
         enforce: vendorCompliance.enforce || "submission",
-        autoSuspendOnExpiry:
-          vendorCompliance.autoSuspendOnExpiry !== false,
+        autoSuspendOnExpiry: vendorCompliance.autoSuspendOnExpiry !== false,
         documents: sanitizeVendorDocuments(vendorCompliance.documents),
       },
     },
@@ -109,11 +106,9 @@ router.put("/", async (req, res, next) => {
       const nextIntervals = { ...settings.intervals };
       if (Object.prototype.hasOwnProperty.call(incoming, "vendorPollSec")) {
         nextIntervals.vendorPollSec = toNumber(incoming.vendorPollSec, 7);
-        nextIntervals.pollDriversSec = nextIntervals.vendorPollSec;
       }
       if (Object.prototype.hasOwnProperty.call(incoming, "vendorPushSec")) {
         nextIntervals.vendorPushSec = toNumber(incoming.vendorPushSec, 15);
-        nextIntervals.driverPatchSec = nextIntervals.vendorPushSec;
       }
       if (Object.prototype.hasOwnProperty.call(incoming, "mapRefreshSec")) {
         nextIntervals.mapRefreshSec = toNumber(incoming.mapRefreshSec, 7);
@@ -132,9 +127,10 @@ router.put("/", async (req, res, next) => {
     if (payload.compliance && payload.compliance.vendor) {
       const current = settings.compliance?.vendor || {};
       const next = payload.compliance.vendor;
-      const enforce = next.enforce && allowedEnforcements.has(next.enforce)
-        ? next.enforce
-        : current.enforce || "submission";
+      const enforce =
+        next.enforce && allowedEnforcements.has(next.enforce)
+          ? next.enforce
+          : current.enforce || "submission";
       const autoSuspendOnExpiry =
         next.autoSuspendOnExpiry !== undefined
           ? Boolean(next.autoSuspendOnExpiry)
@@ -158,14 +154,20 @@ router.put("/", async (req, res, next) => {
     res.json(response);
 
     const nextVendorConfig = await getVendorComplianceConfig();
-    if (JSON.stringify(previousVendorConfig) !== JSON.stringify(nextVendorConfig)) {
+    if (
+      JSON.stringify(previousVendorConfig) !==
+      JSON.stringify(nextVendorConfig)
+    ) {
       const vendors = await Vendor.find({}, { _id: 1 }).lean();
       setImmediate(() => {
         Promise.allSettled(
           vendors.map((vendor) => refreshVendorCompliance(vendor._id))
         ).catch((error) => {
           // eslint-disable-next-line no-console
-          console.error("Failed to refresh vendor compliance after settings update", error);
+          console.error(
+            "Failed to refresh vendor compliance after settings update",
+            error
+          );
         });
       });
     }

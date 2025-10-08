@@ -46,6 +46,9 @@ const VendorSchema = new mongoose.Schema(
     lng: { type: Number },
 
     active: { type: Boolean, default: true },
+    updatesPaused: { type: Boolean, default: false },
+
+    lastSeenAt: { type: Date, default: null },
 
     billing: {
       provider: { type: String, trim: true },

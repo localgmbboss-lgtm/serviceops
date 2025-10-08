@@ -6,71 +6,41 @@ import { useNotifications } from "../contexts/NotificationsContext";
 export default function Topbar() {
   const loc = useLocation();
   const navigate = useNavigate();
-  const { user, logout, isAdmin, isVendor, isDriver, isCustomer } = useAuth();
+  const { user, logout, isAdmin, isVendor, isCustomer } = useAuth();
   const { unreadCount, markAllRead } = useNotifications();
   const [menuOpen, setMenuOpen] = useState(false);
   const navRef = useRef(null);
-  const menuToggleRef = useRef(null);
+  const toggleRef = useRef(null);
 
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false);
-  }, []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   useEffect(() => {
     closeMenu();
   }, [loc.pathname, user, closeMenu]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
+    if (typeof window === "undefined") return undefined;
     const handleResize = () => {
-      if (window.innerWidth > 900) {
-        closeMenu();
-      }
+      if (window.innerWidth > 900) closeMenu();
     };
-
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [closeMenu]);
 
   useEffect(() => {
-    if (!menuOpen || typeof document === "undefined") {
-      return undefined;
-    }
-
+    if (!menuOpen || typeof document === "undefined") return undefined;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     return () => {
       document.body.style.overflow = originalOverflow;
     };
   }, [menuOpen]);
 
   useEffect(() => {
-    if (!menuOpen || typeof window === "undefined") {
-      return undefined;
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        closeMenu();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [menuOpen, closeMenu]);
-
-  useEffect(() => {
-    if (!menuOpen || typeof document === "undefined") {
-      return undefined;
-    }
-
-    const handlePointerDown = (event) => {
+    if (!menuOpen || typeof document === "undefined") return undefined;
+    const handlePointer = (event) => {
       const navEl = navRef.current;
-      const toggleEl = menuToggleRef.current;
+      const toggleEl = toggleRef.current;
       if (
         (navEl && navEl.contains(event.target)) ||
         (toggleEl && toggleEl.contains(event.target))
@@ -79,56 +49,36 @@ export default function Topbar() {
       }
       closeMenu();
     };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("touchstart", handlePointer);
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("touchstart", handlePointer);
     };
+  }, [menuOpen, closeMenu]);
+
+  useEffect(() => {
+    if (!menuOpen || typeof window === "undefined") return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") closeMenu();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuOpen, closeMenu]);
 
   const roleLabel = useMemo(() => {
     if (isAdmin) return "Admin";
     if (isVendor) return "Vendor";
-    if (isDriver) return "Driver";
     if (isCustomer) return "Customer";
     return "";
-  }, [isAdmin, isVendor, isDriver, isCustomer]);
+  }, [isAdmin, isVendor, isCustomer]);
 
   const homePath = useMemo(() => {
     if (isAdmin) return "/admin";
     if (isVendor) return "/vendor/app";
-    if (isDriver) return "/driver";
     if (isCustomer) return "/customer/home";
     return "/";
-  }, [isAdmin, isVendor, isDriver, isCustomer]);
-
-  const brandTitle = user
-    ? roleLabel
-      ? `${roleLabel} workspace`
-      : "Workspace"
-    : "ServiceOps";
-  const topbarClassName = user ? "topbar topbar--authed" : "topbar";
-  const notificationsLabel = unreadCount > 0
-    ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
-    : "Notifications";
-
-  const handleNotificationsClick = () => {
-    closeMenu();
-    markAllRead();
-    navigate("/notifications");
-  };
-
-  const handleNavigation = (path) => {
-    closeMenu();
-    navigate(path);
-  };
-
-  const isActivePath = (path) => {
-    if (path === "/admin" && loc.pathname === "/admin") return true;
-    return loc.pathname.startsWith(path) && path !== "/admin";
-  };
+  }, [isAdmin, isVendor, isCustomer]);
 
   const guestLinks = useMemo(
     () => [
@@ -138,185 +88,118 @@ export default function Topbar() {
     []
   );
 
+  const navItems = useMemo(() => {
+    if (!user) return guestLinks;
+    if (isAdmin) {
+      return [
+        { to: "/admin", label: "Dashboard" },
+        { to: "/jobs", label: "Jobs" },
+        { to: "/reports", label: "Reports" },
+        { to: "/admin/vendors", label: "Vendors" },
+        { to: "/admin/documents", label: "Docs" },
+        { to: "/admin/map", label: "Live Map" },
+        { to: "/admin/settings", label: "Settings" },
+        { to: "/financials", label: "Financials" },
+      ];
+    }
+    if (isVendor) {
+      return [
+        { to: "/vendor/app", label: "Dashboard" },
+        { to: "/vendor/profile", label: "Profile" },
+      ];
+    }
+    if (isCustomer) {
+      return [
+        { to: "/customer/home", label: "My Dashboard" },
+        { to: "/request", label: "New Request" },
+      ];
+    }
+    return [];
+  }, [user, isAdmin, isVendor, isCustomer, guestLinks]);
+
+  const topbarClassName = user ? "topbar topbar--authed" : "topbar";
+
+  const isActivePath = useCallback(
+    (path) => {
+      if (path === "/admin") return loc.pathname === "/admin";
+      return loc.pathname.startsWith(path);
+    },
+    [loc.pathname]
+  );
+
+  const handleNavigation = (path) => {
+    closeMenu();
+    navigate(path);
+  };
+
+  const notificationsLabel =
+    unreadCount > 0
+      ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+      : "Notifications";
+
+  const handleNotificationsClick = () => {
+    markAllRead();
+    closeMenu();
+    navigate("/notifications");
+  };
+
+  const handleLogout = () => {
+    logout();
+    closeMenu();
+    navigate("/");
+  };
+
   return (
     <header className={topbarClassName}>
       <div className="inner">
-        <div className="brand-hub">
-          <h1 className="brand">
-            <Link to={homePath} className="brand-link" onClick={closeMenu}>
-              {brandTitle}
-            </Link>
-          </h1>
-          {!user ? (
-            <>
-              <span className="brand-split" aria-hidden="true" />
-              <span className="brand-tagline">Roadside orchestration, reimagined</span>
-            </>
-          ) : null}
+        <div className="topbar-brand">
+          <Link to={homePath} className="brand-link" onClick={closeMenu}>
+            <span className="brand-dot" aria-hidden="true" />
+            <span className="brand-text">ServiceOps</span>
+          </Link>
+          {user && roleLabel && <span className="topbar-role">{roleLabel}</span>}
         </div>
 
-        <div className="topbar-right">
-          <nav
-            id="mainnav"
-            className={"nav" + (menuOpen ? " nav--open" : "")}
-            aria-label="Primary"
-            ref={navRef}
-          >
-            {user ? (
-            <>
-              {isAdmin && (
-                <>
-                  <button
-                    className={isActivePath("/admin") ? "nav-link active" : "nav-link"}
-                    onClick={() => handleNavigation("/admin")}
-                  >
-                    Dashboard
-                  </button>
-                  <button
-                    className={isActivePath("/jobs") ? "nav-link active" : "nav-link"}
-                    onClick={() => handleNavigation("/jobs")}
-                  >
-                    Jobs
-                  </button>
-                  <button
-                    className={isActivePath("/reports") ? "nav-link active" : "nav-link"}
-                    onClick={() => handleNavigation("/reports")}
-                  >
-                    Reports
-                  </button>
-                  <button
-                    className={
-                      isActivePath("/admin/vendors") ? "nav-link active" : "nav-link"
-                    }
-                    onClick={() => handleNavigation("/admin/vendors")}
-                  >
-                    Vendors
-                  </button>
-                  <button
-                    className={
-                      isActivePath("/admin/drivers") ? "nav-link active" : "nav-link"
-                    }
-                    onClick={() => handleNavigation("/admin/drivers")}
-                  >
-                    Drivers
-                  </button>
-                  <button
-                    className={
-                      isActivePath("/admin/documents") ? "nav-link active" : "nav-link"
-                    }
-                    onClick={() => handleNavigation("/admin/documents")}
-                  >
-                    Docs
-                  </button>
-                  <button
-                    className={isActivePath("/admin/map") ? "nav-link active" : "nav-link"}
-                    onClick={() => handleNavigation("/admin/map")}
-                  >
-                    Live Map
-                  </button>
-                  <button
-                    className={
-                      isActivePath("/admin/settings") ? "nav-link active" : "nav-link"
-                    }
-                    onClick={() => handleNavigation("/admin/settings")}
-                  >
-                    Settings
-                  </button>
-                  <button
-                    className={
-                      isActivePath("/financials") ? "nav-link active" : "nav-link"
-                    }
-                    onClick={() => handleNavigation("/financials")}
-                  >
-                    Financials
-                  </button>
-                </>
-              )}
-
-              {isVendor && (
-                <>
-                  <button
-                    className={
-                      isActivePath("/vendor/app") ? "nav-link active" : "nav-link"
-                    }
-                    onClick={() => handleNavigation("/vendor/app")}
-                  >
-                    Vendor Dashboard
-                  </button>
-                  <button
-                    className={
-                      isActivePath("/vendor/profile") ? "nav-link active" : "nav-link"
-                    }
-                    onClick={() => handleNavigation("/vendor/profile")}
-                  >
-                    Profile
-                  </button>
-                </>
-              )}
-
-              {isDriver && (
-                <button
-                  className={isActivePath("/driver") ? "nav-link active" : "nav-link"}
-                  onClick={() => handleNavigation("/driver")}
-                >
-                  My Jobs
-                </button>
-              )}
-
-              {isCustomer && (
-                <>
-                  <button
-                    className={
-                      isActivePath("/customer/home") ? "nav-link active" : "nav-link"
-                    }
-                    onClick={() => handleNavigation("/customer/home")}
-                  >
-                    My Dashboard
-                  </button>
-                  <button
-                    className={
-                      isActivePath("/request") ? "nav-link active" : "nav-link"
-                    }
-                    onClick={() => handleNavigation("/request")}
-                  >
-                    New Request
-                  </button>
-                </>
-              )}
-
-              <div className="nav-user-section">
-                <span className="nav-user-info">
-                  {user?.name ? "Hello, " + user.name : "Signed in"}
-                </span>
-                <button
-                  className="nav-link nav-logout"
-                  onClick={() => {
-                    logout();
-                    handleNavigation("/");
-                  }}
-                >
-                  Logout
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              {guestLinks.map((item) => (
-                <Link
-                  key={item.to}
-                  className="nav-link"
-                  to={item.to}
-                  onClick={closeMenu}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </>
+        <nav
+          id="mainnav"
+          className={"nav" + (menuOpen ? " nav--open" : "")}
+          aria-label="Primary navigation"
+          ref={navRef}
+        >
+          {navItems.map((item) =>
+            user ? (
+              <button
+                key={item.to}
+                type="button"
+                className={isActivePath(item.to) ? "nav-link active" : "nav-link"}
+                onClick={() => handleNavigation(item.to)}
+              >
+                {item.label}
+              </button>
+            ) : (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="nav-link"
+                onClick={closeMenu}
+              >
+                {item.label}
+              </Link>
+            )
           )}
-          </nav>
+        </nav>
 
-          <div className="topbar-actions">
-            {user ? (
+        <div className="topbar-actions">
+          {user && (
+            <>
+              <div className="topbar-userchip">
+                <span className="topbar-userchip__name">
+                  {user?.name || "Signed in"}
+                </span>
+                {user?.email ? (
+                  <span className="topbar-userchip__sub">{user.email}</span>
+                ) : null}
+              </div>
               <button
                 type="button"
                 className={"topbar-notify" + (unreadCount > 0 ? " has-unread" : "")}
@@ -330,22 +213,29 @@ export default function Topbar() {
                   </span>
                 ) : null}
               </button>
-            ) : null}
+              <button
+                type="button"
+                className="topbar-action topbar-action--logout"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            </>
+          )}
 
-            <button
-              type="button"
-              className={"topbar-menu-toggle" + (menuOpen ? " is-active" : "")}
-              aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-              aria-expanded={menuOpen}
-              aria-controls="mainnav"
-              onClick={() => setMenuOpen((prev) => !prev)}
-              ref={menuToggleRef}
-            >
-              <span />
-              <span />
-              <span />
-            </button>
-          </div>
+          <button
+            type="button"
+            className={"topbar-menu-toggle" + (menuOpen ? " is-active" : "")}
+            aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+            aria-expanded={menuOpen}
+            aria-controls="mainnav"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            ref={toggleRef}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
         </div>
       </div>
       <div
@@ -356,5 +246,4 @@ export default function Topbar() {
     </header>
   );
 }
-
 

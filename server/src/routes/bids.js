@@ -213,7 +213,7 @@ router.post("/:bidId/select", async (req, res, next) => {
       if (cust?.phone) {
         await notifySMS(
           cust.phone,
-          `Driver assigned: ${job.vendorName}. Track: ${statusUrl}`,
+          `Vendor assigned: ${job.vendorName}. Track: ${statusUrl}`,
           job._id
         );
       }

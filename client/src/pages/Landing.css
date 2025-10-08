@@ -1508,6 +1508,59 @@
     gap: 14px;
 }
 
+.panel-readiness {
+    display: grid;
+    gap: 14px;
+    padding: clamp(16px, 2.5vw, 22px);
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 20px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    align-self: stretch;
+}
+
+.panel-readiness h4 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.panel-readiness__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.panel-readiness__item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.panel-readiness__icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(59, 130, 246, 0.05));
+    color: #1d4ed8;
+    font-size: 18px;
+    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.12);
+}
+
+.panel-readiness__item strong {
+    font-size: 14px;
+}
+
+.panel-readiness__item p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: rgba(15, 23, 42, 0.65);
+}
+
 .panel-contact {
     grid-column: 1 / -1;
     display: grid;

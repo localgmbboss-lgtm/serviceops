@@ -45,7 +45,7 @@ function formatAbbr(num, { currency = false, decimals = 1 } = {}) {
 
 export default function AdminDashboard() {
   const [summary, setSummary] = useState(null);
-  const [drivers, setDrivers] = useState([]);
+  const [vendors, setVendors] = useState([]);
   const [docs, setDocs] = useState([]);
   const [dash, setDash] = useState(null);
   const [err, setErr] = useState("");
@@ -67,14 +67,14 @@ export default function AdminDashboard() {
   async function load() {
     try {
       setLoading(true);
-      const [s, d, dc, db] = await Promise.all([
-        api.get("/api/reports/summary"),
-        api.get("/api/drivers?available=true"),
-        api.get("/api/documents"),
-        api.get("/api/reports/dashboard"),
-      ]);
-      setSummary(s.data);
-      setDrivers(d.data);
+    const [s, v, dc, db] = await Promise.all([
+      api.get("/api/reports/summary"),
+      api.get("/api/admin/vendors"),
+      api.get("/api/documents"),
+      api.get("/api/reports/dashboard"),
+    ]);
+    setSummary(s.data);
+    setVendors(Array.isArray(v.data) ? v.data : []);
       setDocs(dc.data);
       setDash(db.data);
       setErr("");
@@ -350,17 +350,19 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* Live drivers + Expiring docs */}
+      {/* Live vendors + Expiring docs */}
       <section className="grid2">
-        <div className="card drivers-card">
+        <div className="card vendors-card">
           <div className="card-head">
-            <h3 className="section-title">Live Drivers</h3>
-            <span className="online-count">{drivers?.length || 0} online</span>
+            <h3 className="section-title">Live Vendors</h3>
+            <span className="online-count">
+              {vendors.filter((v) => v.active !== false).length} active
+            </span>
           </div>
           {hasGoogle ? (
-            <GMap drivers={drivers} showRoute={false} />
+            <GMap vendors={vendors} showRoute={false} />
           ) : (
-            <LiveMap drivers={drivers} />
+            <LiveMap vendors={vendors} />
           )}
         </div>
         <div className="card docs-card">
@@ -384,8 +386,8 @@ export default function AdminDashboard() {
                     {d.title || d.type || "Document"}
                   </strong>
                   <span className="doc-owner">
-                    {d.ownerType === "driver"
-                      ? d.driverId || "Driver"
+                    {d.ownerType === "vendor"
+                      ? d.vendorName || "Vendor"
                       : "Company"}
                   </span>
                 </div>
@@ -426,7 +428,7 @@ export default function AdminDashboard() {
           </div>
           <ul className="perf-list">
             {(dash?.topPerformers || []).map((p) => (
-              <li key={p.driverId} className="perf-item">
+              <li key={p.vendorId || p.name} className="perf-item">
                 <div className="pf-main">
                   <strong>{p.name}</strong>
                   <span className="muted small">{p.city || "-"}</span>

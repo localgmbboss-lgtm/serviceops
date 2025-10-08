@@ -2,14 +2,14 @@ import { useState } from "react";
 import { api } from "../../lib/api";
 import "./styles.css";
 
-export default function NewJobForm({ drivers = [], onCreated }) {
+export default function NewJobForm({ vendors = [], onCreated }) {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [serviceType, setServiceType] = useState("");
   const [quotedPrice, setQuotedPrice] = useState("");
   const [notes, setNotes] = useState("");
-  const [driverId, setDriverId] = useState("");
+  const [vendorId, setVendorId] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -29,12 +29,12 @@ export default function NewJobForm({ drivers = [], onCreated }) {
         quotedPrice: quotedPrice ? Number(quotedPrice) : 0,
         notes: notes || undefined,
       };
-      if (driverId) { payload.driverId = driverId; payload.status = "Assigned"; }
+      if (vendorId) { payload.vendorId = vendorId; payload.status = "Assigned"; }
       await api.post("/api/jobs", payload);
 
       // reset form
       setCustomerName(""); setCustomerPhone(""); setPickupAddress("");
-      setServiceType(""); setQuotedPrice(""); setNotes(""); setDriverId("");
+      setServiceType(""); setQuotedPrice(""); setNotes(""); setVendorId("");
 
       onCreated?.();
     } catch (e) {
@@ -68,10 +68,10 @@ export default function NewJobForm({ drivers = [], onCreated }) {
           <label><span>Notes (optional)</span><textarea value={notes} onChange={e=>setNotes(e.target.value)} /></label>
         </div>
         <div>
-          <label><span>Assign Driver (optional)</span>
-            <select value={driverId} onChange={e=>setDriverId(e.target.value)}>
+          <label><span>Assign Vendor (optional)</span>
+            <select value={vendorId} onChange={e=>setVendorId(e.target.value)}>
               <option value="">- unassigned -</option>
-              {drivers.map(d => <option key={d._id} value={d._id}>{d.name} ({d.city})</option>)}
+              {vendors.map(v => <option key={v._id} value={v._id}>{v.name} ({v.city})</option>)}
             </select>
           </label>
         </div>

@@ -6,7 +6,6 @@ import { createServer } from "http";
 import { connectDB } from "./lib/db.js";
 import { initRealtime } from "./realtime/index.js";
 
-import drivers from "./routes/drivers.js";
 import jobs from "./routes/jobs.js";
 import customers from "./routes/customers.js";
 import feedback from "./routes/feedback.js";
@@ -111,7 +110,6 @@ app.use(express.json());
 app.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 app.use("/api/documents", documents);
 app.use("/api/settings", settings);
-app.use("/api/drivers", drivers);
 app.use("/api/jobs", jobs);
 app.use("/api/customers", customers);
 app.use("/api/feedback", feedback);

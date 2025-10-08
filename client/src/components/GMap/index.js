@@ -146,7 +146,7 @@ function normalizeDestination(value) {
 }
 /**
  * Props
- * - drivers: [{ name, lat, lng, lastSeenAt }]
+ * - vendors: [{ name, lat, lng, lastSeenAt }]
  * - center: {lat, lng}
  * - destination: {lat, lng} | string address
  * - showRoute: boolean (driver -> destination)
@@ -154,7 +154,7 @@ function normalizeDestination(value) {
  * - landmarks: [{ position?: {lat,lng}, lat?, lng?, label?, title?, color?, textColor? }]
  */
 export default function GMap({
-  drivers = [],
+  vendors = [],
   center = DEFAULT_CENTER,
   destination = null,
   showRoute = false,
@@ -171,11 +171,11 @@ export default function GMap({
   const [directionsReady, setDirectionsReady] = useState(false);
 
   const origin = useMemo(() => {
-    const d = drivers.find(
+    const d = vendors.find(
       (x) => Number.isFinite(toNumber(x?.lat)) && Number.isFinite(toNumber(x?.lng))
     );
     return d ? { lat: toNumber(d.lat), lng: toNumber(d.lng) } : null;
-  }, [drivers]);
+  }, [vendors]);
 
   const destinationMeta = useMemo(() => normalizeDestination(destination), [destination]);
   const destinationPosition = destinationMeta?.position || null;
@@ -349,25 +349,25 @@ export default function GMap({
     const bounds = new g.maps.LatLngBounds();
     let hasAny = false;
 
-    drivers.forEach((d, idx) => {
-      const lat = toNumber(d?.lat);
-      const lng = toNumber(d?.lng);
+    vendors.forEach((v, idx) => {
+      const lat = toNumber(v?.lat);
+      const lng = toNumber(v?.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-      const label = d?.label || (idx === 0 ? "DRV" : "CAR");
-      const background = d?.color || d?.pinColor || (idx === 0 ? "#2563eb" : "#334155");
-      const textColor = d?.textColor || d?.pinTextColor || "#111111";
+      const label = v?.label || (idx === 0 ? "VND" : "OPS");
+      const background = v?.color || v?.pinColor || (idx === 0 ? "#2563eb" : "#334155");
+      const textColor = v?.textColor || v?.pinTextColor || "#111111";
       const avatarUrl = sanitizeUrl(
-        d?.avatarUrl ||
-        d?.avatar ||
-        d?.photoUrl ||
-        d?.photo ||
-        d?.image ||
-        d?.iconUrl
+        v?.avatarUrl ||
+        v?.avatar ||
+        v?.photoUrl ||
+        v?.photo ||
+        v?.image ||
+        v?.iconUrl
       );
       const marker = new g.maps.Marker({
         position: { lat, lng },
         map,
-        title: d?.title || d?.name || "Driver",
+        title: v?.title || v?.name || "Vendor",
         icon: createPinIcon(g, label, {
           background,
           color: textColor,
@@ -400,10 +400,10 @@ export default function GMap({
       const { position } = landmark;
       if (!position) return;
       if (destinationPosition && isSamePoint(position, destinationPosition)) return;
-      const overlapsDriver = drivers.some((d) =>
-        isSamePoint(position, { lat: toNumber(d?.lat), lng: toNumber(d?.lng) })
+      const overlapsVendor = vendors.some((v) =>
+        isSamePoint(position, { lat: toNumber(v?.lat), lng: toNumber(v?.lng) })
       );
-      if (overlapsDriver) return;
+      if (overlapsVendor) return;
       const marker = new g.maps.Marker({
         position,
         map,
@@ -463,7 +463,7 @@ export default function GMap({
         rend.setDirections({ routes: [] });
       }
     });
-  }, [ready, directionsReady, drivers, destinationPosition, destinationLabel, destinationTitle, destinationColor, destinationTextColor, destinationAvatar, normalizedLandmarks, center, zoom, origin, showRoute]);
+  }, [ready, directionsReady, vendors, destinationPosition, destinationLabel, destinationTitle, destinationColor, destinationTextColor, destinationAvatar, normalizedLandmarks, center, zoom, origin, showRoute]);
 
   return (
     <div className="gmap-wrap">

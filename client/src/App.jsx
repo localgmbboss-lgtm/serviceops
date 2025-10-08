@@ -4,17 +4,15 @@ import { Routes, Route } from "react-router-dom";
 // Import AuthProvider and ProtectedRoute
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
-import { LiveDriversProvider } from "./contexts/LiveDriversContext";
+import { LiveVendorsProvider } from "./contexts/LiveVendorsContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Import pages
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminJobs from "./pages/AdminJobs";
 import AdminReports from "./pages/AdminReports";
-import DriverJobs from "./pages/DriverJobs";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminFinancials from "./pages/AdminFinancials";
-import AdminDrivers from "./pages/AdminDrivers";
 import DocumentsHub from "./pages/DocumentsHub";
 import AdminLiveMap from "./pages/AdminLiveMap";
 import AdminSettings from "./pages/AdminSettings";
@@ -49,7 +47,7 @@ export default function App() {
   return (
     <AuthProvider>
       <NotificationsProvider>
-        <LiveDriversProvider>
+        <LiveVendorsProvider>
           <ScrollToTop />
           <Topbar />
           <main className="container">
@@ -102,14 +100,6 @@ export default function App() {
                 element={
                   <ProtectedRoute requiredRole="admin" fallbackPath="/admin/login">
                     <AdminVendors />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/drivers"
-                element={
-                  <ProtectedRoute requiredRole="admin" fallbackPath="/admin/login">
-                    <AdminDrivers />
                   </ProtectedRoute>
                 }
               />
@@ -170,15 +160,6 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              {/* Driver routes */}
-              <Route
-                path="/driver"
-                element={
-                  <ProtectedRoute requiredRole="driver">
-                    <DriverJobs />
-                  </ProtectedRoute>
-                }
-              />
               {/* Customer routes */}
               <Route
                 path="/customer/home"
@@ -208,7 +189,7 @@ export default function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
-        </LiveDriversProvider>
+        </LiveVendorsProvider>
       </NotificationsProvider>
     </AuthProvider>
   );
