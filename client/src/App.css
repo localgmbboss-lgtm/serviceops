@@ -434,9 +434,10 @@ h3 {
 }
 .nav {
   display: flex;
+  justify-content: right;
   gap: 12px;
   flex: 1 1 auto;
-  justify-content: right;
+ 
   overflow-x: auto;
   scrollbar-width: none;
 }

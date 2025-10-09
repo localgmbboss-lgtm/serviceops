@@ -72,7 +72,6 @@ export default function CustomerDashboard() {
   }, [load]);
 
   const mapsKey = getGoogleMapsKey();
-
   const hasGoogle = Boolean(mapsKey);
 
   const { customer, job, driver } = state;
@@ -285,6 +284,7 @@ export default function CustomerDashboard() {
 
   const canShowRoute =
     driverMarkers.length > 0 && Boolean(routeDestination?.position);
+
   const copyStatusLink = async () => {
     if (!job?._id) return;
     const url = `${window.location.origin}/status/${job._id}`;
@@ -356,18 +356,22 @@ export default function CustomerDashboard() {
 
   if (err)
     return (
-      <div className="custdash">
-        <div className="card">
-          <p className="error">{err}</p>
+      <div className="custdash" role="status" aria-live="polite">
+        <div className="custdash-shell">
+          <div className="card">
+            <p className="error">{err}</p>
+          </div>
         </div>
       </div>
     );
 
   if (!customer)
     return (
-      <div className="custdash">
-        <div className="card">
-          <p>Loading...</p>
+      <div className="custdash" role="status" aria-live="polite">
+        <div className="custdash-shell">
+          <div className="card">
+            <p>Loading...</p>
+          </div>
         </div>
       </div>
     );
@@ -375,11 +379,16 @@ export default function CustomerDashboard() {
   return (
     <div className="custdash">
       <div className="custdash-shell">
-        <section className="card custdash-hero">
+        <section
+          className="card custdash-hero"
+          aria-labelledby="custdash-hero-title"
+        >
           <header className="custdash-hero__header">
             <div className="custdash-hero__title">
               <p className="custdash-eyebrow">Live rescue</p>
-              <h2>Hi {customer.name}, we're lining everything up</h2>
+              <h2 id="custdash-hero-title">
+                Hi {customer.name}, we're lining everything up
+              </h2>
             </div>
             <div className="custdash-hero__status">
               <span
@@ -395,43 +404,87 @@ export default function CustomerDashboard() {
           </header>
 
           <div className="custdash-hero__content">
-            <div
-              className="custdash-tracker"
-              role="region"
-              aria-label="Job progress"
-            >
-              <span className="custdash-pill custdash-pill--current">
-                {currentTitle}
-              </span>
-              <div className="custdash-mini-road" aria-hidden="true">
-                <div className="custdash-mini-road__lane">
-                  <div className="custdash-mini-road__stripes" />
-                  <div
-                    className="custdash-mini-road__vehicle"
-                    style={{ left: vehicleLeft }}
-                  >
-                    <LuTruck />
+            <div className="custdash-flow" aria-hidden="true">
+              <div className="custdash-flow__rail" aria-hidden="true">
+                <div
+                  className="custdash-flow__progress"
+                  style={{ width: `${roadShare * 100}%` }}
+                />
+              </div>
+
+              <ul className="custdash-flow__steps" role="list">
+                {STAGES.map((s, i) => {
+                  const done = i < activeIndex;
+                  const active = i === activeIndex;
+                  return (
+                    <li
+                      key={s}
+                      className={`custdash-flow__step ${done ? "done" : ""} ${
+                        active ? "active" : ""
+                      }`}
+                      aria-current={active ? "step" : undefined}
+                    >
+                      <div className="step-dot" aria-hidden="true">
+                        {i + 1}
+                      </div>
+                      <div className="step-label">{s}</div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            <div>
+              <div
+                className="custdash-tracker"
+                role="status"
+                aria-live="polite"
+              >
+                <span className="custdash-pill custdash-pill--current">
+                  {currentTitle}
+                </span>
+                <div className="custdash-mini-road" aria-hidden="true">
+                  <div className="custdash-mini-road__lane">
+                    <div className="custdash-mini-road__stripes" />
+                    <div
+                      className="custdash-mini-road__vehicle"
+                      style={{ left: vehicleLeft }}
+                    >
+                      <LuTruck />
+                    </div>
                   </div>
                 </div>
+                <span className="custdash-pill custdash-pill--next">
+                  {isFinalStage ? "All wrapped" : nextCopy}
+                </span>
               </div>
-              <span className="custdash-pill custdash-pill--next">
-                {isFinalStage ? "All wrapped" : nextCopy}
-              </span>
             </div>
           </div>
 
           <div className="custdash-hero__cta">
-            <button className="btn primary" onClick={shareStatus}>
+            <button
+              type="button"
+              className="custdash btn primary"
+              onClick={shareStatus}
+            >
               Share live status
             </button>
-            <button className="btn ghost" onClick={copyStatusLink}>
+            <button
+              type="button"
+              className="custdash btn ghost"
+              onClick={copyStatusLink}
+            >
               Copy tracking link
             </button>
-            {driver?.phone ? (
-              <button className="btn ghost" onClick={callDriver}>
+            {driver?.phone && (
+              <button
+                type="button"
+                className="custdash btn ghost"
+                onClick={callDriver}
+              >
                 Call driver
               </button>
-            ) : null}
+            )}
           </div>
         </section>
 
@@ -441,7 +494,11 @@ export default function CustomerDashboard() {
               <h3>Live map</h3>
               <span className="custdash-chip">Updated every few seconds</span>
             </div>
-            <div className="custdash-map__canvas">
+            <div
+              className="custdash-map__canvas"
+              role="region"
+              aria-label="Live map"
+            >
               {hasGoogle ? (
                 <GMap
                   drivers={driverMarkers}
@@ -472,19 +529,28 @@ export default function CustomerDashboard() {
             </div>
           </section>
 
-          <section className="card custdash-driver">
+          <section
+            className="card custdash-driver"
+            aria-labelledby="driver-heading"
+          >
             <header className="custdash-driver__header">
               <div className="custdash-driver__identity">
-                <span className="custdash-driver__avatar">
+                <span className="custdash-driver__avatar" aria-hidden="true">
                   {driverInitials}
                 </span>
                 <div>
-                  <h3>{driver ? driver.name : "Driver to be assigned"}</h3>
+                  <h3 id="driver-heading">
+                    {driver ? driver.name : "Driver to be assigned"}
+                  </h3>
                   <p className="custdash-driver__subtitle">{driverSubtitle}</p>
                 </div>
               </div>
               {driver?.phone && (
-                <button className="btn ghost" onClick={callDriver}>
+                <button
+                  type="button"
+                  className="custdash btn ghost"
+                  onClick={callDriver}
+                >
                   Call driver
                 </button>
               )}
@@ -521,10 +587,18 @@ export default function CustomerDashboard() {
             </ul>
 
             <div className="custdash-driver__actions">
-              <button className="btn ghost" onClick={shareStatus}>
+              <button
+                type="button"
+                className="custdash btn ghost"
+                onClick={shareStatus}
+              >
                 Share trip progress
               </button>
-              <button className="btn ghost" onClick={copyStatusLink}>
+              <button
+                type="button"
+                className="custdash btn ghost"
+                onClick={copyStatusLink}
+              >
                 Copy link
               </button>
             </div>
@@ -553,6 +627,7 @@ export default function CustomerDashboard() {
                   if (!tile.disabled) tile.action();
                 }}
                 disabled={tile.disabled}
+                aria-disabled={tile.disabled ? "true" : "false"}
               >
                 <span className="custdash-action__icon" aria-hidden="true">
                   {tile.icon}
@@ -588,7 +663,9 @@ export default function CustomerDashboard() {
                     <p>{item.pickupAddress}</p>
                   </div>
                   <span
-                    className={`custdash-status-chip ${item.status.toLowerCase()}`}
+                    className={`custdash-status-chip ${String(
+                      item.status || ""
+                    ).toLowerCase()}`}
                   >
                     {item.status}
                   </span>
