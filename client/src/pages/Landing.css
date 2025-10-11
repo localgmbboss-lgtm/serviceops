@@ -446,11 +446,18 @@
 
 @media (max-width: 420px) {
     .landing {
-        margin: 0 auto 36px;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
         padding: 0 16px 40px;
         border-radius: 0;
         background: none;
         gap: 24px;
+    }
+
+    .landing > * {
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .landing .card {
@@ -519,9 +526,8 @@
     }
 
     .landing-about__panel--wide {
-        width: min(100%, 280px);
-        margin-left: auto;
-        margin-right: auto;
+        width: 100%;
+        margin: 0;
         grid-template-columns: 1fr;
     }
 
@@ -534,15 +540,6 @@
         padding: 14px;
     }
 
-    .landing-gallery,
-    .entry-grid,
-    .features,
-    .final-cta {
-        width: min(100%, 280px);
-        margin-left: auto;
-        margin-right: auto;
-    }
-
     .entry-grid {
         gap: 16px;
     }
@@ -553,14 +550,12 @@
 
     .entry {
         padding: 16px;
-        box-shadow: none;
         border: 1px solid rgba(15, 23, 42, 0.06);
         border-radius: 16px;
     }
 
     .features {
         padding: 16px;
-        box-shadow: none;
         border-radius: 18px;
     }
 
@@ -633,10 +628,6 @@
         padding: 4px 10px;
     }
 
-    .landing-about__panel--wide {
-        width: min(100%, 260px);
-    }
-
     .about-showcase__tabs {
         gap: 5px;
     }
@@ -655,15 +646,6 @@
 
     .about-showcase__list {
         font-size: 0.75rem;
-    }
-
-    .hero,
-    .landing-about,
-    .landing-gallery,
-    .entry-grid,
-    .features,
-    .final-cta {
-        width: min(100%, 260px);
     }
 }
 
@@ -697,16 +679,7 @@
     }
 
     .landing-about__panel--wide {
-        width: min(100%, 240px);
-    }
-
-    .hero,
-    .landing-about,
-    .landing-gallery,
-    .entry-grid,
-    .features,
-    .final-cta {
-        width: min(100%, 240px);
+        width: 100%;
     }
 }
 

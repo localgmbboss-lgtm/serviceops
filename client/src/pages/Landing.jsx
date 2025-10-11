@@ -558,17 +558,13 @@ export default function Landing() {
         <div className="final-left">
           <h2>Need a truck right now?</h2>
           <p className="muted">
-            Sign in to your customer workspace or call 303-900-5503 for direct
-            dispatch with Titan Tow Force.
+            Call 303-900-5503 for direct dispatch with Titan Tow Force.
           </p>
         </div>
         <div className="final-right">
           <a className="btn ghost" href="tel:+13039005503">
             Call 303-900-5503
           </a>
-          <Link className="btn primary" to="/customer/login">
-            Sign in to request service
-          </Link>
         </div>
       </section>
     </div>
