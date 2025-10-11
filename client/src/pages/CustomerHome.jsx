@@ -280,7 +280,7 @@ export default function CustomerHome() {
             {me?.name ? me.name.charAt(0).toUpperCase() : "U"}
           </div>
           <div className="user-details">
-            <h1>Welcome back{me?.name ? `, ${me.name}` : ""}</h1>
+            <h1>Welcome{me?.name ? `, ${me.name}` : ""}</h1>
             <p className="user-email">{me?.email || "Ready to get help?"}</p>
           </div>
         </div>

@@ -24,6 +24,10 @@
   --fs-small: 13px;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 
 * {
   box-sizing: border-box;
