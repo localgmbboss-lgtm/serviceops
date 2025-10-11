@@ -72,6 +72,7 @@ const readinessHighlights = [
     body: "Night visibility kits and securement training refreshed every quarter.",
   },
 ];
+
 const aboutSpotlights = [
   {
     id: "dispatch",
@@ -113,22 +114,27 @@ const aboutSpotlights = [
     ],
   },
 ];
+
 const playbookSteps = [
   {
     title: "Rapid intake",
-    caption: "Digital intake captures location, vehicle, and photos in under 60 seconds.",
+    caption:
+      "Digital intake captures location, vehicle, and photos in under 60 seconds.",
   },
   {
     title: "Smart match",
-    caption: "We ping the closest certified unit with the right rig and recovery tools.",
+    caption:
+      "We ping the closest certified unit with the right rig and recovery tools.",
   },
   {
     title: "Live tracking",
-    caption: "Customers and fleets follow the truck on the map with ETA pushes.",
+    caption:
+      "Customers and fleets follow the truck on the map with ETA pushes.",
   },
   {
     title: "Secure hand-off",
-    caption: "Driver confirms delivery, uploads photos, and the ops desk closes the ticket.",
+    caption:
+      "Driver confirms delivery, uploads photos, and the ops desk closes the ticket.",
   },
 ];
 
@@ -185,18 +191,26 @@ export default function Landing() {
             },
             (results, status) => {
               if (cancelled) return;
-              if (status !== "OK" || !Array.isArray(results) || !results.length) {
+              if (
+                status !== "OK" ||
+                !Array.isArray(results) ||
+                !results.length
+              ) {
                 setFallback();
                 return;
               }
 
               const getComponent = (type) =>
-                results[0].address_components.find((c) => c.types.includes(type));
+                results[0].address_components.find((c) =>
+                  c.types.includes(type)
+                );
 
               const city =
                 getComponent("locality")?.long_name ||
                 getComponent("administrative_area_level_2")?.long_name;
-              const state = getComponent("administrative_area_level_1")?.short_name;
+              const state = getComponent(
+                "administrative_area_level_1"
+              )?.short_name;
               const country = getComponent("country")?.short_name;
 
               const labelParts = [city, state || country].filter(Boolean);
@@ -230,7 +244,7 @@ export default function Landing() {
       setActiveSpotlight((prev) => (prev + 1) % spotlightCount);
     }, 6500);
     return () => window.clearInterval(timer);
-  }, [spotlightPaused, spotlightCount, activeSpotlight]);
+  }, [spotlightPaused, spotlightCount]);
 
   const activeSpotlightItem =
     aboutSpotlights[activeSpotlight] ?? aboutSpotlights[0];
@@ -269,6 +283,7 @@ export default function Landing() {
               type="button"
               className="hero-location__change"
               onClick={handleChangeCity}
+              aria-label="Change city"
             >
               Change city
             </button>
@@ -278,7 +293,9 @@ export default function Landing() {
             Towing and roadside help, ready when you are
           </h1>
           <p className="hero-sub hero-sub--ride">
-            Titan Tow Force delivers fast dispatch, honest pricing, and certified operators across Castle Rock and the surrounding corridors.
+            Titan Tow Force delivers fast dispatch, honest pricing, and
+            certified operators across Castle Rock and the surrounding
+            corridors.
           </p>
 
           <div className="hero-bullets">
@@ -288,7 +305,10 @@ export default function Landing() {
           </div>
 
           <div className="hero-actions">
-            <Link className="hero-action hero-action--primary" to="/customer/login">
+            <Link
+              className="hero-action hero-action--primary"
+              to="/customer/login"
+            >
               Sign in to your workspace
             </Link>
             <Link className="hero-action hero-action--ghost" to="/vendor/login">
@@ -299,7 +319,10 @@ export default function Landing() {
 
         <div className="hero-right hero-right--ride">
           <div className="hero-photo">
-            <img src={galleryImages[activeImage].src} alt={galleryImages[activeImage].alt} />
+            <img
+              src={galleryImages[activeImage].src}
+              alt={galleryImages[activeImage].alt}
+            />
             <span className="hero-photo__badge">24/7 dispatch desk</span>
           </div>
           <div className="hero-photo__thumbs" aria-label="Service gallery">
@@ -325,20 +348,11 @@ export default function Landing() {
             <span className="eyebrow">why drivers pick titan</span>
             <h2>About Titan Tow Force</h2>
             <p className="muted">
-              Built on honest pricing, dependable equipment, and a crew that treats every customer like family.
+              Built on honest pricing, dependable equipment, and a crew that
+              treats every customer like family.
             </p>
           </div>
-          <div className="landing-about__meta">
-            <div className="about-ribbon">
-              <strong>500+</strong>
-              <span>rescues coordinated every month across Colorado</span>
-            </div>
-            <ul className="about-highlights">
-              {aboutHighlights.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </div>
+          {/* landing-about__meta removed to follow your request */}
         </div>
 
         <div className="landing-about__body">
@@ -462,7 +476,8 @@ export default function Landing() {
             <div>
               <strong>Fleet manager?</strong>
               <p>
-                Call <a href="tel:+13039005503">303-900-5503</a> for priority contracts, staging, and monthly reporting.
+                Call <a href="tel:+13039005503">303-900-5503</a> for priority
+                contracts, staging, and monthly reporting.
               </p>
             </div>
           </div>
@@ -473,7 +488,8 @@ export default function Landing() {
         <div className="landing-gallery__head">
           <h3>On the road with our team</h3>
           <p className="muted">
-            A look at recent recoveries and roadside assists from the Titan Tow Force crew.
+            A look at recent recoveries and roadside assists from the Titan Tow
+            Force crew.
           </p>
         </div>
         <div className="landing-gallery__grid">
@@ -492,7 +508,8 @@ export default function Landing() {
           </div>
           <h3>Customer workspace</h3>
           <p className="muted">
-            Follow live jobs, store vehicle details, and access past invoices in seconds.
+            Follow live jobs, store vehicle details, and access past invoices in
+            seconds.
           </p>
         </Link>
 
@@ -512,21 +529,27 @@ export default function Landing() {
           <div className="feat-icon">+</div>
           <div>
             <h4>Live map tracking</h4>
-            <p className="muted">Share real-time ETAs with your family, team, or insurer.</p>
+            <p className="muted">
+              Share real-time ETAs with your family, team, or insurer.
+            </p>
           </div>
         </div>
         <div className="feat">
           <div className="feat-icon">+</div>
           <div>
             <h4>Nationwide partners</h4>
-            <p className="muted">Trusted operators backed by Titan Tow Force standards.</p>
+            <p className="muted">
+              Trusted operators backed by Titan Tow Force standards.
+            </p>
           </div>
         </div>
         <div className="feat">
           <div className="feat-icon">+</div>
           <div>
             <h4>Customer-first support</h4>
-            <p className="muted">Talk to a dispatcher any time you need quick answers.</p>
+            <p className="muted">
+              Talk to a dispatcher any time you need quick answers.
+            </p>
           </div>
         </div>
       </section>
@@ -535,7 +558,8 @@ export default function Landing() {
         <div className="final-left">
           <h2>Need a truck right now?</h2>
           <p className="muted">
-            Sign in to your customer workspace or call 303-900-5503 for direct dispatch with Titan Tow Force.
+            Sign in to your customer workspace or call 303-900-5503 for direct
+            dispatch with Titan Tow Force.
           </p>
         </div>
         <div className="final-right">
