@@ -733,6 +733,13 @@ h3 {
   .topbar-menu-toggle {
     display: inline-flex;
   }
+  .topbar .inner {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
+    overflow: visible;
+    justify-content: space-between;
+  }
   .topbar .nav {
     position: absolute;
     top: calc(100% + 8px);
@@ -776,20 +783,11 @@ h3 {
   .topbar .nav .nav-link.active {
     box-shadow: none;
   }
-  .topbar .inner {
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-    overflow: visible;
-  }
   .topbar-actions {
-    order: 3;
-    width: 100%;
-    justify-content: space-between;
-  }
-  .topbar .nav {
-    order: 4;
-    width: 100%;
+    order: 2;
+    width: auto;
+    justify-content: flex-end;
+    margin-left: auto;
   }
   .topbar-userchip,
   .topbar-action--logout {
@@ -810,6 +808,9 @@ h3 {
     background: rgba(239, 68, 68, 0.12);
     color: #b91c1c;
   }
+  .topbar:not(.topbar--authed) .topbar-actions {
+    width: auto;
+  }
 }
 @media (max-width: 880px) {
   .brand-tagline,
@@ -824,11 +825,12 @@ h3 {
   .topbar .inner {
     padding: 8px 12px;
     gap: 8px;
+    flex-wrap: nowrap;
   }
   .topbar-actions {
-    order: 3;
-    width: 100%;
-    justify-content: space-between;
+    order: 2;
+    width: auto;
+    justify-content: flex-end;
     gap: 8px;
   }
   .brand-hub {
@@ -840,5 +842,15 @@ h3 {
   .nav-link {
     padding: 8px 12px;
     font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-link {
+    font-size: 1rem;
+  }
+  .brand-dot {
+    width: 10px;
+    height: 10px;
   }
 }
