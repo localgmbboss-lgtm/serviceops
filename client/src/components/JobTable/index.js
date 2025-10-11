@@ -240,6 +240,19 @@ export default function JobTable({
             {paginatedJobs.map((job) => {
               const vendor = displayVendor(job);
               const isExpanded = expandedRow === job._id;
+              const numericFinalPrice = Number(job.finalPrice);
+              const hasWinningPrice =
+                Number.isFinite(numericFinalPrice) && numericFinalPrice > 0;
+              const displayedFixedPrice = formatCurrency(
+                job.finalPrice ?? job.quotedPrice,
+                job.currency || "USD"
+              );
+              const winningBidDisplay = hasWinningPrice
+                ? formatCurrency(numericFinalPrice, job.currency || "USD")
+                : "Awaiting winning bid";
+              const bidPriceClass = `jobtable-price jobtable-price--bid${
+                hasWinningPrice ? " is-filled" : ""
+              }`;
 
               return (
                 <>
@@ -272,7 +285,12 @@ export default function JobTable({
                         )}
                         {job.bidMode === "fixed" && Number.isFinite(Number(job.quotedPrice)) && (
                           <div className="jobtable-price">
-                            {formatCurrency(job.finalPrice ?? job.quotedPrice, job.currency || "USD")}
+                            {displayedFixedPrice}
+                          </div>
+                        )}
+                        {job.bidMode !== "fixed" && (
+                          <div className={bidPriceClass}>
+                            {winningBidDisplay}
                           </div>
                         )}
                       </div>
@@ -466,11 +484,8 @@ export default function JobTable({
                               <div>
                                 <strong>Quoted Price:</strong>{" "}
                                 {job.bidMode === "fixed"
-                                  ? formatCurrency(
-                                      job.finalPrice ?? job.quotedPrice,
-                                      job.currency || "USD"
-                                    )
-                                  : "Set by winning bid"}
+                                  ? displayedFixedPrice
+                                  : winningBidDisplay}
                               </div>
                               <div>
                                 <strong>Status:</strong> {job.status || "Unassigned"}

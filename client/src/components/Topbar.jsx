@@ -9,8 +9,12 @@ export default function Topbar() {
   const { user, logout, isAdmin, isVendor, isCustomer } = useAuth();
   const { unreadCount, markAllRead } = useNotifications();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isHidden, setIsHidden] = useState(false);
   const navRef = useRef(null);
   const toggleRef = useRef(null);
+  const lastScrollY = useRef(
+    typeof window !== "undefined" ? window.scrollY || 0 : 0
+  );
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
@@ -65,6 +69,38 @@ export default function Topbar() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuOpen, closeMenu]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    let ticking = false;
+
+    const handleScroll = () => {
+      const currentY = window.scrollY || document.documentElement.scrollTop || 0;
+      const delta = currentY - lastScrollY.current;
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (delta > 20 && currentY > 60 && !isHidden) {
+            setIsHidden(true);
+          } else if ((delta < -10 || currentY <= 10) && isHidden) {
+            setIsHidden(false);
+          }
+          lastScrollY.current = currentY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isHidden]);
+
+  useEffect(() => {
+    if (menuOpen) {
+      setIsHidden(false);
+    }
+  }, [menuOpen]);
 
   const roleLabel = useMemo(() => {
     if (isAdmin) return "Admin";
@@ -149,8 +185,15 @@ export default function Topbar() {
     navigate("/");
   };
 
+  const headerClassName = [
+    topbarClassName,
+    isHidden ? "topbar--hidden" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <header className={topbarClassName}>
+    <header className={headerClassName}>
       <div className="inner">
         <div className="topbar-brand">
           <Link to={homePath} className="brand-link" onClick={closeMenu}>
@@ -186,6 +229,17 @@ export default function Topbar() {
                 {item.label}
               </Link>
             )
+          )}
+          {user && (
+            <div className="nav-mobile-actions">
+              <button
+                type="button"
+                className="nav-link nav-link--mobile nav-link--logout"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            </div>
           )}
         </nav>
 
@@ -246,4 +300,3 @@ export default function Topbar() {
     </header>
   );
 }
-

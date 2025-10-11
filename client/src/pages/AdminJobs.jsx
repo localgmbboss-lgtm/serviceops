@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { api } from "../lib/api";
 import JobTable from "../components/JobTable";
 import JobCreate from "../components/JobCreate";
-import Kanban from "../components/Kanban";
 import { copyText } from "../utils/clipboard";
+import { useNotifications } from "../contexts/NotificationsContext";
+import { recordAuditEvent } from "../utils/auditLog";
 import "./AdminJobs.css";
 
 const STATUSES = ["Unassigned", "Assigned", "OnTheWay", "Arrived", "Completed"];
@@ -12,7 +13,6 @@ export default function AdminJobs() {
   const [jobs, setJobs] = useState([]);
   const [banner, setBanner] = useState("");
   const [toast, setToast] = useState("");
-  const [view, setView] = useState("table");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,13 @@ export default function AdminJobs() {
   const [soloMode, setSoloMode] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
   const [links, setLinks] = useState(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const jobSnapshotRef = useRef(new Map());
+  const jobsInitializedRef = useRef(false);
+  const { publish } = useNotifications();
+
+  const openCreateModal = () => setCreateOpen(true);
+  const closeCreateModal = () => setCreateOpen(false);
 
   const withToast = (msg, ms = 2000) => {
     setToast(msg);
@@ -60,12 +66,137 @@ export default function AdminJobs() {
   }, [load]);
 
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "Escape") setLinksOpen(false);
+    if (!publish) return;
+    const previous = jobSnapshotRef.current;
+    const next = new Map();
+    const isInitial = !jobsInitializedRef.current;
+
+    (jobs || []).forEach((job) => {
+      if (!job?._id) return;
+      next.set(job._id, job);
+      if (isInitial) return;
+
+      const prevJob = previous.get(job._id);
+      const jobLabel = job.serviceType || "Job";
+      const pickupLabel = job.pickupAddress || job.customerAddress || "Unknown pickup";
+
+      if (!prevJob) {
+        publish({
+          title: "New job created",
+          body: `${jobLabel} at ${pickupLabel}`,
+          severity: "info",
+          meta: {
+            role: "admin",
+            jobId: job._id,
+            kind: "job",
+            route: "/jobs",
+          },
+          dedupeKey: `admin:job:new:${job._id}`,
+        });
+        recordAuditEvent({
+          title: "Job created",
+          message: `${jobLabel} created for ${pickupLabel}.`,
+          type: "info",
+          meta: { jobId: job._id },
+        });
+        return;
+      }
+
+      if (prevJob.status !== job.status) {
+        publish({
+          title: "Job status update",
+          body: `${jobLabel} is now ${job.status}.`,
+          severity: job.status === "Completed" ? "success" : "info",
+          meta: {
+            role: "admin",
+            jobId: job._id,
+            kind: "job",
+            status: job.status,
+            route: "/jobs",
+          },
+          dedupeKey: `admin:job:${job._id}:status:${job.status}`,
+        });
+        recordAuditEvent({
+          title: "Job status changed",
+          message: `${jobLabel} moved to ${job.status}.`,
+          type: job.status === "Completed" ? "success" : "info",
+          meta: { jobId: job._id, status: job.status },
+        });
+      }
+
+      if (prevJob.vendorId !== job.vendorId) {
+        const assigned = job.vendorName || "Vendor assigned";
+        const hasVendor = Boolean(job.vendorId);
+        publish({
+          title: hasVendor ? "Vendor assigned" : "Vendor unassigned",
+          body: hasVendor
+            ? `${assigned} accepted ${jobLabel}.`
+            : `${jobLabel} returned to pool.`,
+          severity: hasVendor ? "success" : "warning",
+          meta: {
+            role: "admin",
+            jobId: job._id,
+            kind: "job",
+            vendorId: job.vendorId || null,
+            route: "/jobs",
+          },
+          dedupeKey: `admin:job:${job._id}:vendor:${job.vendorId || "none"}`,
+        });
+        recordAuditEvent({
+          title: hasVendor ? "Vendor assigned" : "Vendor unassigned",
+          message: hasVendor
+            ? `${assigned} assigned to ${jobLabel}.`
+            : `${jobLabel} unassigned from vendor.`,
+          type: hasVendor ? "success" : "warning",
+          meta: { jobId: job._id, vendorId: job.vendorId || null },
+        });
+      }
+    });
+
+    if (!isInitial) {
+      previous.forEach((prevJob, jobId) => {
+        if (!next.has(jobId)) {
+          publish({
+            title: "Job removed",
+            body: `${prevJob.serviceType || "Job"} was removed from the board.`,
+            severity: "info",
+            meta: {
+              role: "admin",
+              jobId,
+              kind: "job",
+              route: "/jobs",
+            },
+            dedupeKey: `admin:job:${jobId}:removed`,
+          });
+          recordAuditEvent({
+            title: "Job removed",
+            message: `${prevJob.serviceType || "Job"} removed from overview.`,
+            type: "info",
+            meta: { jobId },
+          });
+        }
+      });
+    }
+
+    jobSnapshotRef.current = next;
+    if (!jobsInitializedRef.current && (jobs || []).length > 0) {
+      jobsInitializedRef.current = true;
+    }
+  }, [jobs, publish]);
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === "Escape") {
+        if (linksOpen) setLinksOpen(false);
+        if (createOpen) setCreateOpen(false);
+      }
     };
-    if (linksOpen) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [linksOpen]);
+    if (linksOpen || createOpen) {
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }
+    return undefined;
+  }, [linksOpen, createOpen]);
 
   const onUpdateJob = async (id, patch) => {
     try {
@@ -131,6 +262,12 @@ export default function AdminJobs() {
     await copy(link, "Customer portal link");
   };
 
+  const handleJobCreated = async () => {
+    await load();
+    withToast("Job created");
+    setCreateOpen(false);
+  };
+
   const onOpenBidding = async (jobId) => {
     try {
       const { data } = await api.post(`/api/jobs/${jobId}/open-bidding`);
@@ -172,207 +309,177 @@ export default function AdminJobs() {
         <div className="admin-jobs-toast admin-jobs-toast-success">{toast}</div>
       )}
 
-      {/* Mobile menu toggle */}
-      <button
-        className="admin-jobs-mobile-toggle"
-        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        aria-label="Toggle menu"
-      >
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-
-      {/* Create Job */}
-      <details className="admin-jobs-card admin-jobs-create-card" open>
-        <summary className="admin-jobs-create-summary">
-          <span>Create a new job</span>
-          <span className="admin-jobs-dropdown-icon">v</span>
-        </summary>
-        <JobCreate onCreated={load} />
-      </details>
-
-      {/* Toolbar */}
-      <div
-        className={`admin-jobs-card admin-jobs-toolbar ${
-          mobileMenuOpen ? "admin-jobs-mobile-open" : ""
-        }`}
-      >
-        <div className="admin-jobs-tabs" role="tablist" aria-label="Board view">
-          <button
-            className={`admin-jobs-tab ${
-              view === "table" ? "admin-jobs-tab-active" : ""
-            }`}
-            onClick={() => setView("table")}
-            aria-selected={view === "table"}
-            role="tab"
-          >
-            <span className="admin-jobs-tab-text">Table</span>
-          </button>
-          <button
-            className={`admin-jobs-tab ${
-              view === "kanban" ? "admin-jobs-tab-active" : ""
-            }`}
-            onClick={() => setView("kanban")}
-            aria-selected={view === "kanban"}
-            role="tab"
-          >
-            <span className="admin-jobs-tab-text">Kanban</span>
-          </button>
-        </div>
-
-        <div className="admin-jobs-filters">
-          <div className="admin-jobs-search-container">
-            <input
-              className="admin-jobs-search"
-              placeholder="Search jobs..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search jobs"
-            />
-          </div>
-
-          <div className="admin-jobs-select-container">
-            <select
-              className="admin-jobs-status-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              aria-label="Filter by status"
-            >
-              <option value="all">All statuses</option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <label className="admin-jobs-toggle">
-            <input
-              type="checkbox"
-              checked={soloMode}
-              onChange={(e) => setSoloMode(e.target.checked)}
-            />
-            <span className="admin-jobs-toggle-slider"></span>
-            <span className="admin-jobs-toggle-text">Solo mode</span>
-          </label>
-
-          <button
-            className="admin-jobs-btn admin-jobs-btn-ghost admin-jobs-refresh-btn"
-            onClick={load}
-            disabled={loading}
-          >
-            <span
-              className={`admin-jobs-btn-icon ${
-                loading ? "admin-jobs-refresh-spinner" : ""
-              }`}
-            >
-              {loading ? "" : ""}
-            </span>
-            <span className="admin-jobs-btn-text">
-              {loading ? "Refreshing..." : "Refresh"}
-            </span>
-          </button>
-
-          <div className="admin-jobs-dropdown-container">
-            <button className="admin-jobs-btn admin-jobs-dropdown-btn">
-              <span className="admin-jobs-btn-text">Export</span>
-              <span className="admin-jobs-dropdown-arrow">v</span>
-            </button>
-            <div className="admin-jobs-dropdown-menu">
-              <button className="admin-jobs-dropdown-item" onClick={exportCsv}>
-                Export CSV
-              </button>
-              <button
-                className="admin-jobs-dropdown-item"
-                onClick={copySelfServeLink}
-              >
-                Copy customer login link
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Status chips */}
-      <div className="admin-jobs-chips-scroller">
-        <div className="admin-jobs-card admin-jobs-chips">
-          {["all", ...STATUSES].map((s) => (
-            <button
-              key={s}
-              className={`admin-jobs-chip ${
-                statusFilter === s ? "admin-jobs-chip-active" : ""
-              } ${
-                s === "Completed"
-                  ? "admin-jobs-chip-green"
-                  : s === "Unassigned"
-                  ? "admin-jobs-chip-gray"
-                  : ""
-              }`}
-              onClick={() => setStatusFilter(s)}
-            >
-              {s === "all" ? "All" : s}{" "}
-              <span className="admin-jobs-count">
-                {s === "all" ? jobs.length : counts[s] || 0}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Board */}
       <section className="admin-jobs-board-section">
         <div className="admin-jobs-card admin-jobs-board-card">
           <div className="admin-jobs-board-header">
-            <div className="admin-jobs-tabs" role="tablist" aria-label="Board view">
-              <button
-                className={`admin-jobs-tab ${
-                  view === "table" ? "admin-jobs-tab-active" : ""
-                }`}
-                onClick={() => setView("table")}
-                aria-selected={view === "table"}
-                role="tab"
-              >
-                <span className="admin-jobs-tab-text">Table</span>
-              </button>
-              <button
-                className={`admin-jobs-tab ${
-                  view === "kanban" ? "admin-jobs-tab-active" : ""
-                }`}
-                onClick={() => setView("kanban")}
-                aria-selected={view === "kanban"}
-                role="tab"
-              >
-                <span className="admin-jobs-tab-text">Kanban</span>
-              </button>
-            </div>
-            <div className="admin-jobs-last-updated">
+            <div className="admin-jobs-board-heading">
+              <h2>Jobs table</h2>
               {last && (
-                <span className="admin-jobs-muted admin-jobs-small">
+                <span className="admin-jobs-board-updated admin-jobs-muted admin-jobs-small">
                   Updated {last.toLocaleTimeString()}
                 </span>
               )}
             </div>
+            <div className="admin-jobs-board-controls">
+              <button
+                type="button"
+                className="admin-jobs-btn admin-jobs-btn-primary admin-jobs-create-btn"
+                onClick={openCreateModal}
+              >
+                Create job
+              </button>
+
+              <div className="admin-jobs-filters">
+                <div className="admin-jobs-search-container">
+                  <input
+                    className="admin-jobs-search"
+                    placeholder="Search jobs..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    aria-label="Search jobs"
+                  />
+                </div>
+
+                <div className="admin-jobs-select-container">
+                  <select
+                    className="admin-jobs-status-select"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    aria-label="Filter by status"
+                  >
+                    <option value="all">All statuses</option>
+                    {STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <label className="admin-jobs-toggle">
+                  <input
+                    type="checkbox"
+                    checked={soloMode}
+                    onChange={(e) => setSoloMode(e.target.checked)}
+                  />
+                  <span className="admin-jobs-toggle-slider"></span>
+                  <span className="admin-jobs-toggle-text">Solo mode</span>
+                </label>
+
+                <button
+                  type="button"
+                  className="admin-jobs-btn admin-jobs-btn-ghost admin-jobs-refresh-btn"
+                  onClick={load}
+                  disabled={loading}
+                >
+                  <span
+                    className={`admin-jobs-btn-icon ${
+                      loading ? "admin-jobs-refresh-spinner" : ""
+                    }`}
+                  >
+                    {loading ? "" : ""}
+                  </span>
+                  <span className="admin-jobs-btn-text">
+                    {loading ? "Refreshing..." : "Refresh"}
+                  </span>
+                </button>
+
+                <div className="admin-jobs-dropdown-container">
+                  <button
+                    type="button"
+                    className="admin-jobs-btn admin-jobs-dropdown-btn"
+                  >
+                    <span className="admin-jobs-btn-text">Export</span>
+                    <span className="admin-jobs-dropdown-arrow">v</span>
+                  </button>
+                  <div className="admin-jobs-dropdown-menu">
+                    <button
+                      type="button"
+                      className="admin-jobs-dropdown-item"
+                      onClick={exportCsv}
+                    >
+                      Export CSV
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-jobs-dropdown-item"
+                      onClick={copySelfServeLink}
+                    >
+                      Copy customer login link
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="admin-jobs-board-chips">
+            <div className="admin-jobs-chips-scroller">
+              <div className="admin-jobs-chips">
+                {["all", ...STATUSES].map((s) => (
+                  <button
+                    key={s}
+                    className={`admin-jobs-chip ${
+                      statusFilter === s ? "admin-jobs-chip-active" : ""
+                    } ${
+                      s === "Completed"
+                        ? "admin-jobs-chip-green"
+                        : s === "Unassigned"
+                        ? "admin-jobs-chip-gray"
+                        : ""
+                    }`}
+                    onClick={() => setStatusFilter(s)}
+                    type="button"
+                  >
+                    <span className="admin-jobs-chip-label">
+                      {s === "all" ? "All" : s}
+                    </span>
+                    <span className="admin-jobs-count">
+                      {s === "all" ? jobs.length : counts[s] || 0}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="admin-jobs-board-body">
-            {view === "table" ? (
-              <div className="admin-jobs-scroll-x">
-                <JobTable
-                  jobs={filteredJobs}
-                  drivers={[]}
-                  onUpdateJob={onUpdateJob}
-                  soloMode={soloMode}
-                  onOpenBidding={onOpenBidding}
-                  onShowLinks={onShowLinks}
-                />
-              </div>
-            ) : (
-              <Kanban jobs={filteredJobs} onUpdateJob={onUpdateJob} />
-            )}
+            <div className="admin-jobs-scroll-x">
+              <JobTable
+                jobs={filteredJobs}
+                drivers={[]}
+                onUpdateJob={onUpdateJob}
+                soloMode={soloMode}
+                onOpenBidding={onOpenBidding}
+                onShowLinks={onShowLinks}
+              />
+            </div>
           </div>
         </div>
       </section>
+
+      {/* Create job modal */}
+      {createOpen && (
+        <div className="admin-jobs-modal-overlay" onClick={closeCreateModal}>
+          <div
+            className="admin-jobs-modal-content admin-jobs-create-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="admin-jobs-modal-header">
+              <h3>New job</h3>
+              <button
+                className="admin-jobs-modal-close"
+                onClick={closeCreateModal}
+                aria-label="Close"
+              >
+                x
+              </button>
+            </div>
+            <div className="admin-jobs-modal-body">
+              <JobCreate onCreated={handleJobCreated} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Links drawer */}
       {linksOpen && links && (

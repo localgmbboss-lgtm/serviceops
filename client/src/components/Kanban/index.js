@@ -423,7 +423,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                           <div className="kanban-action-group">
                             {!isUrgent ? (
                               <button
-                                className="kanban-action-btn escalate priority-pulse"
+                                className="kanban-action-btn escalate"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   createRipple(event);
@@ -438,7 +438,7 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                               </button>
                             ) : (
                               <button
-                                className="kanban-action-btn deescalate priority-pulse"
+                                className="kanban-action-btn deescalate"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   createRipple(event);

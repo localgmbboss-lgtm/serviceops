@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "./styles.css";
 
@@ -14,17 +14,41 @@ import "./styles.css";
  */
 export default function LiveMap({
   vendors = [],
+  drivers = [],
   center = [6.5244, 3.3792],
   zoom = 11,
   autoFit = true,
   staleMs = 60_000,
   destination = null,
+  showRoute = false,
+  routeColor = "#2563eb",
+  routeWeight = 5,
+  routeDistanceMeters = null,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const markersRef = useRef(new Map());
   const destinationRef = useRef(null);
+  const routesRef = useRef(new Map());
+
+  const activeVendors = useMemo(() => {
+    if (Array.isArray(vendors) && vendors.length) return vendors;
+    if (Array.isArray(drivers) && drivers.length) return drivers;
+    return [];
+  }, [vendors, drivers]);
+
+  const distanceSummary = useMemo(() => {
+    if (!showRoute || !Number.isFinite(routeDistanceMeters)) return null;
+    if (routeDistanceMeters < 1000) {
+      return `${Math.max(1, Math.round(routeDistanceMeters))} m`;
+    }
+    const km = routeDistanceMeters / 1000;
+    if (km < 10) return `${km.toFixed(1)} km`;
+    const miles = km * 0.621371;
+    if (miles < 10) return `${miles.toFixed(1)} mi`;
+    return `${Math.round(miles)} mi`;
+  }, [routeDistanceMeters, showRoute]);
 
   useEffect(() => {
     const retina =
@@ -79,14 +103,19 @@ export default function LiveMap({
 
     const now = Date.now();
     const seen = new Set();
+    let primaryLatLng = null;
 
-    vendors.forEach((vendor) => {
+    activeVendors.forEach((vendor) => {
       const lat = toNumber(vendor?.lat);
       const lng = toNumber(vendor?.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
       const key = String(vendor?._id || `${vendor?.name || "vendor"}-${vendor?.phone || ""}`);
       seen.add(key);
+
+      if (!primaryLatLng) {
+        primaryLatLng = [lat, lng];
+      }
 
       let marker = markersRef.current.get(key);
 
@@ -170,6 +199,52 @@ export default function LiveMap({
       destinationRef.current = null;
     }
 
+    if (!showRoute || !hasDestination) {
+      routesRef.current.forEach((polyline) => polyline.remove());
+      routesRef.current.clear();
+    } else {
+      const activeRouteKeys = new Set();
+      activeVendors.forEach((vendor) => {
+        const lat = toNumber(vendor?.lat);
+        const lng = toNumber(vendor?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        const key = String(vendor?._id || `${vendor?.name || "vendor"}-${vendor?.phone || ""}`);
+        const routeKey = `route:${key}`;
+        activeRouteKeys.add(routeKey);
+        const points = [
+          [lat, lng],
+          [destLat, destLng],
+        ];
+        let poly = routesRef.current.get(routeKey);
+        if (!poly) {
+          poly = L.polyline(points, {
+            color: routeColor,
+            weight: routeWeight,
+            opacity: 0.7,
+            dashArray: "10 6",
+          }).addTo(layer);
+          routesRef.current.set(routeKey, poly);
+        } else {
+          poly.setLatLngs(points);
+          poly.setStyle({
+            color: routeColor,
+            weight: routeWeight,
+            opacity: 0.7,
+            dashArray: "10 6",
+          });
+          if (!layer.hasLayer(poly)) {
+            poly.addTo(layer);
+          }
+        }
+      });
+      for (const [key, poly] of routesRef.current.entries()) {
+        if (!activeRouteKeys.has(key)) {
+          poly.remove();
+          routesRef.current.delete(key);
+        }
+      }
+    }
+
     if (autoFit) {
       const points = Array.from(markersRef.current.values()).map((marker) =>
         marker.getLatLng()
@@ -186,11 +261,17 @@ export default function LiveMap({
         map.setView(center, zoom);
       }
     }
-  }, [vendors, autoFit, staleMs, center, zoom, destination]);
+  }, [activeVendors, autoFit, staleMs, center, zoom, destination, showRoute, routeColor, routeWeight]);
 
   return (
     <div className="lm-wrap">
       <div ref={containerRef} className="lm-map" />
+      {distanceSummary && (
+        <div className="lm-route-meta">
+          <span className="lm-route-chip">Route</span>
+          <strong>{distanceSummary}</strong>
+        </div>
+      )}
       <div className="lm-legend">
         <span className="dot fresh" /> Fresh (&le; 60s)
         <span className="dot stale" /> Stale (&gt; 60s)
@@ -273,4 +354,3 @@ function updateMarkerVisual(marker, { stale, active, label }) {
     marker.once("add", () => apply(marker.getElement()));
   }
 }
-

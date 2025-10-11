@@ -11,6 +11,35 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
+.lm-route-meta {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #f8fafc;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.28);
+}
+.lm-route-meta strong {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+.lm-route-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.2);
+  color: rgba(191, 219, 254, 0.94);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
 
 /* Popup content */
 .lm-popup .lm-name {

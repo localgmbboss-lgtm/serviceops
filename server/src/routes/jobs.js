@@ -201,16 +201,16 @@ router.patch("/:id", async (req, res, next) => {
 
     if (Object.prototype.hasOwnProperty.call(payload, "status")) {
       const nextStatus = payload.status;
-      if (!STAGES.includes(nextStatus)) {
+      if (!STATUSES.includes(nextStatus)) {
         return res.status(400).json({ message: "Invalid status" });
       }
 
       const currentStatus = job.status;
       if (nextStatus !== currentStatus) {
         const allowed = new Set(ALLOWED_NEXT[currentStatus] || []);
-        const currentIndex = STAGES.indexOf(currentStatus);
+        const currentIndex = STATUSES.indexOf(currentStatus);
         if (currentIndex > 0) {
-          allowed.add(STAGES[currentIndex - 1]);
+          allowed.add(STATUSES[currentIndex - 1]);
         }
         allowed.add(currentStatus);
 

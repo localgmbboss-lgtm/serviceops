@@ -518,6 +518,43 @@
   white-space: pre-line;
 }
 
+.va-detail__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.va-note-toggle {
+  appearance: none;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.va-note-toggle:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.18);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.va-note-toggle:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.va-note-error {
+  font-size: 11px;
+  color: #b91c1c;
+  letter-spacing: 0.01em;
+}
+
 .va-job__map {
   margin-top: 16px;
   border-radius: 18px;

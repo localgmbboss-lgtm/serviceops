@@ -55,13 +55,21 @@ export default function AdminSettings() {
 
   const setK = (path, val) => {
     setS((prev) => {
-      const next = structuredClone(prev);
+      const next = structuredClone(prev || {});
       const parts = path.split(".");
-      let t = next;
-      while (parts.length > 1) {
-        t = t[parts.shift()];
+      let cursor = next;
+      for (let i = 0; i < parts.length - 1; i += 1) {
+        const key = parts[i];
+        if (
+          typeof cursor[key] !== "object" ||
+          cursor[key] === null ||
+          Array.isArray(cursor[key])
+        ) {
+          cursor[key] = {};
+        }
+        cursor = cursor[key];
       }
-      t[parts[0]] = val;
+      cursor[parts[parts.length - 1]] = val;
       return next;
     });
   };

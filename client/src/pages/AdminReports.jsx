@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import KPIBlock from "../components/KPIBlock";
+import { readAuditLog, clearAuditLog } from "../utils/auditLog";
 import "./AdminReports.css";
 
 const VENDORS_PER_PAGE = 4;
@@ -36,6 +37,7 @@ export default function AdminReports() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [vendorPage, setVendorPage] = useState(1);
+  const [auditLog, setAuditLog] = useState(() => readAuditLog());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,6 +67,18 @@ export default function AdminReports() {
     );
     setVendorPage((prev) => Math.min(prev, total));
   }, [data]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleAuditUpdate = () => setAuditLog(readAuditLog());
+    window.addEventListener("audit-log:updated", handleAuditUpdate);
+    return () => window.removeEventListener("audit-log:updated", handleAuditUpdate);
+  }, []);
+
+  const handleClearAudit = () => {
+    clearAuditLog();
+    setAuditLog([]);
+  };
 
   const resetFilters = () => {
     setFrom(defaultDatesRef.current.from);
@@ -330,6 +344,47 @@ export default function AdminReports() {
               ))}
             </ul>
             <p className="muted small">Rule-based highlights (no AI).</p>
+          </section>
+
+          <section className="card r-audit">
+            <div className="r-audit-head">
+              <div>
+                <h3 className="section-title">Audit trail</h3>
+                <p className="muted">Key actions captured locally for quick review.</p>
+              </div>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={handleClearAudit}
+                disabled={auditLog.length === 0}
+              >
+                Clear log
+              </button>
+            </div>
+            {auditLog.length === 0 ? (
+              <p className="muted">No activity recorded yet.</p>
+            ) : (
+              <ul className="r-audit-list">
+                {auditLog.slice(0, 20).map((entry) => (
+                  <li key={entry.id}>
+                    <div className="r-audit-row">
+                      <span className={`r-audit-badge ${entry.type}`}>
+                        {entry.type?.toUpperCase?.() || "INFO"}
+                      </span>
+                      <div className="r-audit-copy">
+                        <p className="r-audit-title">{entry.title}</p>
+                        {entry.message && (
+                          <p className="r-audit-message">{entry.message}</p>
+                        )}
+                      </div>
+                      <span className="r-audit-time">
+                        {new Date(entry.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </>
       )}

@@ -6,6 +6,7 @@ import {
   deriveCustomerCoordinates,
   deriveDriverCoordinates,
   deriveDropoffCoordinates,
+  distanceBetweenPointsKm,
 } from "../utils/geo";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
@@ -40,6 +41,16 @@ const stageMeta = {
   Completed: { title: "Service complete", icon: LuFlag },
 };
 
+const KM_TO_MI = 0.621371;
+
+const formatDistanceLabel = (km) => {
+  if (!Number.isFinite(km)) return null;
+  if (km < 0.2) return `${Math.round(km * 1000)} meters`;
+  const miles = km * KM_TO_MI;
+  if (miles < 10) return `${miles.toFixed(1)} miles`;
+  return `${Math.round(miles)} miles`;
+};
+
 export default function CustomerDashboard() {
   const { id } = useParams();
   const [state, setState] = useState({
@@ -47,6 +58,7 @@ export default function CustomerDashboard() {
     job: null,
     driver: null,
   });
+
   const [history, setHistory] = useState([]);
   const [err, setErr] = useState("");
   const historyRef = useRef(null);
@@ -270,6 +282,17 @@ export default function CustomerDashboard() {
   }, [driver]);
 
   const fallbackDestination = customerCoordinates || dropoffCoordinates || null;
+  const primaryDriverPosition = useMemo(() => {
+    if (driverMarkers.length === 0) return null;
+    const primary = driverMarkers[0];
+    if (
+      Number.isFinite(primary.lat) &&
+      Number.isFinite(primary.lng)
+    ) {
+      return { lat: primary.lat, lng: primary.lng };
+    }
+    return null;
+  }, [driverMarkers]);
 
   const mapCenter = useMemo(() => {
     if (routeDestination?.position) return routeDestination.position;
@@ -284,6 +307,27 @@ export default function CustomerDashboard() {
 
   const canShowRoute =
     driverMarkers.length > 0 && Boolean(routeDestination?.position);
+
+  const routeDistanceKm = useMemo(() => {
+    if (!primaryDriverPosition || !routeDestination?.position) return null;
+    return distanceBetweenPointsKm(
+      primaryDriverPosition,
+      routeDestination.position
+    );
+  }, [primaryDriverPosition, routeDestination]);
+
+  const routeDistanceMeters = useMemo(() => {
+    if (!Number.isFinite(routeDistanceKm)) return null;
+    return routeDistanceKm * 1000;
+  }, [routeDistanceKm]);
+
+  const routeDistanceLabel = useMemo(
+    () => formatDistanceLabel(routeDistanceKm),
+    [routeDistanceKm]
+  );
+
+  const destinationRoleLabel =
+    routeDestination?.role === "customer" ? "customer" : "destination";
 
   const copyStatusLink = async () => {
     if (!job?._id) return;
@@ -518,13 +562,19 @@ export default function CustomerDashboard() {
                         ? [mapCenter.lat, mapCenter.lng]
                         : [6.5244, 3.3792]
                     }
-                    destination={fallbackDestination}
+                    destination={routeDestination?.position || fallbackDestination}
+                    showRoute={canShowRoute}
+                    routeDistanceMeters={routeDistanceMeters}
                   />
                   <p className="muted tiny">
-                    Live route view requires a Google Maps API key. Showing
-                    driver position only.
+                    Route preview uses open-map data and reflects the latest driver update.
                   </p>
                 </>
+              )}
+              {routeDistanceLabel && (
+                <p className="muted tiny">
+                  Distance to {destinationRoleLabel}: {routeDistanceLabel}
+                </p>
               )}
             </div>
           </section>
@@ -678,3 +728,6 @@ export default function CustomerDashboard() {
     </div>
   );
 }
+
+
+

@@ -156,6 +156,86 @@ export default function VendorApp() {
   const [openPage, setOpenPage] = useState(0);
   const [assignedPage, setAssignedPage] = useState(0);
   const [expandedJobId, setExpandedJobId] = useState(null);
+  const [noteTranslations, setNoteTranslations] = useState({});
+
+  const handleToggleNoteLanguage = async (event, job) => {
+    event?.stopPropagation?.();
+    const noteText = extractNote(job);
+    if (!noteText) return;
+    const current = noteTranslations[job._id];
+    if (current?.mode === "es") {
+      setNoteTranslations((prev) => ({
+        ...prev,
+        [job._id]: { ...current, mode: "en" },
+      }));
+      return;
+    }
+    if (current?.text && current.status === "ready") {
+      setNoteTranslations((prev) => ({
+        ...prev,
+        [job._id]: { ...current, mode: "es" },
+      }));
+      return;
+    }
+    setNoteTranslations((prev) => ({
+      ...prev,
+      [job._id]: { status: "loading", mode: "loading", original: noteText },
+    }));
+    try {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+        noteText
+      )}&langpair=en|es`;
+      const response = await fetch(url);
+      const data = await response.json();
+      const translated = data?.responseData?.translatedText;
+      if (!translated) throw new Error("Translation unavailable");
+      setNoteTranslations((prev) => ({
+        ...prev,
+        [job._id]: {
+          status: "ready",
+          mode: "es",
+          text: translated,
+          original: noteText,
+        },
+      }));
+    } catch (error) {
+      setNoteTranslations((prev) => ({
+        ...prev,
+        [job._id]: {
+          status: "error",
+          mode: "en",
+          error: error?.message || "Translation failed",
+          original: noteText,
+        },
+      }));
+    }
+  };
+
+  const resolveNoteDisplay = (jobId, original) => {
+    const entry = noteTranslations[jobId];
+    if (!entry) {
+      return { text: original, mode: "en", status: "idle" };
+    }
+    if (entry.mode === "es" && entry.status === "ready" && entry.text) {
+      return { text: entry.text, mode: "es", status: "ready" };
+    }
+    if (entry.status === "loading") {
+      return { text: original, mode: "loading", status: "loading" };
+    }
+    if (entry.status === "error") {
+      return {
+        text: original,
+        mode: "error",
+        status: "error",
+        error: entry.error,
+      };
+    }
+    return {
+      text: original,
+      mode: entry.mode === "es" ? "es" : "en",
+      status: entry.status || "idle",
+    };
+  };
 
   const load = async () => {
     try {
@@ -650,6 +730,9 @@ export default function VendorApp() {
                       job.destination ||
                       job.dropoff?.address;
                     const noteText = extractNote(job);
+                    const noteDisplay = noteText
+                      ? resolveNoteDisplay(job._id, noteText)
+                      : null;
                     const vehicleDetails = [
                       job.vehicleMake,
                       job.vehicleModel,
@@ -670,7 +753,16 @@ export default function VendorApp() {
                       vehicleDetails
                         ? { label: "Vehicle", value: vehicleDetails }
                         : null,
-                      noteText ? { label: "Notes", value: noteText } : null,
+                      noteText
+                        ? {
+                            label: "Notes",
+                            value: noteDisplay?.text || noteText,
+                            isNote: true,
+                            noteStatus: noteDisplay?.status || "idle",
+                            noteMode: noteDisplay?.mode || "en",
+                            noteError: noteDisplay?.error,
+                          }
+                        : null,
                     ].filter(Boolean);
                     return (
                       <li
@@ -728,6 +820,29 @@ export default function VendorApp() {
                                   <span className="va-detail__value">
                                     {row.value}
                                   </span>
+                                  {row.isNote && (
+                                    <div className="va-detail__actions">
+                                      <button
+                                        type="button"
+                                        className="va-note-toggle"
+                                        onClick={(event) =>
+                                          handleToggleNoteLanguage(event, job)
+                                        }
+                                        disabled={row.noteStatus === "loading"}
+                                      >
+                                        {row.noteStatus === "loading"
+                                          ? "Translating..."
+                                          : row.noteMode === "es"
+                                          ? "View original"
+                                          : "Translate to Spanish"}
+                                      </button>
+                                      {row.noteStatus === "error" && (
+                                        <span className="va-note-error">
+                                          {row.noteError || "Translation failed"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -840,6 +955,9 @@ export default function VendorApp() {
                       job.destination ||
                       job.dropoff?.address;
                     const noteText = extractNote(job);
+                    const noteDisplay = noteText
+                      ? resolveNoteDisplay(job._id, noteText)
+                      : null;
                     const vehicleDetails = [
                       job.vehicleMake,
                       job.vehicleModel,
@@ -872,7 +990,16 @@ export default function VendorApp() {
                       vehicleDetails
                         ? { label: "Vehicle", value: vehicleDetails }
                         : null,
-                      noteText ? { label: "Notes", value: noteText } : null,
+                      noteText
+                        ? {
+                            label: "Notes",
+                            value: noteDisplay?.text || noteText,
+                            isNote: true,
+                            noteStatus: noteDisplay?.status || "idle",
+                            noteMode: noteDisplay?.mode || "en",
+                            noteError: noteDisplay?.error,
+                          }
+                        : null,
                     ].filter(Boolean);
                     const statusLabel =
                       (job.status && String(job.status).trim()) || "Unassigned";
@@ -917,6 +1044,29 @@ export default function VendorApp() {
                                   <span className="va-detail__value">
                                     {row.value}
                                   </span>
+                                  {row.isNote && (
+                                    <div className="va-detail__actions">
+                                      <button
+                                        type="button"
+                                        className="va-note-toggle"
+                                        onClick={(event) =>
+                                          handleToggleNoteLanguage(event, job)
+                                        }
+                                        disabled={row.noteStatus === "loading"}
+                                      >
+                                        {row.noteStatus === "loading"
+                                          ? "Translating..."
+                                          : row.noteMode === "es"
+                                          ? "View original"
+                                          : "Translate to Spanish"}
+                                      </button>
+                                      {row.noteStatus === "error" && (
+                                        <span className="va-note-error">
+                                          {row.noteError || "Translation failed"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -1173,3 +1323,15 @@ export default function VendorApp() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
