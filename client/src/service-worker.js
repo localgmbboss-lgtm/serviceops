@@ -1,5 +1,12 @@
 /* eslint-disable no-restricted-globals */
+import { clientsClaim } from "workbox-core";
+import { precacheAndRoute } from "workbox-precaching";
+
+clientsClaim();
+precacheAndRoute(self.__WB_MANIFEST || []);
+
 const APP_SHELL = "serviceops-app-shell-v1";
+const swClients = self.clients;
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -58,7 +65,7 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(
     (async () => {
-      const clientsList = await clients.matchAll({
+      const clientsList = await swClients.matchAll({
         type: "window",
         includeUncontrolled: true,
       });
@@ -87,7 +94,7 @@ self.addEventListener("notificationclick", (event) => {
 
   event.waitUntil(
     (async () => {
-      const allClients = await clients.matchAll({
+      const allClients = await swClients.matchAll({
         type: "window",
         includeUncontrolled: true,
       });
@@ -104,7 +111,7 @@ self.addEventListener("notificationclick", (event) => {
         }
       }
 
-      await clients.openWindow(targetUrl);
+      await swClients.openWindow(targetUrl);
     })()
   );
 });
@@ -119,7 +126,7 @@ self.addEventListener("pushsubscriptionchange", (event) => {
           applicationServerKey,
         });
 
-        const allClients = await clients.matchAll({
+        const allClients = await swClients.matchAll({
           includeUncontrolled: true,
           type: "window",
         });
