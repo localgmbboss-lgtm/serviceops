@@ -4,6 +4,10 @@ import { LuSettings } from "react-icons/lu";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationsContext";
 import brandMark from "../assets/brand-mark.png";
+import {
+  ensureAdminPushSubscription,
+  ensureVendorPushSubscription,
+} from "../lib/pushNotifications.js";
 
 export default function Topbar() {
   const loc = useLocation();
@@ -18,6 +22,8 @@ export default function Topbar() {
   const toggleRef = useRef(null);
   const userMenuRef = useRef(null);
   const userMenuButtonRef = useRef(null);
+  const vendorPushAttemptedRef = useRef(false);
+  const adminPushAttemptedRef = useRef(false);
   const updateUserMenuPosition = useCallback(() => {
     if (
       typeof window === "undefined" ||
@@ -124,6 +130,22 @@ export default function Topbar() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuOpen, closeMenu]);
+
+  useEffect(() => {
+    if (!isVendor || vendorPushAttemptedRef.current) return undefined;
+    vendorPushAttemptedRef.current = true;
+    ensureVendorPushSubscription({ source: "vendor-app" }).catch((error) => {
+      console.warn("Vendor push subscription failed:", error);
+    });
+  }, [isVendor]);
+
+  useEffect(() => {
+    if (!isAdmin || adminPushAttemptedRef.current) return undefined;
+    adminPushAttemptedRef.current = true;
+    ensureAdminPushSubscription({ source: "admin-app" }).catch((error) => {
+      console.warn("Admin push subscription failed:", error);
+    });
+  }, [isAdmin]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -414,3 +436,4 @@ export default function Topbar() {
     </header>
   );
 }
+

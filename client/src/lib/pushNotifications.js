@@ -1,4 +1,5 @@
 import { API_BASE_URL, APP_BASE_URL } from "../config/env.js";
+import { api } from "./api";
 import { vendorApi } from "./vendorApi.js";
 
 const SUPPORTS_SERVICE_WORKER =
@@ -62,20 +63,22 @@ async function createSubscription() {
   return subscription;
 }
 
-async function postVendorSubscription(subscription, meta = {}) {
-  if (!subscription) return;
-  try {
-    await vendorApi.post("/api/vendor/feed/push/subscribe", {
-      subscription,
-      meta: {
-        ...meta,
-        appBaseUrl: APP_BASE_URL,
-      },
-    });
-  } catch (error) {
-    // Bubble the actual error so callers can decide what to do.
-    throw error;
-  }
+function toSerializableSubscription(subscription) {
+  if (!subscription) return null;
+  return typeof subscription.toJSON === "function"
+    ? subscription.toJSON()
+    : subscription;
+}
+
+async function postSubscription(client, route, subscription, meta = {}) {
+  if (!subscription || !client || !route) return;
+  await client.post(route, {
+    subscription: toSerializableSubscription(subscription),
+    meta: {
+      ...meta,
+      appBaseUrl: APP_BASE_URL,
+    },
+  });
 }
 
 export async function ensureVendorPushSubscription(options = {}) {
@@ -93,7 +96,7 @@ export async function ensureVendorPushSubscription(options = {}) {
     subscription = await createSubscription();
   }
 
-  await postVendorSubscription(subscription, {
+  await postSubscription(vendorApi, "/api/vendor/feed/push/subscribe", subscription, {
     userAgent: navigator.userAgent,
     platform: navigator.platform,
     source: options.source || "vendor-app",
@@ -106,14 +109,49 @@ export async function ensureVendorPushSubscription(options = {}) {
   };
 }
 
+export async function ensureAdminPushSubscription(options = {}) {
+  if (!SUPPORTS_SERVICE_WORKER || !SUPPORTS_PUSH || typeof Notification === "undefined") {
+    return { supported: false, reason: "unsupported" };
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    return { supported: true, permission };
+  }
+
+  let subscription = await getExistingSubscription();
+  if (!subscription) {
+    subscription = await createSubscription();
+  }
+
+  await postSubscription(api, "/api/admin/push/subscribe", subscription, {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    source: options.source || "admin-app",
+  });
+
+  return {
+    supported: true,
+    permission: "granted",
+    subscription,
+  };
+}
+
 export async function syncSubscriptionFromWorker(subscription) {
   if (!subscription) return;
+  const meta = {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    source: "sw-renew",
+  };
   try {
-    await postVendorSubscription(subscription, {
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      source: "sw-renew",
-    });
+    await postSubscription(vendorApi, "/api/vendor/feed/push/subscribe", subscription, meta);
+    return;
+  } catch (error) {
+    // ignore and try admin
+  }
+  try {
+    await postSubscription(api, "/api/admin/push/subscribe", subscription, meta);
   } catch (error) {
     console.warn("Failed to sync renewed push subscription:", error);
   }

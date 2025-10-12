@@ -36,46 +36,76 @@ export function getVapidPublicKey() {
   return configured ? PUBLIC_KEY : "";
 }
 
-export async function registerVendorSubscription(vendorId, payload = {}) {
+function normalizeSubscription(raw) {
+  if (!raw) return null;
+  return typeof raw.toJSON === "function" ? raw.toJSON() : raw;
+}
+
+async function upsertSubscription({
+  role,
+  vendorId = null,
+  userId = null,
+  subscription,
+  meta = {},
+}) {
   if (!configured) {
     throw new Error("Push messaging not configured.");
   }
-
-  if (!payload?.subscription || !payload.subscription.endpoint) {
+  if (!subscription?.endpoint) {
     throw new Error("Invalid subscription payload.");
   }
 
-  const rawSubscription = payload.subscription;
-  const subscription =
-    typeof rawSubscription?.toJSON === "function"
-      ? rawSubscription.toJSON()
-      : rawSubscription;
-  const userAgent = payload.meta?.userAgent || payload.userAgent || "";
-  const platform = payload.meta?.platform || payload.platform || "";
-  const source = payload.meta?.source || payload.source || "";
-  const appBaseUrl = payload.meta?.appBaseUrl || payload.appBaseUrl || "";
+  const normalized = normalizeSubscription(subscription);
+  const userAgent = meta?.userAgent || "";
+  const platform = meta?.platform || "";
+  const source = meta?.source || "";
+  const appBaseUrl = meta?.appBaseUrl || "";
+
+  const update = {
+    role,
+    subscription: normalized,
+    userAgent,
+    platform,
+    source,
+    appBaseUrl,
+    status: "active",
+    failCount: 0,
+    lastError: "",
+    lastUsedAt: new Date(),
+  };
+
+  if (role === "vendor") {
+    update.vendorId = vendorId;
+    update.userId = null;
+  } else if (role === "admin") {
+    update.userId = userId;
+    update.vendorId = null;
+  }
 
   const doc = await PushSubscription.findOneAndUpdate(
-    { "subscription.endpoint": subscription.endpoint },
-    {
-      $set: {
-        vendorId,
-        role: "vendor",
-        subscription,
-        userAgent,
-        platform,
-        source,
-        appBaseUrl,
-        status: "active",
-        failCount: 0,
-        lastError: "",
-        lastUsedAt: new Date(),
-      },
-    },
+    { "subscription.endpoint": normalized.endpoint },
+    { $set: update },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
-
   return doc;
+}
+
+export async function registerVendorSubscription(vendorId, payload = {}) {
+  return upsertSubscription({
+    role: "vendor",
+    vendorId,
+    subscription: payload.subscription,
+    meta: payload.meta || payload,
+  });
+}
+
+export async function registerAdminSubscription(userId, payload = {}) {
+  return upsertSubscription({
+    role: "admin",
+    userId,
+    subscription: payload.subscription,
+    meta: payload.meta || payload,
+  });
 }
 
 export async function unregisterSubscription(endpoint) {
@@ -87,15 +117,16 @@ export async function unregisterSubscription(endpoint) {
   }
 }
 
-function toPayload(notification, defaultBaseUrl) {
+function toPayload(notification, { type, defaultRoute, defaultBaseUrl }) {
   const meta = notification.meta || {};
-  const route = meta.route || "/vendor/app";
+  const route = meta.route || defaultRoute || "/";
   const appBase = meta.appBaseUrl || defaultBaseUrl || "";
   const absoluteUrl =
-    meta.absoluteUrl || (appBase ? `${appBase}${route.startsWith("/") ? "" : "/"}${route}` : null);
+    meta.absoluteUrl ||
+    (appBase ? `${appBase}${route.startsWith("/") ? "" : "/"}${route}` : null);
 
   return {
-    type: "vendor_notification",
+    type,
     title: notification.title || "ServiceOps",
     body: notification.body || "",
     meta: {
@@ -105,9 +136,48 @@ function toPayload(notification, defaultBaseUrl) {
       notificationId: notification._id,
     },
     createdAt: notification.createdAt,
-    vendorId: notification.vendorId,
+    jobId: notification.jobId,
+    customerId: notification.customerId,
     url: absoluteUrl || route,
   };
+}
+
+async function dispatchNotifications(subs, payload) {
+  if (!subs.length) return;
+  await Promise.all(
+    subs.map(async (sub) => {
+      try {
+        await webPush.sendNotification(sub.subscription, payload);
+        await PushSubscription.updateOne(
+          { _id: sub._id },
+          {
+            $set: {
+              lastUsedAt: new Date(),
+              failCount: 0,
+              lastError: "",
+            },
+          }
+        );
+      } catch (error) {
+        const status = error?.statusCode;
+        const body = error?.body || "";
+        const isGone = status === 404 || status === 410;
+        if (isGone) {
+          await PushSubscription.deleteOne({ _id: sub._id });
+        } else {
+          await PushSubscription.updateOne(
+            { _id: sub._id },
+            {
+              $inc: { failCount: 1 },
+              $set: {
+                lastError: body || error?.message || "push send failed",
+              },
+            }
+          );
+        }
+      }
+    })
+  );
 }
 
 export async function sendVendorPushNotifications(notifications = []) {
@@ -130,42 +200,35 @@ export async function sendVendorPushNotifications(notifications = []) {
     if (!subs.length) continue;
 
     const payload = JSON.stringify(
-      toPayload(vendorNotifications[vendorNotifications.length - 1])
+      toPayload(
+        vendorNotifications[vendorNotifications.length - 1],
+        {
+          type: "vendor_notification",
+          defaultRoute: "/vendor/app",
+        }
+      )
     );
 
-    await Promise.all(
-      subs.map(async (sub) => {
-        try {
-          await webPush.sendNotification(sub.subscription, payload);
-          await PushSubscription.updateOne(
-            { _id: sub._id },
-            {
-              $set: {
-                lastUsedAt: new Date(),
-                failCount: 0,
-                lastError: "",
-              },
-            }
-          );
-        } catch (error) {
-          const status = error?.statusCode;
-          const body = error?.body || "";
-          const isGone = status === 404 || status === 410;
-          if (isGone) {
-            await PushSubscription.deleteOne({ _id: sub._id });
-          } else {
-            await PushSubscription.updateOne(
-              { _id: sub._id },
-              {
-                $inc: { failCount: 1 },
-                $set: {
-                  lastError: body || error?.message || "push send failed",
-                },
-              }
-            );
-          }
-        }
-      })
-    );
+    await dispatchNotifications(subs, payload);
   }
+}
+
+export async function sendAdminPushNotifications(notifications = []) {
+  if (!configured || !notifications.length) return;
+
+  const subs = await PushSubscription.find({
+    role: "admin",
+    status: "active",
+  }).lean();
+
+  if (!subs.length) return;
+
+  const payload = JSON.stringify(
+    toPayload(notifications[notifications.length - 1], {
+      type: "admin_notification",
+      defaultRoute: "/admin",
+    })
+  );
+
+  await dispatchNotifications(subs, payload);
 }

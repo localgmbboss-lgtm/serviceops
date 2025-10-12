@@ -10,6 +10,12 @@ import {
   broadcastVendorUpdate,
   broadcastVendorRemoval,
 } from "../realtime/index.js";
+import { requireAdminAuth } from "./adminAuth.js";
+import {
+  isPushConfigured,
+  registerAdminSubscription,
+  unregisterSubscription,
+} from "../lib/push.js";
 
 const router = Router();
 
@@ -364,6 +370,48 @@ router.delete("/vendors/:vendorId", async (req, res, next) => {
     }
 
     broadcastVendorRemoval(vendorId);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/push/subscribe", requireAdminAuth, async (req, res, next) => {
+  try {
+    if (!isPushConfigured()) {
+      return res
+        .status(503)
+        .json({ message: "Push messaging is not configured." });
+    }
+
+    const { subscription, meta } = req.body || {};
+    if (
+      !subscription ||
+      !subscription.endpoint ||
+      !subscription.keys?.p256dh ||
+      !subscription.keys?.auth
+    ) {
+      return res.status(400).json({ message: "Invalid push subscription." });
+    }
+
+    const doc = await registerAdminSubscription(req.adminId || null, {
+      subscription,
+      meta,
+    });
+
+    res.status(201).json({ ok: true, id: doc._id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/push/unsubscribe", requireAdminAuth, async (req, res, next) => {
+  try {
+    const { endpoint } = req.body || {};
+    if (!endpoint) {
+      return res.status(400).json({ message: "Endpoint is required." });
+    }
+    await unregisterSubscription(endpoint);
     res.json({ ok: true });
   } catch (error) {
     next(error);

@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { vendorApi } from "../lib/vendorApi";
 import { useNotifications } from "../contexts/NotificationsContext";
 import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
-import { ensureVendorPushSubscription } from "../lib/pushNotifications.js";
 import "./VendorApp.css";
 
 const KM_TO_MI = 0.621371;
@@ -159,7 +158,6 @@ export default function VendorApp() {
   const [assignedPage, setAssignedPage] = useState(0);
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [noteTranslations, setNoteTranslations] = useState({});
-  const pushAttemptedRef = useRef(false);
   const [requestingLocation, setRequestingLocation] = useState(false);
   const [locationError, setLocationError] = useState("");
 
@@ -325,18 +323,6 @@ export default function VendorApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityFilter]);
 
-  useEffect(() => {
-    if (pushAttemptedRef.current) return;
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window)) {
-      pushAttemptedRef.current = true;
-      return;
-    }
-    pushAttemptedRef.current = true;
-    ensureVendorPushSubscription({ source: "vendor-app" }).catch((error) => {
-      console.warn("Push subscription failed:", error);
-    });
-  }, []);
 
   useEffect(() => {
     const tick = () => {
