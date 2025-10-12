@@ -1,8 +1,9 @@
-// server/src/routes/vendorAuth.js
+﻿// server/src/routes/vendorAuth.js
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Vendor from "../models/Vendor.js";
+import { refreshVendorCompliance } from "../lib/compliance.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
@@ -34,6 +35,14 @@ function sanitizeVendor(v) {
     lat: typeof v.lat === "number" ? v.lat : null,
     lng: typeof v.lng === "number" ? v.lng : null,
     active: v.active !== false,
+    complianceStatus: v.complianceStatus || "pending",
+    compliance: v.compliance || {
+      enforcement: "submission",
+      allowed: false,
+      missing: [],
+      requirements: [],
+      lastCheckedAt: null,
+    },
   };
 }
 
@@ -108,7 +117,10 @@ router.post("/register", async (req, res, next) => {
       lat: Number.isFinite(Number(lat)) ? Number(lat) : undefined,
       lng: Number.isFinite(Number(lng)) ? Number(lng) : undefined,
       active: true,
+      complianceStatus: "pending",
     });
+
+    await refreshVendorCompliance(v._id);
 
     const token = signToken(v._id);
     res.status(201).json({ token, vendor: sanitizeVendor(v) });
@@ -178,6 +190,7 @@ router.post("/phone-login", async (req, res, next) => {
     next(e);
   }
 });
+
 // ---- GET /api/vendor/auth/me ----
 // Use this on VendorApp load to restore the session
 router.get("/me", requireVendorAuth, async (req, res, next) => {
@@ -218,10 +231,5 @@ router.patch("/profile", requireVendorAuth, async (req, res, next) => {
 });
 
 export default router;
-
-
-
-
-
 
 

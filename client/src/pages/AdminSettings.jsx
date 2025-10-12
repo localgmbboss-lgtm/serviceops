@@ -22,9 +22,9 @@ export default function AdminSettings() {
   useEffect(() => {
     api
       .get("/api/settings")
-      .then((r) => setS(r.data))
-      .catch((e) => {
-        setErr(e?.response?.data?.message || "Failed to load settings");
+      .then((response) => setS(response.data))
+      .catch((error) => {
+        setErr(error?.response?.data?.message || "Failed to load settings");
       });
   }, []);
 
@@ -32,19 +32,23 @@ export default function AdminSettings() {
     if (!s) return;
     try {
       setBusy(true);
-      // send only whitelisted sections (matches server route)
       const body = {
         mode: s.mode,
         workflow: s.workflow,
         defaults: s.defaults,
         intervals: s.intervals,
         reviews: s.reviews,
+        commission: s.commission,
+        compliance: s.compliance,
       };
       const { data } = await api.put("/api/settings", body);
       setS(data);
       setErr("");
-    } catch (e) {
-      setErr(e?.response?.data?.message || "Failed to save");
+      // Surface a quick confirmation in the dev console so admins know the payload persisted.
+      // eslint-disable-next-line no-console
+      console.log("[AdminSettings] Settings successfully updated:", data);
+    } catch (error) {
+      setErr(error?.response?.data?.message || "Failed to save");
     } finally {
       setBusy(false);
     }
@@ -54,20 +58,92 @@ export default function AdminSettings() {
 
   const setK = (path, val) => {
     setS((prev) => {
-      const next = structuredClone(prev);
-      // simple path setter
+      const next = structuredClone(prev || {});
       const parts = path.split(".");
-      let t = next;
-      while (parts.length > 1) {
-        t = t[parts.shift()];
+      let cursor = next;
+      for (let i = 0; i < parts.length - 1; i += 1) {
+        const key = parts[i];
+        if (
+          typeof cursor[key] !== "object" ||
+          cursor[key] === null ||
+          Array.isArray(cursor[key])
+        ) {
+          cursor[key] = {};
+        }
+        cursor = cursor[key];
       }
-      t[parts[0]] = val;
+      cursor[parts[parts.length - 1]] = val;
       return next;
     });
   };
 
-  // accept split% as 0-100 in UI but store 0-1
+  const mutateVendorCompliance = (mutator) => {
+    setS((prev) => {
+      const next = structuredClone(prev);
+      if (!next.compliance) next.compliance = {};
+      if (!next.compliance.vendor) {
+        next.compliance.vendor = {
+          enforce: "submission",
+          autoSuspendOnExpiry: true,
+          documents: [],
+        };
+      }
+      if (!Array.isArray(next.compliance.vendor.documents)) {
+        next.compliance.vendor.documents = [];
+      }
+      mutator(next.compliance.vendor);
+      return next;
+    });
+  };
+
+  const setVendorEnforce = (value) =>
+    mutateVendorCompliance((vendor) => {
+      vendor.enforce = value;
+    });
+
+  const setVendorAutoSuspend = (value) =>
+    mutateVendorCompliance((vendor) => {
+      vendor.autoSuspendOnExpiry = value;
+    });
+
+  const addVendorRequirement = () =>
+    mutateVendorCompliance((vendor) => {
+      vendor.documents.push({
+        key: "new_requirement",
+        label: "New Requirement",
+        description: "",
+        kind: "general",
+        required: true,
+        accepts: ["pdf", "jpg"],
+        expires: false,
+        validityDays: null,
+      });
+    });
+
+  const updateVendorRequirement = (index, field, value) =>
+    mutateVendorCompliance((vendor) => {
+      if (!vendor.documents[index]) return;
+      vendor.documents[index][field] = value;
+    });
+
+  const updateVendorRequirementAccepts = (index, value) => {
+    const accepts = value
+      .split(",")
+      .map((part) => part.trim().toLowerCase())
+      .filter(Boolean);
+    updateVendorRequirement(index, "accepts", accepts.length ? accepts : ["pdf"]);
+  };
+
+  const removeVendorRequirement = (index) =>
+    mutateVendorCompliance((vendor) => {
+      vendor.documents.splice(index, 1);
+    });
+
   const splitPct = Math.round((s.defaults?.defaultEarningsSplit ?? 0.6) * 100);
+  const vendorCompliance = s.compliance?.vendor || {};
+  const vendorDocs = Array.isArray(vendorCompliance.documents)
+    ? vendorCompliance.documents
+    : [];
   const presetKey = s.mode?.preset || "solo";
   const presetLabel = MODE_LABELS[presetKey] || MODE_LABELS.solo;
   const presetDescription =
@@ -150,13 +226,13 @@ export default function AdminSettings() {
             ["multiServiceMode", "Multi-Service Mode"],
             ["showReportsTab", "Show Reports Tab"],
             ["enableMessaging", "Enable Messaging"],
-          ].map(([k, label]) => (
-            <label className="chk" key={k}>
+          ].map(([key, label]) => (
+            <label className="chk" key={key}>
               <input
                 type="checkbox"
                 className="toggle-input"
-                checked={!!s.workflow?.[k]}
-                onChange={(e) => setK(`workflow.${k}`, e.target.checked)}
+                checked={!!s.workflow?.[key]}
+                onChange={(event) => setK(`workflow.${key}`, event.target.checked)}
               />
               <span className="toggle-bar" aria-hidden="true">
                 <span className="toggle-thumb" />
@@ -180,14 +256,14 @@ export default function AdminSettings() {
             <span>Currency</span>
             <input
               value={s.defaults?.currency || ""}
-              onChange={(e) => setK("defaults.currency", e.target.value)}
+              onChange={(event) => setK("defaults.currency", event.target.value)}
             />
           </label>
           <label>
             <span>Default City</span>
             <input
               value={s.defaults?.defaultCity || ""}
-              onChange={(e) => setK("defaults.defaultCity", e.target.value)}
+              onChange={(event) => setK("defaults.defaultCity", event.target.value)}
             />
           </label>
           <label>
@@ -197,10 +273,10 @@ export default function AdminSettings() {
               min="0"
               max="100"
               value={splitPct}
-              onChange={(e) => {
+              onChange={(event) => {
                 const pct = Math.max(
                   0,
-                  Math.min(100, Number(e.target.value) || 0)
+                  Math.min(100, Number(event.target.value) || 0)
                 );
                 setK("defaults.defaultEarningsSplit", pct / 100);
               }}
@@ -218,26 +294,34 @@ export default function AdminSettings() {
         </div>
         <div className="row">
           <label>
-            <span>Driver Poll (sec)</span>
+            <span>Vendor Poll (sec)</span>
             <input
               type="number"
               min="3"
               max="60"
-              value={s.intervals?.pollDriversSec ?? 7}
-              onChange={(e) =>
-                setK("intervals.pollDriversSec", Number(e.target.value) || 7)
+              value={
+                s.intervals?.vendorPollSec ??
+                s.intervals?.pollDriversSec ??
+                7
+              }
+              onChange={(event) =>
+                setK("intervals.vendorPollSec", Number(event.target.value) || 7)
               }
             />
           </label>
           <label>
-            <span>Driver Patch (sec)</span>
+            <span>Vendor Push (sec)</span>
             <input
               type="number"
               min="5"
               max="60"
-              value={s.intervals?.driverPatchSec ?? 15}
-              onChange={(e) =>
-                setK("intervals.driverPatchSec", Number(e.target.value) || 15)
+              value={
+                s.intervals?.vendorPushSec ??
+                s.intervals?.driverPatchSec ??
+                15
+              }
+              onChange={(event) =>
+                setK("intervals.vendorPushSec", Number(event.target.value) || 15)
               }
             />
           </label>
@@ -248,11 +332,152 @@ export default function AdminSettings() {
               min="3"
               max="60"
               value={s.intervals?.mapRefreshSec ?? 7}
-              onChange={(e) =>
-                setK("intervals.mapRefreshSec", Number(e.target.value) || 7)
+              onChange={(event) =>
+                setK("intervals.mapRefreshSec", Number(event.target.value) || 7)
               }
             />
           </label>
+        </div>
+      </section>
+
+      <section className="card aset-section">
+        <div className="aset-section-head">
+          <h2 className="section-title">Vendor compliance</h2>
+          <p className="section-subtext">
+            Define and enforce the documents vendors must submit before receiving jobs.
+          </p>
+        </div>
+        <div className="aset-compliance">
+          <div className="aset-compliance__controls">
+            <label>
+              <span>Enforcement mode</span>
+              <select
+                value={vendorCompliance.enforce || "submission"}
+                onChange={(event) => setVendorEnforce(event.target.value)}
+              >
+                <option value="off">Disabled</option>
+                <option value="submission">Require submission</option>
+                <option value="verified">Require verification</option>
+              </select>
+            </label>
+            <label className="aset-toggle">
+              <input
+                type="checkbox"
+                checked={vendorCompliance.autoSuspendOnExpiry !== false}
+                onChange={(event) => setVendorAutoSuspend(event.target.checked)}
+              />
+              <span>Auto-suspend on expiry</span>
+            </label>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={addVendorRequirement}
+            >
+              Add requirement
+            </button>
+          </div>
+          <div className="aset-compliance__list">
+            {vendorDocs.length === 0 ? (
+              <p className="muted">No document requirements configured.</p>
+            ) : (
+              <div className="aset-compliance__grid">
+                {vendorDocs.map((doc, index) => (
+                  <article key={doc.key || index} className="aset-compliance__item">
+                    <header className="aset-compliance__item-head">
+                      <input
+                        placeholder="Unique key"
+                        value={doc.key || ""}
+                        onChange={(event) =>
+                          updateVendorRequirement(index, "key", event.target.value.trim())
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="btn-text danger"
+                        onClick={() => removeVendorRequirement(index)}
+                      >
+                        Remove
+                      </button>
+                    </header>
+                    <label>
+                      <span>Label</span>
+                      <input
+                        value={doc.label || ""}
+                        onChange={(event) =>
+                          updateVendorRequirement(index, "label", event.target.value)
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>Kind</span>
+                      <input
+                        value={doc.kind || ""}
+                        onChange={(event) =>
+                          updateVendorRequirement(index, "kind", event.target.value)
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>Accepted formats</span>
+                      <input
+                        value={(doc.accepts || []).join(", ")}
+                        onChange={(event) =>
+                          updateVendorRequirementAccepts(index, event.target.value)
+                        }
+                      />
+                    </label>
+                    <div className="aset-compliance__flags">
+                      <label className="aset-inline">
+                        <input
+                          type="checkbox"
+                          checked={doc.required !== false}
+                          onChange={(event) =>
+                            updateVendorRequirement(index, "required", event.target.checked)
+                          }
+                        />
+                        <span>Required</span>
+                      </label>
+                      <label className="aset-inline">
+                        <input
+                          type="checkbox"
+                          checked={doc.expires === true}
+                          onChange={(event) =>
+                            updateVendorRequirement(index, "expires", event.target.checked)
+                          }
+                        />
+                        <span>Expires</span>
+                      </label>
+                    </div>
+                    <label>
+                      <span>Validity days</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={doc.validityDays ?? ""}
+                        onChange={(event) =>
+                          updateVendorRequirement(
+                            index,
+                            "validityDays",
+                            event.target.value ? Number(event.target.value) : null
+                          )
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>Description</span>
+                      <textarea
+                        rows={2}
+                        value={doc.description || ""}
+                        onChange={(event) =>
+                          updateVendorRequirement(index, "description", event.target.value)
+                        }
+                      />
+                    </label>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -271,8 +496,8 @@ export default function AdminSettings() {
               min="1"
               max="5"
               value={s.reviews?.publicThreshold ?? 5}
-              onChange={(e) =>
-                setK("reviews.publicThreshold", Number(e.target.value) || 5)
+              onChange={(event) =>
+                setK("reviews.publicThreshold", Number(event.target.value) || 5)
               }
             />
           </label>
@@ -280,7 +505,7 @@ export default function AdminSettings() {
             <span>Google Public URL</span>
             <input
               value={s.reviews?.googlePublicUrl || ""}
-              onChange={(e) => setK("reviews.googlePublicUrl", e.target.value)}
+              onChange={(event) => setK("reviews.googlePublicUrl", event.target.value)}
             />
           </label>
         </div>
@@ -301,7 +526,3 @@ export default function AdminSettings() {
     </div>
   );
 }
-
-
-
-

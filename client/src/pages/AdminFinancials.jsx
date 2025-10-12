@@ -86,7 +86,7 @@ export default function AdminFinancials(){
         <div className={"card metric "+((sum?.net||0)>=0?"ok":"bad")}><span className="muted">Net</span><strong>${(sum?.net||0).toFixed(2)}</strong></div>
       </section>
 
-      {/* By city & owed by driver */}
+      {/* By city & owed by vendor */}
       <section className="grid2">
         <div className="card">
           <h3 className="section-title">Revenue by City</h3>
@@ -101,14 +101,14 @@ export default function AdminFinancials(){
           </table>
         </div>
         <div className="card">
-          <h3 className="section-title">Payouts Owed (by Driver)</h3>
+          <h3 className="section-title">Payouts Owed (by Vendor)</h3>
           <table className="table">
-            <thead><tr><th>Driver</th><th>City</th><th>Amount</th></tr></thead>
+            <thead><tr><th>Vendor</th><th>City</th><th>Amount</th></tr></thead>
             <tbody>
-              {(sum?.payouts?.byDriver||[]).map(d=>(
-                <tr key={d.driverId}><td>{d.name}</td><td>{d.city||"-"}</td><td>${d.amount.toFixed(2)}</td></tr>
+              {(sum?.payouts?.byVendor||[]).map(v=>(
+                <tr key={v.vendorId || v.name}><td>{v.name}</td><td>{v.city||"-"}</td><td>${v.amount.toFixed(2)}</td></tr>
               ))}
-              {(sum?.payouts?.byDriver||[]).length===0 && <tr><td colSpan="3" className="muted">No data</td></tr>}
+              {(sum?.payouts?.byVendor||[]).length===0 && <tr><td colSpan="3" className="muted">No data</td></tr>}
             </tbody>
           </table>
         </div>

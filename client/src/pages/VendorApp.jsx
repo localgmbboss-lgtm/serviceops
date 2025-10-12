@@ -3,31 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { vendorApi } from "../lib/vendorApi";
 import { useNotifications } from "../contexts/NotificationsContext";
 import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
-import GMap from "../components/GMap";
 import "./VendorApp.css";
 
 const KM_TO_MI = 0.621371;
 const AVERAGE_SPEED_MPH = 34; // blended city/highway assumption
-const currencyFormatterCache = new Map();
-const formatCurrency = (value, currency = "USD") => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return null;
-  const key = currency || "USD";
-  if (!currencyFormatterCache.has(key)) {
-    try {
-      currencyFormatterCache.set(
-        key,
-        new Intl.NumberFormat("en-US", { style: "currency", currency: key })
-      );
-    } catch (err) {
-      currencyFormatterCache.set(
-        key,
-        new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
-      );
-    }
-  }
-  return currencyFormatterCache.get(key).format(num);
-};
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const num = typeof value === "number" ? value : Number(value);
@@ -60,20 +39,6 @@ const derivePickupCoordinates = (job) => {
     toFiniteNumber(job?.pickup?.lng) ??
     toFiniteNumber(job?.coordinates?.lng) ??
     toFiniteNumber(job?.vehicleLocation?.lng);
-  return lat !== null && lng !== null ? { lat, lng } : null;
-};
-
-const deriveDropoffCoordinates = (job) => {
-  const lat =
-    toFiniteNumber(job?.dropoffLat) ??
-    toFiniteNumber(job?.dropoff?.lat) ??
-    toFiniteNumber(job?.dropoffLocation?.lat) ??
-    toFiniteNumber(job?.destination?.lat);
-  const lng =
-    toFiniteNumber(job?.dropoffLng) ??
-    toFiniteNumber(job?.dropoff?.lng) ??
-    toFiniteNumber(job?.dropoffLocation?.lng) ??
-    toFiniteNumber(job?.destination?.lng);
   return lat !== null && lng !== null ? { lat, lng } : null;
 };
 
@@ -191,6 +156,86 @@ export default function VendorApp() {
   const [openPage, setOpenPage] = useState(0);
   const [assignedPage, setAssignedPage] = useState(0);
   const [expandedJobId, setExpandedJobId] = useState(null);
+  const [noteTranslations, setNoteTranslations] = useState({});
+
+  const handleToggleNoteLanguage = async (event, job) => {
+    event?.stopPropagation?.();
+    const noteText = extractNote(job);
+    if (!noteText) return;
+    const current = noteTranslations[job._id];
+    if (current?.mode === "es") {
+      setNoteTranslations((prev) => ({
+        ...prev,
+        [job._id]: { ...current, mode: "en" },
+      }));
+      return;
+    }
+    if (current?.text && current.status === "ready") {
+      setNoteTranslations((prev) => ({
+        ...prev,
+        [job._id]: { ...current, mode: "es" },
+      }));
+      return;
+    }
+    setNoteTranslations((prev) => ({
+      ...prev,
+      [job._id]: { status: "loading", mode: "loading", original: noteText },
+    }));
+    try {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+        noteText
+      )}&langpair=en|es`;
+      const response = await fetch(url);
+      const data = await response.json();
+      const translated = data?.responseData?.translatedText;
+      if (!translated) throw new Error("Translation unavailable");
+      setNoteTranslations((prev) => ({
+        ...prev,
+        [job._id]: {
+          status: "ready",
+          mode: "es",
+          text: translated,
+          original: noteText,
+        },
+      }));
+    } catch (error) {
+      setNoteTranslations((prev) => ({
+        ...prev,
+        [job._id]: {
+          status: "error",
+          mode: "en",
+          error: error?.message || "Translation failed",
+          original: noteText,
+        },
+      }));
+    }
+  };
+
+  const resolveNoteDisplay = (jobId, original) => {
+    const entry = noteTranslations[jobId];
+    if (!entry) {
+      return { text: original, mode: "en", status: "idle" };
+    }
+    if (entry.mode === "es" && entry.status === "ready" && entry.text) {
+      return { text: entry.text, mode: "es", status: "ready" };
+    }
+    if (entry.status === "loading") {
+      return { text: original, mode: "loading", status: "loading" };
+    }
+    if (entry.status === "error") {
+      return {
+        text: original,
+        mode: "error",
+        status: "error",
+        error: entry.error,
+      };
+    }
+    return {
+      text: original,
+      mode: entry.mode === "es" ? "es" : "en",
+      status: entry.status || "idle",
+    };
+  };
 
   const load = async () => {
     try {
@@ -685,6 +730,9 @@ export default function VendorApp() {
                       job.destination ||
                       job.dropoff?.address;
                     const noteText = extractNote(job);
+                    const noteDisplay = noteText
+                      ? resolveNoteDisplay(job._id, noteText)
+                      : null;
                     const vehicleDetails = [
                       job.vehicleMake,
                       job.vehicleModel,
@@ -705,13 +753,17 @@ export default function VendorApp() {
                       vehicleDetails
                         ? { label: "Vehicle", value: vehicleDetails }
                         : null,
-                      noteText ? { label: "Notes", value: noteText } : null,
+                      noteText
+                        ? {
+                            label: "Notes",
+                            value: noteDisplay?.text || noteText,
+                            isNote: true,
+                            noteStatus: noteDisplay?.status || "idle",
+                            noteMode: noteDisplay?.mode || "en",
+                            noteError: noteDisplay?.error,
+                          }
+                        : null,
                     ].filter(Boolean);
-                    const statusLabel =
-                      (job.status && String(job.status).trim()) || "Unassigned";
-                    const statusClass = statusLabel
-                      .toLowerCase()
-                      .replace(/\s+/g, "");
                     return (
                       <li
                         key={job._id}
@@ -768,6 +820,29 @@ export default function VendorApp() {
                                   <span className="va-detail__value">
                                     {row.value}
                                   </span>
+                                  {row.isNote && (
+                                    <div className="va-detail__actions">
+                                      <button
+                                        type="button"
+                                        className="va-note-toggle"
+                                        onClick={(event) =>
+                                          handleToggleNoteLanguage(event, job)
+                                        }
+                                        disabled={row.noteStatus === "loading"}
+                                      >
+                                        {row.noteStatus === "loading"
+                                          ? "Translating..."
+                                          : row.noteMode === "es"
+                                          ? "View original"
+                                          : "Translate to Spanish"}
+                                      </button>
+                                      {row.noteStatus === "error" && (
+                                        <span className="va-note-error">
+                                          {row.noteError || "Translation failed"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -880,6 +955,9 @@ export default function VendorApp() {
                       job.destination ||
                       job.dropoff?.address;
                     const noteText = extractNote(job);
+                    const noteDisplay = noteText
+                      ? resolveNoteDisplay(job._id, noteText)
+                      : null;
                     const vehicleDetails = [
                       job.vehicleMake,
                       job.vehicleModel,
@@ -889,19 +967,6 @@ export default function VendorApp() {
                       .join(" / ");
                     const travelMinutes = estimateTravelMinutes(job.distanceKm);
                     const pickupCoords = derivePickupCoordinates(job);
-                    const dropoffCoords = deriveDropoffCoordinates(job);
-                    const routeLandmarks = dropoffCoords
-                      ? [
-                          {
-                            key: `${job._id}-dropoff`,
-                            label: "Dropoff",
-                            position: dropoffCoords,
-                            color: "#2563eb",
-                            textColor: "#ffffff",
-                          },
-                        ]
-                      : [];
-                    const hasRoute = Boolean(vendorCoordinates && pickupCoords);
                     const routeFallbackCopy = !vendorCoordinates
                       ? "Add your base location in your vendor profile to unlock turn-by-turn directions."
                       : "Waiting on the customer to share a precise pickup coordinate.";
@@ -912,8 +977,6 @@ export default function VendorApp() {
                             : ""
                         }&destination=${pickupCoords.lat},${pickupCoords.lng}`
                       : null;
-                    const vendorAvatar =
-                      me?.photoUrl || me?.avatarUrl || me?.logoUrl || null;
                     const detailRows = [
                       contactName
                         ? { label: "Contact", value: contactName }
@@ -927,7 +990,16 @@ export default function VendorApp() {
                       vehicleDetails
                         ? { label: "Vehicle", value: vehicleDetails }
                         : null,
-                      noteText ? { label: "Notes", value: noteText } : null,
+                      noteText
+                        ? {
+                            label: "Notes",
+                            value: noteDisplay?.text || noteText,
+                            isNote: true,
+                            noteStatus: noteDisplay?.status || "idle",
+                            noteMode: noteDisplay?.mode || "en",
+                            noteError: noteDisplay?.error,
+                          }
+                        : null,
                     ].filter(Boolean);
                     const statusLabel =
                       (job.status && String(job.status).trim()) || "Unassigned";
@@ -972,6 +1044,29 @@ export default function VendorApp() {
                                   <span className="va-detail__value">
                                     {row.value}
                                   </span>
+                                  {row.isNote && (
+                                    <div className="va-detail__actions">
+                                      <button
+                                        type="button"
+                                        className="va-note-toggle"
+                                        onClick={(event) =>
+                                          handleToggleNoteLanguage(event, job)
+                                        }
+                                        disabled={row.noteStatus === "loading"}
+                                      >
+                                        {row.noteStatus === "loading"
+                                          ? "Translating..."
+                                          : row.noteMode === "es"
+                                          ? "View original"
+                                          : "Translate to Spanish"}
+                                      </button>
+                                      {row.noteStatus === "error" && (
+                                        <span className="va-note-error">
+                                          {row.noteError || "Translation failed"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -999,7 +1094,7 @@ export default function VendorApp() {
                                     }}
                                   >
                                     Get directions
-                                    <span aria-hidden="true">→</span>
+                                    <span aria-hidden="true">&rarr;</span>
                                   </a>
                                 </div>
                               </div>
@@ -1228,3 +1323,15 @@ export default function VendorApp() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+

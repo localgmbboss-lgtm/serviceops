@@ -2,13 +2,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { copyText } from "../utils/clipboard";
-import { deriveCustomerCoordinates, deriveDriverCoordinates, deriveDropoffCoordinates } from "../utils/geo";
+import {
+  deriveCustomerCoordinates,
+  deriveDriverCoordinates,
+  deriveDropoffCoordinates,
+  distanceBetweenPointsKm,
+} from "../utils/geo";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
 import { useNotifications } from "../contexts/NotificationsContext";
-import { LuCar, LuFlag, LuMapPin, LuSearch, LuTruck, LuUserCheck } from "react-icons/lu";
+import {
+  LuCar,
+  LuFlag,
+  LuMapPin,
+  LuSearch,
+  LuTruck,
+  LuUserCheck,
+} from "react-icons/lu";
 import "./CustomerDashboard.css";
 
 const STAGES = ["Unassigned", "Assigned", "OnTheWay", "Arrived", "Completed"];
@@ -29,9 +41,24 @@ const stageMeta = {
   Completed: { title: "Service complete", icon: LuFlag },
 };
 
+const KM_TO_MI = 0.621371;
+
+const formatDistanceLabel = (km) => {
+  if (!Number.isFinite(km)) return null;
+  if (km < 0.2) return `${Math.round(km * 1000)} meters`;
+  const miles = km * KM_TO_MI;
+  if (miles < 10) return `${miles.toFixed(1)} miles`;
+  return `${Math.round(miles)} miles`;
+};
+
 export default function CustomerDashboard() {
   const { id } = useParams();
-  const [state, setState] = useState({ customer: null, job: null, driver: null });
+  const [state, setState] = useState({
+    customer: null,
+    job: null,
+    driver: null,
+  });
+
   const [history, setHistory] = useState([]);
   const [err, setErr] = useState("");
   const historyRef = useRef(null);
@@ -57,7 +84,6 @@ export default function CustomerDashboard() {
   }, [load]);
 
   const mapsKey = getGoogleMapsKey();
-
   const hasGoogle = Boolean(mapsKey);
 
   const { customer, job, driver } = state;
@@ -89,10 +115,14 @@ export default function CustomerDashboard() {
   const nextIndex = Math.min(activeIndex + 1, STAGES.length - 1);
   const nextStage = STAGES[nextIndex];
   const isFinalStage = nextIndex === activeIndex;
-  const nextCopy = isFinalStage ? "All wrapped" : stageMeta[nextStage]?.title || nextStage;
+  const nextCopy = isFinalStage
+    ? "All wrapped"
+    : stageMeta[nextStage]?.title || nextStage;
   const currentTitle = stageMeta[currentStage]?.title || currentStage;
 
-  const jobNumber = job?._id ? `#${job._id.slice(-6).toUpperCase()}` : "Pending";
+  const jobNumber = job?._id
+    ? `#${job._id.slice(-6).toUpperCase()}`
+    : "Pending";
   const etaText = job?.estimatedDuration || "Calculating";
 
   useEffect(() => {
@@ -100,7 +130,10 @@ export default function CustomerDashboard() {
     const previousStatus = previousStatusRef.current;
     const shouldAnnounceInitial =
       !previousStatus && ["Assigned", "OnTheWay"].includes(job.status);
-    if ((previousStatus && job.status !== previousStatus) || shouldAnnounceInitial) {
+    if (
+      (previousStatus && job.status !== previousStatus) ||
+      shouldAnnounceInitial
+    ) {
       const statusTitle = stageMeta[job.status]?.title || job.status;
       let body = statusMessage[job.status] || `Your job is now ${statusTitle}.`;
       if (job.status === "OnTheWay" && etaText) {
@@ -110,7 +143,12 @@ export default function CustomerDashboard() {
         title: statusTitle,
         body,
         severity: "info",
-        meta: { jobId: job._id, stage: job.status, stageLabel: statusTitle, role: "customer" },
+        meta: {
+          jobId: job._id,
+          stage: job.status,
+          stageLabel: statusTitle,
+          role: "customer",
+        },
         dedupeKey: `customer-job-${job._id}-${job.status}`,
       });
     }
@@ -135,7 +173,11 @@ export default function CustomerDashboard() {
           ? `${driver.name} is on the way.`
           : "A driver has been assigned to your service.",
         severity: "success",
-        meta: { jobId: job._id, driver: driver?.name || currentDriverKey, role: "customer" },
+        meta: {
+          jobId: job._id,
+          driver: driver?.name || currentDriverKey,
+          role: "customer",
+        },
         dedupeKey: `customer-driver-${job._id}-${currentDriverKey}`,
       });
     }
@@ -156,11 +198,21 @@ export default function CustomerDashboard() {
     job?.destinationAddress ||
     (typeof job?.destination === "string" ? job.destination : null);
 
-  const customerCoordinates = useMemo(() => deriveCustomerCoordinates(job), [job]);
-  const dropoffCoordinates = useMemo(() => deriveDropoffCoordinates(job), [job]);
+  const customerCoordinates = useMemo(
+    () => deriveCustomerCoordinates(job),
+    [job]
+  );
+  const dropoffCoordinates = useMemo(
+    () => deriveDropoffCoordinates(job),
+    [job]
+  );
 
   const customerAvatar =
-    customer?.avatarUrl || customer?.photoUrl || customer?.photo || customer?.image || null;
+    customer?.avatarUrl ||
+    customer?.photoUrl ||
+    customer?.photo ||
+    customer?.image ||
+    null;
   const routeDestination = useMemo(() => {
     if (customerCoordinates) {
       return {
@@ -184,7 +236,13 @@ export default function CustomerDashboard() {
       };
     }
     return null;
-  }, [customerCoordinates, dropoffCoordinates, pickupAddress, dropoffAddress, customerAvatar]);
+  }, [
+    customerCoordinates,
+    dropoffCoordinates,
+    pickupAddress,
+    dropoffAddress,
+    customerAvatar,
+  ]);
 
   const mapLandmarks = useMemo(() => {
     if (!dropoffCoordinates || !customerCoordinates) return [];
@@ -210,7 +268,12 @@ export default function CustomerDashboard() {
         lat: coords.lat,
         lng: coords.lng,
         label: driver?.label || "DRV",
-        avatarUrl: driver?.avatarUrl || driver?.photoUrl || driver?.photo || driver?.image || null,
+        avatarUrl:
+          driver?.avatarUrl ||
+          driver?.photoUrl ||
+          driver?.photo ||
+          driver?.image ||
+          null,
         title: driver?.name ? `${driver.name}` : "Driver",
         color: "#2563eb",
         textColor: "#ffffff",
@@ -219,6 +282,17 @@ export default function CustomerDashboard() {
   }, [driver]);
 
   const fallbackDestination = customerCoordinates || dropoffCoordinates || null;
+  const primaryDriverPosition = useMemo(() => {
+    if (driverMarkers.length === 0) return null;
+    const primary = driverMarkers[0];
+    if (
+      Number.isFinite(primary.lat) &&
+      Number.isFinite(primary.lng)
+    ) {
+      return { lat: primary.lat, lng: primary.lng };
+    }
+    return null;
+  }, [driverMarkers]);
 
   const mapCenter = useMemo(() => {
     if (routeDestination?.position) return routeDestination.position;
@@ -231,7 +305,30 @@ export default function CustomerDashboard() {
     return fallbackDestination || null;
   }, [driverMarkers, routeDestination, fallbackDestination]);
 
-  const canShowRoute = driverMarkers.length > 0 && Boolean(routeDestination?.position);
+  const canShowRoute =
+    driverMarkers.length > 0 && Boolean(routeDestination?.position);
+
+  const routeDistanceKm = useMemo(() => {
+    if (!primaryDriverPosition || !routeDestination?.position) return null;
+    return distanceBetweenPointsKm(
+      primaryDriverPosition,
+      routeDestination.position
+    );
+  }, [primaryDriverPosition, routeDestination]);
+
+  const routeDistanceMeters = useMemo(() => {
+    if (!Number.isFinite(routeDistanceKm)) return null;
+    return routeDistanceKm * 1000;
+  }, [routeDistanceKm]);
+
+  const routeDistanceLabel = useMemo(
+    () => formatDistanceLabel(routeDistanceKm),
+    [routeDistanceKm]
+  );
+
+  const destinationRoleLabel =
+    routeDestination?.role === "customer" ? "customer" : "destination";
+
   const copyStatusLink = async () => {
     if (!job?._id) return;
     const url = `${window.location.origin}/status/${job._id}`;
@@ -303,63 +400,135 @@ export default function CustomerDashboard() {
 
   if (err)
     return (
-      <div className="custdash">
-        <div className="card"><p className="error">{err}</p></div>
+      <div className="custdash" role="status" aria-live="polite">
+        <div className="custdash-shell">
+          <div className="card">
+            <p className="error">{err}</p>
+          </div>
+        </div>
       </div>
     );
 
   if (!customer)
     return (
-      <div className="custdash">
-        <div className="card"><p>Loading...</p></div>
+      <div className="custdash" role="status" aria-live="polite">
+        <div className="custdash-shell">
+          <div className="card">
+            <p>Loading...</p>
+          </div>
+        </div>
       </div>
     );
 
   return (
     <div className="custdash">
       <div className="custdash-shell">
-        <section className="card custdash-hero">
+        <section
+          className="card custdash-hero"
+          aria-labelledby="custdash-hero-title"
+        >
           <header className="custdash-hero__header">
             <div className="custdash-hero__title">
               <p className="custdash-eyebrow">Live rescue</p>
-              <h2>Hi {customer.name}, we're lining everything up</h2>
+              <h2 id="custdash-hero-title">
+                Hi {customer.name}, we're lining everything up
+              </h2>
             </div>
             <div className="custdash-hero__status">
-              <span className={`custdash-status-chip ${currentStage.toLowerCase()}`}>
+              <span
+                className={`custdash-status-chip ${currentStage.toLowerCase()}`}
+              >
                 {currentTitle}
               </span>
-              <p className="custdash-status-line">{statusMessage[currentStage]}</p>
+              <p className="custdash-status-line">
+                {statusMessage[currentStage]}
+              </p>
               <span className="custdash-job-id">Job {jobNumber}</span>
             </div>
           </header>
 
           <div className="custdash-hero__content">
-            <div className="custdash-tracker" role="region" aria-label="Job progress">
-              <span className="custdash-pill custdash-pill--current">{currentTitle}</span>
-              <div className="custdash-mini-road" aria-hidden="true">
-                <div className="custdash-mini-road__lane">
-                  <div className="custdash-mini-road__stripes" />
-                  <div className="custdash-mini-road__vehicle" style={{ left: vehicleLeft }}>
-                    <LuTruck />
+            <div className="custdash-flow" aria-hidden="true">
+              <div className="custdash-flow__rail" aria-hidden="true">
+                <div
+                  className="custdash-flow__progress"
+                  style={{ width: `${roadShare * 100}%` }}
+                />
+              </div>
+
+              <ul className="custdash-flow__steps" role="list">
+                {STAGES.map((s, i) => {
+                  const done = i < activeIndex;
+                  const active = i === activeIndex;
+                  return (
+                    <li
+                      key={s}
+                      className={`custdash-flow__step ${done ? "done" : ""} ${
+                        active ? "active" : ""
+                      }`}
+                      aria-current={active ? "step" : undefined}
+                    >
+                      <div className="step-dot" aria-hidden="true">
+                        {i + 1}
+                      </div>
+                      <div className="step-label">{s}</div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            <div>
+              <div
+                className="custdash-tracker"
+                role="status"
+                aria-live="polite"
+              >
+                <span className="custdash-pill custdash-pill--current">
+                  {currentTitle}
+                </span>
+                <div className="custdash-mini-road" aria-hidden="true">
+                  <div className="custdash-mini-road__lane">
+                    <div className="custdash-mini-road__stripes" />
+                    <div
+                      className="custdash-mini-road__vehicle"
+                      style={{ left: vehicleLeft }}
+                    >
+                      <LuTruck />
+                    </div>
                   </div>
                 </div>
+                <span className="custdash-pill custdash-pill--next">
+                  {isFinalStage ? "All wrapped" : nextCopy}
+                </span>
               </div>
-              <span className="custdash-pill custdash-pill--next">{isFinalStage ? "All wrapped" : nextCopy}</span>
             </div>
           </div>
 
           <div className="custdash-hero__cta">
-            <button className="btn primary" onClick={shareStatus}>
+            <button
+              type="button"
+              className="custdash btn primary"
+              onClick={shareStatus}
+            >
               Share live status
             </button>
-            <button className="btn ghost" onClick={copyStatusLink}>
+            <button
+              type="button"
+              className="custdash btn ghost"
+              onClick={copyStatusLink}
+            >
               Copy tracking link
             </button>
-            {driver?.phone ? (
-              <button className="btn ghost" onClick={callDriver}>
+            {driver?.phone && (
+              <button
+                type="button"
+                className="custdash btn ghost"
+                onClick={callDriver}
+              >
                 Call driver
               </button>
-            ) : null}
+            )}
           </div>
         </section>
 
@@ -369,7 +538,11 @@ export default function CustomerDashboard() {
               <h3>Live map</h3>
               <span className="custdash-chip">Updated every few seconds</span>
             </div>
-            <div className="custdash-map__canvas">
+            <div
+              className="custdash-map__canvas"
+              role="region"
+              aria-label="Live map"
+            >
               {hasGoogle ? (
                 <GMap
                   drivers={driverMarkers}
@@ -384,35 +557,59 @@ export default function CustomerDashboard() {
                   <LiveMap
                     drivers={driverMarkers}
                     autoFit
-                    center={mapCenter ? [mapCenter.lat, mapCenter.lng] : [6.5244, 3.3792]}
-                    destination={fallbackDestination}
+                    center={
+                      mapCenter
+                        ? [mapCenter.lat, mapCenter.lng]
+                        : [6.5244, 3.3792]
+                    }
+                    destination={routeDestination?.position || fallbackDestination}
+                    showRoute={canShowRoute}
+                    routeDistanceMeters={routeDistanceMeters}
                   />
                   <p className="muted tiny">
-                    Live route view requires a Google Maps API key. Showing driver position only.
+                    Route preview uses open-map data and reflects the latest driver update.
                   </p>
                 </>
+              )}
+              {routeDistanceLabel && (
+                <p className="muted tiny">
+                  Distance to {destinationRoleLabel}: {routeDistanceLabel}
+                </p>
               )}
             </div>
           </section>
 
-          <section className="card custdash-driver">
+          <section
+            className="card custdash-driver"
+            aria-labelledby="driver-heading"
+          >
             <header className="custdash-driver__header">
               <div className="custdash-driver__identity">
-                <span className="custdash-driver__avatar">{driverInitials}</span>
+                <span className="custdash-driver__avatar" aria-hidden="true">
+                  {driverInitials}
+                </span>
                 <div>
-                  <h3>{driver ? driver.name : "Driver to be assigned"}</h3>
+                  <h3 id="driver-heading">
+                    {driver ? driver.name : "Driver to be assigned"}
+                  </h3>
                   <p className="custdash-driver__subtitle">{driverSubtitle}</p>
                 </div>
               </div>
               {driver?.phone && (
-                <button className="btn ghost" onClick={callDriver}>
+                <button
+                  type="button"
+                  className="custdash btn ghost"
+                  onClick={callDriver}
+                >
                   Call driver
                 </button>
               )}
             </header>
 
             <div className="custdash-driver__status">
-              <span className={`custdash-status-chip ${currentStage.toLowerCase()}`}>
+              <span
+                className={`custdash-status-chip ${currentStage.toLowerCase()}`}
+              >
                 {currentTitle}
               </span>
               <span className="custdash-driver__status-note">
@@ -425,9 +622,9 @@ export default function CustomerDashboard() {
                 <span className="label">Vehicle</span>
                 <p>
                   {driver?.vehicleMake || driver?.vehicleModel
-                    ? `${driver?.vehicleColor || ""} ${driver?.vehicleMake || ""} ${
-                        driver?.vehicleModel || ""
-                      }`
+                    ? `${driver?.vehicleColor || ""} ${
+                        driver?.vehicleMake || ""
+                      } ${driver?.vehicleModel || ""}`
                         .trim()
                         .replace(/\s+/g, " ")
                     : "We'll share vehicle details when assigned."}
@@ -440,10 +637,18 @@ export default function CustomerDashboard() {
             </ul>
 
             <div className="custdash-driver__actions">
-              <button className="btn ghost" onClick={shareStatus}>
+              <button
+                type="button"
+                className="custdash btn ghost"
+                onClick={shareStatus}
+              >
                 Share trip progress
               </button>
-              <button className="btn ghost" onClick={copyStatusLink}>
+              <button
+                type="button"
+                className="custdash btn ghost"
+                onClick={copyStatusLink}
+              >
                 Copy link
               </button>
             </div>
@@ -472,13 +677,16 @@ export default function CustomerDashboard() {
                   if (!tile.disabled) tile.action();
                 }}
                 disabled={tile.disabled}
+                aria-disabled={tile.disabled ? "true" : "false"}
               >
                 <span className="custdash-action__icon" aria-hidden="true">
                   {tile.icon}
                 </span>
                 <span className="custdash-action__text">
                   <span className="custdash-action__label">{tile.label}</span>
-                  <span className="custdash-action__caption">{tile.caption}</span>
+                  <span className="custdash-action__caption">
+                    {tile.caption}
+                  </span>
                 </span>
               </button>
             ))}
@@ -504,7 +712,11 @@ export default function CustomerDashboard() {
                     <strong>{item.serviceType || "Service"}</strong>
                     <p>{item.pickupAddress}</p>
                   </div>
-                  <span className={`custdash-status-chip ${item.status.toLowerCase()}`}>
+                  <span
+                    className={`custdash-status-chip ${String(
+                      item.status || ""
+                    ).toLowerCase()}`}
+                  >
                     {item.status}
                   </span>
                 </li>
@@ -516,11 +728,6 @@ export default function CustomerDashboard() {
     </div>
   );
 }
-
-
-
-
-
 
 
 

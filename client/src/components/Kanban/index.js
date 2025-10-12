@@ -108,33 +108,6 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
     return index > 0 ? STAGES[index - 1] : null;
   };
 
-  const createRipple = (event) => {
-    const button = event.currentTarget;
-    const circle = document.createElement("span");
-    const diameter = Math.max(button.clientWidth, button.clientHeight);
-    const radius = diameter / 2;
-
-    circle.style.width = circle.style.height = `${diameter}px`;
-    circle.style.left = `${
-      event.clientX - button.getBoundingClientRect().left - radius
-    }px`;
-    circle.style.top = `${
-      event.clientY - button.getBoundingClientRect().top - radius
-    }px`;
-    circle.className = "kanban-ripple";
-
-    const ripple = button.getElementsByClassName("kanban-ripple")[0];
-    if (ripple) ripple.remove();
-
-    button.appendChild(circle);
-
-    setTimeout(() => {
-      if (circle.parentNode === button) {
-        button.removeChild(circle);
-      }
-    }, 600);
-  };
-
   const setCardUrgency = (jobId, urgent) => {
     const card = cardRefs.current[jobId];
     if (card) {
@@ -368,7 +341,6 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                                 className="kanban-action-btn back"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  createRipple(event);
                                   move(j, prev);
                                 }}
                               >
@@ -381,7 +353,6 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                                 className="kanban-action-btn next"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  createRipple(event);
                                   move(j, next);
                                 }}
                               >
@@ -396,7 +367,6 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                                 className="kanban-action-btn complete"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  createRipple(event);
                                   move(j, "Completed");
                                 }}
                               >
@@ -409,7 +379,6 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                                 className="kanban-action-btn unassign"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  createRipple(event);
                                   move(j, "Unassigned", { vendorId: null });
                                 }}
                               >
@@ -423,10 +392,9 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                           <div className="kanban-action-group">
                             {!isUrgent ? (
                               <button
-                                className="kanban-action-btn escalate priority-pulse"
+                                className="kanban-action-btn escalate"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  createRipple(event);
                                   setCardUrgency(j._id, true);
                                   onUpdateJob?.(j._id, { priority: "urgent" });
                                 }}
@@ -438,10 +406,9 @@ export default function Kanban({ jobs = [], onUpdateJob, onCompleteJob }) {
                               </button>
                             ) : (
                               <button
-                                className="kanban-action-btn deescalate priority-pulse"
+                                className="kanban-action-btn deescalate"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  createRipple(event);
                                   setCardUrgency(j._id, false);
                                   onUpdateJob?.(j._id, { priority: "normal" });
                                 }}

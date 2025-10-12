@@ -40,9 +40,9 @@ const JobSchema = new mongoose.Schema(
     completed: { type: Date },
 
     // Bidding / public links
-    vendorToken: { type: String, default: null, index: true },
-    customerToken: { type: String, default: null, index: true },
-    vendorAcceptedToken: { type: String, default: null, index: true },
+    vendorToken: { type: String, default: null },
+    customerToken: { type: String, default: null },
+    vendorAcceptedToken: { type: String, default: null },
     selectedBidId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Bid",

@@ -1,5 +1,5 @@
 // src/pages/GuestRequest.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -20,14 +20,6 @@ const SERVICE_SUGGESTIONS = [
 ];
 
 /* global google */
-
-const normalizePhoneValue = (input = "") => {
-  const t = String(input).trim();
-  if (!t) return "";
-  return t.startsWith("+")
-    ? "+" + t.slice(1).replace(/\D+/g, "")
-    : t.replace(/\D+/g, "");
-};
 
 const PROFILE_KEYS = [
   "name",
@@ -289,7 +281,7 @@ export default function GuestRequest({
   requireEmail = true,
 } = {}) {
   const navigate = useNavigate();
-  const { user, token, isCustomer, login } = useAuth();
+  const { user, isCustomer } = useAuth();
   const [formData, setFormData] = useState(() => ({
     ...DEFAULT_GUEST_FORM,
     ...initialValues,
@@ -332,10 +324,6 @@ export default function GuestRequest({
   }, [isCustomer, user?.savedProfile]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [showSavePrompt, setShowSavePrompt] = useState(false);
-  const [profileBusy, setProfileBusy] = useState(false);
-  const [pendingResult, setPendingResult] = useState(null);
-  const pendingSnapshot = pendingResult?.snapshot || {};
   const defaultTransformRequest = (data) => ({
     ...data,
     name: data.name.trim(),
@@ -361,36 +349,12 @@ export default function GuestRequest({
     navigate("/");
   };
 
-  const buildProfileSnapshot = (data) => ({
-    name: (data.name || "").trim(),
-    email: (data.email || "").trim(),
-    phone: normalizePhoneValue(data.phone),
-    phoneDisplay: (data.phone || "").trim(),
-    address: (data.address || "").trim(),
-    vehicleMake: (data.vehicleMake || "").trim(),
-    vehicleModel: (data.vehicleModel || "").trim(),
-    vehicleColor: (data.vehicleColor || "").trim(),
-  });
-
   const navigateAfterSubmit = (result) => {
     if (onSuccess) {
       onSuccess(result, { navigate, formData });
     } else {
       defaultOnSuccess(result);
     }
-  };
-
-  const shouldPromptToSave = (snapshot) => {
-    if (!isCustomer || !token) return false;
-    if (!snapshot.phone || !snapshot.name) return false;
-    const hasVehicle =
-      snapshot.vehicleMake && snapshot.vehicleModel && snapshot.vehicleColor;
-    if (!hasVehicle) return false;
-    const saved = user?.savedProfile || {};
-    if (!saved || !Object.keys(saved).length) return true;
-    return PROFILE_KEYS.some(
-      (key) => (snapshot[key] || "") !== (saved[key] || "")
-    );
   };
 
   const handleChange = (e) => {
@@ -415,14 +379,6 @@ export default function GuestRequest({
         coordinates: { lat: loc.lat(), lng: loc.lng() },
       }));
     }
-  };
-
-  const handleMapLocationSelect = (position, address = null) => {
-    setFormData((p) => ({
-      ...p,
-      coordinates: { lat: position.lat(), lng: position.lng() },
-      address: address || p.address,
-    }));
   };
 
   const handleDistanceCalculated = (distanceInfo) => {
@@ -505,13 +461,7 @@ export default function GuestRequest({
       const payload = transformer(formData);
       const submitFn = submitRequest || defaultSubmitRequest;
       const result = await submitFn(payload);
-      const snapshot = buildProfileSnapshot(formData);
-      if (shouldPromptToSave(snapshot)) {
-        setPendingResult({ result, snapshot });
-        setShowSavePrompt(true);
-      } else {
-        navigateAfterSubmit(result);
-      }
+      navigateAfterSubmit(result);
     } catch (err) {
       console.error(err);
       const message =
@@ -521,53 +471,6 @@ export default function GuestRequest({
     } finally {
       setIsSubmitting(false);
     }
-
-  };
-
-  const handleSaveProfile = async () => {
-    if (!pendingResult) return;
-    setProfileBusy(true);
-    try {
-      const { snapshot, result } = pendingResult;
-      const payload = {
-        name: snapshot.name,
-        email: snapshot.email,
-        phone: snapshot.phone,
-        address: snapshot.address,
-        vehicleMake: snapshot.vehicleMake,
-        vehicleModel: snapshot.vehicleModel,
-        vehicleColor: snapshot.vehicleColor,
-      };
-      const { data } = await api.put("/api/customer/auth/profile", payload);
-      if (data?.customer) {
-        const updated = {
-          ...(user || {}),
-          ...data.customer,
-          role: user?.role || "customer",
-        };
-        login(updated, token);
-      }
-      setShowSavePrompt(false);
-      setPendingResult(null);
-      navigateAfterSubmit(result);
-    } catch (error) {
-      alert(
-        error?.response?.data?.message ||
-          error?.message ||
-          "Unable to save your info right now"
-      );
-    } finally {
-      setProfileBusy(false);
-    }
-  };
-
-  const handleSkipSave = () => {
-    if (pendingResult) {
-      const { result } = pendingResult;
-      setPendingResult(null);
-      navigateAfterSubmit(result);
-    }
-    setShowSavePrompt(false);
   };
   const nextStep = () => setCurrentStep((s) => s + 1);
   const prevStep = () => setCurrentStep((s) => s - 1);
@@ -928,82 +831,6 @@ export default function GuestRequest({
           </div>
         )}
       </form>
-      {showSavePrompt && pendingResult && (
-        <div className="save-profile-overlay" role="dialog" aria-modal="true">
-          <div className="save-profile-modal">
-            <h3>Save these details for next time?</h3>
-            <p className="muted small">
-              We can pre-fill your next request with the same contact and vehicle info.
-            </p>
-            <ul className="save-profile-list">
-              {pendingSnapshot.name && (
-                <li>
-                  <span className="label">Name</span>
-                  <span>{pendingSnapshot.name}</span>
-                </li>
-              )}
-              {(pendingSnapshot.phoneDisplay || pendingSnapshot.phone) && (
-                <li>
-                  <span className="label">Phone</span>
-                  <span>{pendingSnapshot.phoneDisplay || pendingSnapshot.phone}</span>
-                </li>
-              )}
-              {pendingSnapshot.email && (
-                <li>
-                  <span className="label">Email</span>
-                  <span>{pendingSnapshot.email}</span>
-                </li>
-              )}
-              {pendingSnapshot.address && (
-                <li>
-                  <span className="label">Address</span>
-                  <span>{pendingSnapshot.address}</span>
-                </li>
-              )}
-              {(pendingSnapshot.vehicleMake ||
-                pendingSnapshot.vehicleModel ||
-                pendingSnapshot.vehicleColor) && (
-                <li>
-                  <span className="label">Vehicle</span>
-                  <span>
-                    {[pendingSnapshot.vehicleMake, pendingSnapshot.vehicleModel, pendingSnapshot.vehicleColor]
-                      .filter(Boolean)
-                      .join(" ")}
-                  </span>
-                </li>
-              )}
-            </ul>
-            <div className="save-profile-actions">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleSkipSave}
-                disabled={profileBusy}
-              >
-                Not now
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleSaveProfile}
-                disabled={profileBusy}
-              >
-                {profileBusy ? "Saving..." : "Save info"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-

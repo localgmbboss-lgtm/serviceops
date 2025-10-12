@@ -1,8 +1,6 @@
 import { Router } from "express";
 import Job from "../models/Jobs.js";
-import Driver from "../models/Driver.js";
 import Customer from "../models/Customer.js";
-import mongoose from "mongoose";
 
 const router = Router();
 
@@ -40,7 +38,7 @@ router.get("/jobs.csv", async (req, res, next) => {
     if (req.query.status) match.status = req.query.status;
     if (req.query.service) match.serviceType = req.query.service;
 
-    // Join Customer + Driver (for names/city)
+    // Join Customer + Vendor (for names/city)
     const pipeline = [
       { $match: match },
       { $sort: { created: -1 } },
@@ -55,13 +53,13 @@ router.get("/jobs.csv", async (req, res, next) => {
       { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
-          from: "drivers",
-          localField: "driverId",
+          from: "vendors",
+          localField: "vendorId",
           foreignField: "_id",
-          as: "driver",
+          as: "vendor",
         },
       },
-      { $unwind: { path: "$driver", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$vendor", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           created: 1,
@@ -74,8 +72,8 @@ router.get("/jobs.csv", async (req, res, next) => {
           priority: 1,
           customerName: "$customer.name",
           customerPhone: "$customer.phone",
-          driverName: "$driver.name",
-          driverCity: "$driver.city",
+          vendorName: { $ifNull: ["$vendor.name", "$vendorName"] },
+          vendorCity: { $ifNull: ["$vendor.city", "$vendorCity"] },
         },
       },
     ];
@@ -93,8 +91,8 @@ router.get("/jobs.csv", async (req, res, next) => {
       "priority",
       "customerName",
       "customerPhone",
-      "driverName",
-      "driverCity",
+      "vendorName",
+      "vendorCity",
     ];
     const rows = [header];
     for (const j of docs) {
@@ -109,8 +107,8 @@ router.get("/jobs.csv", async (req, res, next) => {
         j.priority || "",
         j.customerName || "",
         j.customerPhone || "",
-        j.driverName || "",
-        j.driverCity || "",
+        j.vendorName || "",
+        j.vendorCity || "",
       ]);
     }
     const name = `jobs_${from.toISOString().slice(0, 10)}_${to
@@ -123,3 +121,7 @@ router.get("/jobs.csv", async (req, res, next) => {
 });
 
 export default router;
+
+
+
+

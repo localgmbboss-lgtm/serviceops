@@ -1,31 +1,55 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "./styles.css";
 
 /**
  * LiveMap (Leaflet + OSM)
  * Props:
- *  - drivers: [{ _id?, name, city, lat, lng, lastSeenAt }]
- *  - center?: [lat, lng]        (default Lagos)
- *  - zoom?: number              (default 11)
- *  - autoFit?: boolean          (default true) fit map to visible drivers
- *  - staleMs?: number           (default 60_000 ms) > stale threshold
+ *  - vendors: [{ _id, name, city, lat, lng, lastSeenAt, updatedAt, active }]
+ *  - center?: [lat, lng]
+ *  - zoom?: number
+ *  - autoFit?: boolean
+ *  - staleMs?: number
+ *  - destination?: { lat, lng }
  */
 export default function LiveMap({
+  vendors = [],
   drivers = [],
   center = [6.5244, 3.3792],
   zoom = 11,
   autoFit = true,
   staleMs = 60_000,
   destination = null,
+  showRoute = false,
+  routeColor = "#2563eb",
+  routeWeight = 5,
+  routeDistanceMeters = null,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const layerRef = useRef(null); // parent layer for markers
-  const markersRef = useRef(new Map()); // key -> { marker, ring }
+  const layerRef = useRef(null);
+  const markersRef = useRef(new Map());
   const destinationRef = useRef(null);
+  const routesRef = useRef(new Map());
 
-  // Fix default marker icons (CRA/Webpack)
+  const activeVendors = useMemo(() => {
+    if (Array.isArray(vendors) && vendors.length) return vendors;
+    if (Array.isArray(drivers) && drivers.length) return drivers;
+    return [];
+  }, [vendors, drivers]);
+
+  const distanceSummary = useMemo(() => {
+    if (!showRoute || !Number.isFinite(routeDistanceMeters)) return null;
+    if (routeDistanceMeters < 1000) {
+      return `${Math.max(1, Math.round(routeDistanceMeters))} m`;
+    }
+    const km = routeDistanceMeters / 1000;
+    if (km < 10) return `${km.toFixed(1)} km`;
+    const miles = km * 0.621371;
+    if (miles < 10) return `${miles.toFixed(1)} mi`;
+    return `${Math.round(miles)} mi`;
+  }, [routeDistanceMeters, showRoute]);
+
   useEffect(() => {
     const retina =
       "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png";
@@ -41,7 +65,6 @@ export default function LiveMap({
     });
   }, []);
 
-  // Init map once
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
 
@@ -60,7 +83,6 @@ export default function LiveMap({
     mapRef.current = map;
     layerRef.current = layer;
 
-    // Resize observer to fix 0x0 containers on route changes
     const ro = new ResizeObserver(() =>
       setTimeout(() => map.invalidateSize(), 0)
     );
@@ -68,82 +90,94 @@ export default function LiveMap({
     return () => ro.disconnect();
   }, [center, zoom]);
 
-  // Update markers on driver changes
   useEffect(() => {
     const map = mapRef.current;
     const layer = layerRef.current;
     if (!map || !layer) return;
 
-    const toNum = (v) => (v === null || v === undefined ? NaN : Number(v));
+    const toNumber = (value) => {
+      if (value === null || value === undefined || value === "") return NaN;
+      const num = typeof value === "number" ? value : Number(value);
+      return Number.isFinite(num) ? num : NaN;
+    };
+
     const now = Date.now();
-    const freshColor = "#2563eb"; // blue
-    const staleColor = "#9ca3af"; // gray
-
-    // Track which keys we saw this cycle (for cleanup)
     const seen = new Set();
+    let primaryLatLng = null;
 
-    // Create/update markers
-    drivers.forEach((d) => {
-      const _lat = toNum(d.lat);
-      const _lng = toNum(d.lng);
-      if (!Number.isFinite(_lat) || !Number.isFinite(_lng)) return;
+    activeVendors.forEach((vendor) => {
+      const lat = toNumber(vendor?.lat);
+      const lng = toNumber(vendor?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-      const key = String(d._id || `${d.name || "driver"}-${d.phone || ""}`);
+      const key = String(vendor?._id || `${vendor?.name || "vendor"}-${vendor?.phone || ""}`);
       seen.add(key);
 
-      // get or create marker + ring
-      let entry = markersRef.current.get(key);
-      if (!entry) {
-        const marker = L.marker([_lat, _lng]).addTo(layer);
-        const ring = L.circleMarker([_lat, _lng], {
-          radius: 6,
-          color: freshColor,
-          fillColor: freshColor,
-          fillOpacity: 0.9,
-          weight: 2,
-        }).addTo(layer);
-        entry = { marker, ring };
-        markersRef.current.set(key, entry);
+      if (!primaryLatLng) {
+        primaryLatLng = [lat, lng];
       }
 
-      // update positions
-      entry.marker.setLatLng([_lat, _lng]);
-      entry.ring.setLatLng([_lat, _lng]);
+      let marker = markersRef.current.get(key);
 
-      // freshness
+      const lastSeenSource = vendor?.lastSeenAt || vendor?.updatedAt;
+      const lastSeen = lastSeenSource ? new Date(lastSeenSource) : null;
       const isStale =
-        !d.lastSeenAt || now - new Date(d.lastSeenAt).getTime() > staleMs;
-      const clr = isStale ? staleColor : freshColor;
-      entry.ring.setStyle({ color: clr, fillColor: clr });
+        lastSeen && Number.isFinite(staleMs)
+          ? now - lastSeen.getTime() > staleMs
+          : false;
+      const isActive = vendor?.active !== false;
 
-      // popup
-      const when = d.lastSeenAt ? new Date(d.lastSeenAt) : null;
-      const last = when ? timeAgo(when) : "-";
-      entry.marker.bindPopup(`
+      if (!marker) {
+        marker = L.marker([lat, lng], {
+          icon: createVendorIcon({
+            stale: isStale,
+            active: isActive,
+            label: initials(vendor?.name || vendor?.phone),
+          }),
+        }).addTo(layer);
+        markersRef.current.set(key, marker);
+      } else {
+        marker.setLatLng([lat, lng]);
+      }
+
+      updateMarkerVisual(marker, {
+        stale: isStale,
+        active: isActive,
+        label: initials(vendor?.name || vendor?.phone),
+      });
+
+      const last = lastSeen ? timeAgo(lastSeen) : "unknown";
+      const city = vendor?.city
+        ? `<div class="lm-city">${escapeHtml(vendor.city)}</div>`
+        : "";
+      const meta = [];
+      meta.push(isActive ? "Receiving jobs" : "Suspended");
+      if (isStale) meta.push("No updates");
+      const metaHtml = meta.length
+        ? `<div class="lm-meta"><small>${meta.map(escapeHtml).join(" · ")}</small></div>`
+        : "";
+
+      marker.bindPopup(`
         <div class="lm-popup">
           <div class="lm-name"><strong>${escapeHtml(
-            d.name || "Driver"
+            vendor?.name || "Vendor"
           )}</strong></div>
-          <div class="lm-city">${escapeHtml(d.city || "")}</div>
-          <div class="lm-seen"><small>Last seen: ${last}${
-        isStale ? " (stale)" : ""
-      }</small></div>
+          ${city}
+          <div class="lm-seen"><small>Last update: ${escapeHtml(last)}</small></div>
+          ${metaHtml}
         </div>
       `);
     });
 
-    // Remove markers for drivers that disappeared
-    for (const [key, entry] of markersRef.current.entries()) {
+    for (const [key, marker] of markersRef.current.entries()) {
       if (!seen.has(key)) {
-        entry.marker.remove();
-        entry.ring.remove();
+        marker.remove();
         markersRef.current.delete(key);
       }
     }
 
-    // Destination marker (optional)
-    const destLat = Number(destination?.lat);
-    const destLng = Number(destination?.lng);
+    const destLat = toNumber(destination?.lat);
+    const destLng = toNumber(destination?.lng);
     const hasDestination =
       destination && Number.isFinite(destLat) && Number.isFinite(destLng);
 
@@ -165,28 +199,79 @@ export default function LiveMap({
       destinationRef.current = null;
     }
 
-    // Fit bounds if requested
+    if (!showRoute || !hasDestination) {
+      routesRef.current.forEach((polyline) => polyline.remove());
+      routesRef.current.clear();
+    } else {
+      const activeRouteKeys = new Set();
+      activeVendors.forEach((vendor) => {
+        const lat = toNumber(vendor?.lat);
+        const lng = toNumber(vendor?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        const key = String(vendor?._id || `${vendor?.name || "vendor"}-${vendor?.phone || ""}`);
+        const routeKey = `route:${key}`;
+        activeRouteKeys.add(routeKey);
+        const points = [
+          [lat, lng],
+          [destLat, destLng],
+        ];
+        let poly = routesRef.current.get(routeKey);
+        if (!poly) {
+          poly = L.polyline(points, {
+            color: routeColor,
+            weight: routeWeight,
+            opacity: 0.7,
+            dashArray: "10 6",
+          }).addTo(layer);
+          routesRef.current.set(routeKey, poly);
+        } else {
+          poly.setLatLngs(points);
+          poly.setStyle({
+            color: routeColor,
+            weight: routeWeight,
+            opacity: 0.7,
+            dashArray: "10 6",
+          });
+          if (!layer.hasLayer(poly)) {
+            poly.addTo(layer);
+          }
+        }
+      });
+      for (const [key, poly] of routesRef.current.entries()) {
+        if (!activeRouteKeys.has(key)) {
+          poly.remove();
+          routesRef.current.delete(key);
+        }
+      }
+    }
+
     if (autoFit) {
-      const pts = [...markersRef.current.values()].map((e) =>
-        e.marker.getLatLng()
+      const points = Array.from(markersRef.current.values()).map((marker) =>
+        marker.getLatLng()
       );
       if (hasDestination && destinationRef.current) {
-        pts.push(destinationRef.current.getLatLng());
+        points.push(destinationRef.current.getLatLng());
       }
-      if (pts.length === 1) {
-        map.setView(pts[0], 14, { animate: true });
-      } else if (pts.length > 1) {
-        const bounds = L.latLngBounds(pts);
+      if (points.length === 1) {
+        map.setView(points[0], 14, { animate: true });
+      } else if (points.length > 1) {
+        const bounds = L.latLngBounds(points);
         map.fitBounds(bounds, { padding: [40, 40] });
       } else {
         map.setView(center, zoom);
       }
     }
-  }, [drivers, autoFit, staleMs, center, zoom, destination]);
+  }, [activeVendors, autoFit, staleMs, center, zoom, destination, showRoute, routeColor, routeWeight]);
 
   return (
     <div className="lm-wrap">
       <div ref={containerRef} className="lm-map" />
+      {distanceSummary && (
+        <div className="lm-route-meta">
+          <span className="lm-route-chip">Route</span>
+          <strong>{distanceSummary}</strong>
+        </div>
+      )}
       <div className="lm-legend">
         <span className="dot fresh" /> Fresh (&le; 60s)
         <span className="dot stale" /> Stale (&gt; 60s)
@@ -194,8 +279,6 @@ export default function LiveMap({
     </div>
   );
 }
-
-/* -------- helpers -------- */
 
 function timeAgo(date) {
   const diff = Math.max(0, Date.now() - date.getTime());
@@ -208,8 +291,8 @@ function timeAgo(date) {
   return `${days} day${days > 1 ? "s" : ""} ago`;
 }
 
-function escapeHtml(s) {
-  return String(s)
+function escapeHtml(value) {
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -217,7 +300,57 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
+function initials(value) {
+  if (!value) return "VN";
+  const tokens = String(value)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!tokens.length) return "VN";
+  return tokens
+    .slice(0, 2)
+    .map((token) => token[0])
+    .join("")
+    .toUpperCase();
+}
 
+function createVendorIcon({ label, stale, active }) {
+  const classes = ["lm-marker__body"];
+  if (stale) classes.push("is-stale");
+  if (active === false) classes.push("is-offline");
+  const className = classes.join(" ");
 
+  return L.divIcon({
+    className: "lm-marker",
+    html: `
+      <div class="${className}">
+        <div class="lm-pin">
+          <span class="lm-pin__arrow"></span>
+          <span class="lm-pin__label">${escapeHtml(label || "VN")}</span>
+        </div>
+      </div>
+    `,
+    iconSize: [46, 46],
+    iconAnchor: [23, 30],
+  });
+}
 
+function updateMarkerVisual(marker, { stale, active, label }) {
+  const apply = (element) => {
+    if (!element) return;
+    const body = element.querySelector(".lm-marker__body");
+    if (body) {
+      body.classList.toggle("is-stale", Boolean(stale));
+      body.classList.toggle("is-offline", active === false);
+      const labelNode = body.querySelector(".lm-pin__label");
+      if (labelNode) labelNode.textContent = label || "VN";
+    }
+  };
 
+  const el = marker.getElement();
+  if (el) {
+    apply(el);
+  } else {
+    marker.once("add", () => apply(marker.getElement()));
+  }
+}

@@ -3,13 +3,11 @@ import { Router } from "express";
 import crypto from "crypto";
 import Customer from "../models/Customer.js";
 import Job from "../models/Jobs.js";
+import { getClientBaseUrl } from "../lib/clientUrl.js";
 
 const router = Router();
 
-const baseClient =
-  process.env.CLIENT_ORIGIN ||
-  process.env.CLIENT_URL ||
-  "http://localhost:3000";
+const baseClient = getClientBaseUrl();
 
 // --- helpers -------------------------------------------------
 const isNonEmpty = (s) => typeof s === "string" && s.trim().length > 0;
@@ -140,6 +138,3 @@ router.post("/jobs", async (req, res, next) => {
 });
 
 export default router;
-
-
-

@@ -5,13 +5,12 @@ import mongoose from "mongoose";
 import { completeJobWithPayment } from "../lib/jobCompletion.js";
 import Job from "../models/Jobs.js";
 import Vendor from "../models/Vendor.js"; // Changed from Driver to Vendor
-import { checkVendorCompliance } from "../lib/compliance.js"; // Changed from Driver to Vendor
 import Customer from "../models/Customer.js";
 import { notifySMS } from "../lib/notifier.js";
+import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
 const router = Router();
 
-
-
+const defaultClientBase = getClientBaseUrl();
 
 export const STATUSES = [
   "Unassigned",
@@ -29,11 +28,6 @@ const ALLOWED_NEXT = {
   Completed: [],
 };
 
-const baseClient =
-  process.env.CLIENT_ORIGIN ||
-  process.env.CLIENT_URL ||
-  "http://localhost:3000";
-
 const makeToken = () => crypto.randomBytes(16).toString("hex");
 
 const PAYMENT_METHODS = new Set([
@@ -46,13 +40,13 @@ const PAYMENT_METHODS = new Set([
 ]);
 
 // Build link payload (only includes vendor/customer links if tokens exist)
-const linkFor = (job) => ({
-  statusUrl: `${baseClient}/status/${job._id}`,
+const linkFor = (job, base = defaultClientBase) => ({
+  statusUrl: `${base}/status/${job._id}`,
   ...(job.vendorToken
-    ? { vendorLink: `${baseClient}/vendor/${job.vendorToken}` }
+    ? { vendorLink: `${base}/vendor/${job.vendorToken}` }
     : {}),
   ...(job.customerToken
-    ? { customerLink: `${baseClient}/choose/${job.customerToken}` }
+    ? { customerLink: `${base}/choose/${job.customerToken}` }
     : {}),
 });
 
@@ -62,6 +56,33 @@ const assertId = (id) => {
     err.status = 400;
     throw err;
   }
+};
+
+const toRadians = (deg) => (deg * Math.PI) / 180;
+const haversineKm = (aLat, aLng, bLat, bLng) => {
+  const lat1 = Number(aLat);
+  const lat2 = Number(bLat);
+  const lng1 = Number(aLng);
+  const lng2 = Number(bLng);
+  if (
+    !Number.isFinite(lat1) ||
+    !Number.isFinite(lat2) ||
+    !Number.isFinite(lng1) ||
+    !Number.isFinite(lng2)
+  ) {
+    return Infinity;
+  }
+  const R = 6371; // km
+  const dLat = toRadians(lat2 - lat1);
+  const dLng = toRadians(lng2 - lng1);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return R * c;
 };
 
 // ---------- LIST (optional filters: ?status=...&q=...) ----------
@@ -85,6 +106,140 @@ router.get("/", async (req, res, next) => {
     res.json(items);
   } catch (e) {
     next(e);
+  }
+});
+
+router.get("/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    assertId(id);
+
+    const job = await Job.findById(id).lean();
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    const [customerDoc, vendorDoc] = await Promise.all([
+      job.customerId ? Customer.findById(job.customerId).lean() : null,
+      job.vendorId ? Vendor.findById(job.vendorId).lean() : null,
+    ]);
+
+    let nearbyVendors = [];
+    const hasPickupCoords =
+      Number.isFinite(job.pickupLat) && Number.isFinite(job.pickupLng);
+
+    if (hasPickupCoords) {
+      const vendors = await Vendor.find({
+        lat: { $exists: true },
+        lng: { $exists: true },
+      })
+        .select("_id name phone lat lng services heavyDuty radiusKm lastSeenAt active")
+        .lean();
+
+      nearbyVendors = vendors
+        .filter((vendor) => vendor && String(vendor._id) !== String(job.vendorId || ""))
+        .map((vendor) => {
+          const distanceKm = haversineKm(
+            job.pickupLat,
+            job.pickupLng,
+            vendor.lat,
+            vendor.lng
+          );
+          return {
+            _id: vendor._id,
+            name: vendor.name || "",
+            phone: vendor.phone || "",
+            lat: vendor.lat ?? null,
+            lng: vendor.lng ?? null,
+            services: vendor.services || [],
+            heavyDuty: vendor.heavyDuty || false,
+            radiusKm: vendor.radiusKm || null,
+            lastSeenAt: vendor.lastSeenAt || vendor.updatedAt || null,
+            active: vendor.active !== false,
+            distanceKm,
+          };
+        })
+        .filter((vendor) => vendor.distanceKm < Infinity)
+        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .slice(0, 12);
+    }
+
+    const safeJob = {
+      ...job,
+      _id: job._id,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
+
+    const customer = customerDoc
+      ? {
+          _id: customerDoc._id,
+          name: customerDoc.name || customerDoc.savedProfile?.name || "",
+          phone: customerDoc.phone || customerDoc.savedProfile?.phone || "",
+          email: customerDoc.email || customerDoc.savedProfile?.email || "",
+          savedProfile: customerDoc.savedProfile || null,
+          lastServiceRequest: customerDoc.lastServiceRequest || null,
+        }
+      : null;
+
+    const vendor = vendorDoc
+      ? {
+          _id: vendorDoc._id,
+          name: vendorDoc.name || "",
+          phone: vendorDoc.phone || "",
+          email: vendorDoc.email || "",
+          lat: vendorDoc.lat ?? null,
+          lng: vendorDoc.lng ?? null,
+          services: vendorDoc.services || [],
+          heavyDuty: vendorDoc.heavyDuty || false,
+          radiusKm: vendorDoc.radiusKm || null,
+          lastSeenAt: vendorDoc.lastSeenAt || vendorDoc.updatedAt || null,
+        }
+      : null;
+
+    const coordinates = {
+      pickup: Number.isFinite(job.pickupLat) && Number.isFinite(job.pickupLng)
+        ? { lat: job.pickupLat, lng: job.pickupLng }
+        : null,
+      dropoff:
+        Number.isFinite(job.dropoffLat) && Number.isFinite(job.dropoffLng)
+          ? { lat: job.dropoffLat, lng: job.dropoffLng }
+          : null,
+    };
+
+    const timeline = {
+      created: job.created,
+      assignedAt: job.assignedAt || null,
+      onTheWayAt: job.onTheWayAt || null,
+      arrivedAt: job.arrivedAt || null,
+      completedAt: job.completedAt || job.completed || null,
+      escalatedAt: job.escalatedAt || null,
+    };
+
+    const payment = {
+      status: job.paymentStatus || "pending",
+      method: job.paymentMethod || job.reportedPayment?.method || null,
+      reported: job.reportedPayment || null,
+      finalPrice: job.finalPrice || null,
+      quotedPrice: job.quotedPrice || null,
+      paymentDate: job.paymentDate || null,
+      commission: job.commission || null,
+    };
+
+    const links = linkFor(job, resolveClientBaseUrl(req));
+
+    res.json({
+      job: safeJob,
+      customer,
+      vendor,
+      coordinates,
+      timeline,
+      payment,
+      nearbyVendors,
+      links,
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -207,16 +362,16 @@ router.patch("/:id", async (req, res, next) => {
 
     if (Object.prototype.hasOwnProperty.call(payload, "status")) {
       const nextStatus = payload.status;
-      if (!STAGES.includes(nextStatus)) {
+      if (!STATUSES.includes(nextStatus)) {
         return res.status(400).json({ message: "Invalid status" });
       }
 
       const currentStatus = job.status;
       if (nextStatus !== currentStatus) {
         const allowed = new Set(ALLOWED_NEXT[currentStatus] || []);
-        const currentIndex = STAGES.indexOf(currentStatus);
+        const currentIndex = STATUSES.indexOf(currentStatus);
         if (currentIndex > 0) {
-          allowed.add(STAGES[currentIndex - 1]);
+          allowed.add(STATUSES[currentIndex - 1]);
         }
         allowed.add(currentStatus);
 
@@ -261,155 +416,15 @@ router.patch("/:id", async (req, res, next) => {
   }
 });
 
-router.post("/guest", async (req, res, next) => {
-  try {
-    const body = req.body || {};
-
-    if (!body?.name || !body?.phone || !body?.email) {
-      return res
-        .status(400)
-        .json({ message: "name, phone and email are required" });
-    }
-    if (!body?.address) {
-      return res.status(400).json({ message: "Pickup address is required" });
-    }
-
-    const cust = await Customer.findOneAndUpdate(
-      {
-        $or: [
-          { email: body.email.trim().toLowerCase() },
-          { phone: body.phone.trim() },
-        ],
-      },
-      {
-        $setOnInsert: {
-          name: body.name.trim(),
-          email: body.email.trim().toLowerCase(),
-          phone: body.phone.trim(),
-          isGuest: true,
-        },
-      },
-      { new: true, upsert: true }
-    );
-
-    const details = [];
-    if (body.description) details.push(`Problem: ${body.description}`);
-    if (body.vehicleMake || body.vehicleModel || body.vehicleColor) {
-      const v = [body.vehicleColor, body.vehicleMake, body.vehicleModel]
-        .filter(Boolean)
-        .join(" ");
-      details.push(`Vehicle: ${v}`);
-    }
-    if (body.distanceInfo?.distance && body.distanceInfo?.duration) {
-      details.push(
-        `Route: ${body.distanceInfo.distance} ~${body.distanceInfo.duration}`
-      );
-    }
-
-    const job = await Job.create({
-      customerId: cust._id,
-      guestRequest: true,
-      pickupAddress: String(body.address).trim(),
-      dropoffAddress: body.destination
-        ? String(body.destination).trim()
-        : undefined,
-      serviceType: body.serviceType || "",
-      notes: details.join("\n"),
-      bidMode: "open",
-      status: "Unassigned",
-      biddingOpen: true,
-      priority:
-        body.urgency === "emergency" || body.urgency === "urgent"
-          ? "urgent"
-          : "normal",
-      pickupLat: body.coordinates?.lat,
-      pickupLng: body.coordinates?.lng,
-    });
-
-    job.vendorToken = job.vendorToken || makeToken();
-    job.customerToken = job.customerToken || makeToken();
-    await job.save();
-
-    const trackUrl = `${baseClient}/track/guest/${job.customerToken}`;
-    res.status(201).json({
-      ok: true,
-      jobId: job._id,
-      jobToken: job.customerToken,
-      trackUrl,
-      links: linkFor(job),
-    });
-  } catch (e) {
-    next(e);
-  }
+router.post("/guest", async (req, res) => {
+  return res
+    .status(403)
+    .json({ message: "Guest intake is currently disabled." });
 });
 
 // ---------- GUEST STATUS (read-only by token) ----------
-router.get("/guest/:token", async (req, res, next) => {
-  try {
-    const { token } = req.params;
-    
-    // Validate token format
-    if (!token || typeof token !== "string" || token.length < 8) {
-      return res.status(400).json({ 
-        success: false,
-        message: "Invalid token format" 
-      });
-    }
-
-    // Find the job by customer token and populate vendor info
-    const job = await Job.findOne({ customerToken: token })
-      .populate("vendorId", "name phone city lat lng lastSeenAt")
-      .lean();
-    
-    if (!job) {
-      return res.status(404).json({ 
-        success: false,
-        message: "Job not found or token invalid" 
-      });
-    }
-
-    // Format the response
-    const response = {
-      success: true,
-      job: {
-        _id: job._id,
-        status: job.status,
-        serviceType: job.serviceType,
-        pickupAddress: job.pickupAddress,
-        dropoffAddress: job.dropoffAddress || "",
-        quotedPrice: job.quotedPrice || 0,
-        created: job.createdAt || job.created,
-        completed: job.completed || null,
-        biddingOpen: !!job.biddingOpen,
-        bidMode: job.bidMode || "open",
-        notes: job.notes || "",
-        priority: job.priority || "normal"
-      },
-      vendor: job.vendorId ? {
-        _id: job.vendorId._id,
-        name: job.vendorId.name,
-        city: job.vendorId.city,
-        phone: job.vendorId.phone,
-        lat: job.vendorId.lat,
-        lng: job.vendorId.lng,
-        lastSeenAt: job.vendorId.lastSeenAt
-      } : null,
-      links: {
-        trackUrl: `${baseClient}/track/guest/${job.customerToken}`,
-        statusUrl: `${baseClient}/status/${job._id}`,
-        ...(job.vendorToken ? { vendorLink: `${baseClient}/vendor/${job.vendorToken}` } : {}),
-        ...(job.customerToken ? { customerLink: `${baseClient}/choose/${job.customerToken}` } : {})
-      }
-    };
-
-    res.json(response);
-  } catch (error) {
-    console.error("Error fetching guest job status:", error);
-    res.status(500).json({ 
-      success: false,
-      message: "Internal server error" 
-    });
-  }
+router.get("/guest/:token", async (req, res) => {
+  return res.status(404).json({ message: "Guest tracking is unavailable." });
 });
 
 router.post("/:id/complete", async (req, res, next) => {
@@ -484,84 +499,89 @@ router.post("/:id/open-bidding", async (req, res, next) => {
 
     await job.save();
 
-    res.json(linkFor(job));
+    const base = resolveClientBaseUrl(req);
+    res.json(linkFor(job, base));
   } catch (e) {
     next(e);
   }
 });
 
-
-// ---------- GET JOB BY ID (for authenticated users) ----------
-router.get("/:id", async (req, res, next) => {
+router.post("/:id/ping-vendors", async (req, res, next) => {
   try {
     const { id } = req.params;
-    
-    if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ 
-        success: false,
-        message: "Invalid job ID" 
-      });
+    assertId(id);
+    const { vendorIds, message } = req.body || {};
+
+    if (!Array.isArray(vendorIds) || vendorIds.length === 0) {
+      return res.status(400).json({ message: "vendorIds array required" });
     }
 
-    const job = await Job.findById(id)
-      .populate("vendorId", "name phone city lat lng lastSeenAt")
-      .populate("customerId", "name email phone")
+    const job = await Job.findById(id).lean();
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    const validVendorIds = vendorIds
+      .map((value) => {
+        try {
+          return new mongoose.Types.ObjectId(String(value));
+        } catch (error) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    if (!validVendorIds.length) {
+      return res.status(400).json({ message: "No valid vendor ids provided" });
+    }
+
+    const vendors = await Vendor.find({
+      _id: { $in: validVendorIds },
+      phone: { $exists: true, $ne: null, $ne: "" },
+    })
+      .select("_id name phone")
       .lean();
 
-    if (!job) {
-      return res.status(404).json({ 
-        success: false,
-        message: "Job not found" 
-      });
+    if (!vendors.length) {
+      return res
+        .status(404)
+        .json({ message: "No vendors with contact information available" });
+    }
+
+    const baseMessage =
+      typeof message === "string" && message.trim().length
+        ? message.trim()
+        : `Job ${job.serviceType || ""} near ${job.pickupAddress || "customer"} needs assistance.`;
+
+    const results = [];
+    for (const vendor of vendors) {
+      try {
+        const body = `${baseMessage}
+Status: ${job.status || "Unassigned"}
+Respond in the ServiceOps vendor portal if available.`;
+        const { ok, queuedId } = await notifySMS(vendor.phone, body, job._id);
+        results.push({
+          vendorId: vendor._id,
+          ok: Boolean(ok),
+          queuedId: queuedId || null,
+        });
+      } catch (error) {
+        results.push({
+          vendorId: vendor._id,
+          ok: false,
+          error: error?.message || "Failed to notify vendor",
+        });
+      }
     }
 
     res.json({
-      success: true,
-      job: {
-        _id: job._id,
-        status: job.status,
-        serviceType: job.serviceType,
-        pickupAddress: job.pickupAddress,
-        dropoffAddress: job.dropoffAddress || "",
-        quotedPrice: job.quotedPrice || 0,
-        created: job.createdAt || job.created,
-        completed: job.completed || null,
-        biddingOpen: !!job.biddingOpen,
-        bidMode: job.bidMode || "open",
-        notes: job.notes || "",
-        priority: job.priority || "normal",
-        customer: job.customerId ? {
-          _id: job.customerId._id,
-          name: job.customerId.name,
-          email: job.customerId.email,
-          phone: job.customerId.phone
-        } : null
-      },
-      vendor: job.vendorId ? {
-        _id: job.vendorId._id,
-        name: job.vendorId.name,
-        city: job.vendorId.city,
-        phone: job.vendorId.phone,
-        lat: job.vendorId.lat,
-        lng: job.vendorId.lng,
-        lastSeenAt: job.vendorId.lastSeenAt
-      } : null
+      ok: true,
+      count: results.length,
+      results,
     });
   } catch (error) {
-    console.error("Error fetching job details:", error);
-    res.status(500).json({ 
-      success: false,
-      message: "Internal server error" 
-    });
+    next(error);
   }
 });
 
 export default router;
-
-
-
-
-
-
 
 

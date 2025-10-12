@@ -3,7 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
-import { deriveCustomerCoordinates, deriveDropoffCoordinates, deriveDriverCoordinates } from "../utils/geo";
+import {
+  deriveCustomerCoordinates,
+  deriveDropoffCoordinates,
+  deriveDriverCoordinates,
+  distanceBetweenPointsKm,
+} from "../utils/geo";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
@@ -11,6 +16,15 @@ import "./GuestJobTracker.css";
 
 const REFRESH_MS = 10000;
 const STEPS = ["Unassigned", "Assigned", "OnTheWay", "Arrived", "Completed"];
+const KM_TO_MI = 0.621371;
+
+const formatDistanceLabel = (km) => {
+  if (!Number.isFinite(km)) return null;
+  if (km < 0.2) return `${Math.round(km * 1000)} meters`;
+  const miles = km * KM_TO_MI;
+  if (miles < 10) return `${miles.toFixed(1)} miles`;
+  return `${Math.round(miles)} miles`;
+};
 
 export default function GuestJobTracker() {
   const { jobToken } = useParams();
@@ -162,6 +176,18 @@ export default function GuestJobTracker() {
 
   const fallbackDestination = customerCoordinates || dropoffCoordinates || null;
 
+  const primaryDriverPosition = useMemo(() => {
+    if (driverMarkers.length === 0) return null;
+    const primary = driverMarkers[0];
+    if (
+      Number.isFinite(primary.lat) &&
+      Number.isFinite(primary.lng)
+    ) {
+      return { lat: primary.lat, lng: primary.lng };
+    }
+    return null;
+  }, [driverMarkers]);
+
   const mapCenter = useMemo(() => {
     if (routeDestination?.position) return routeDestination.position;
     if (driverMarkers.length > 0) {
@@ -174,6 +200,27 @@ export default function GuestJobTracker() {
   }, [driverMarkers, routeDestination, fallbackDestination]);
 
   const canShowRoute = driverMarkers.length > 0 && Boolean(routeDestination?.position);
+
+  const routeDistanceKm = useMemo(() => {
+    if (!primaryDriverPosition || !routeDestination?.position) return null;
+    return distanceBetweenPointsKm(
+      primaryDriverPosition,
+      routeDestination.position
+    );
+  }, [primaryDriverPosition, routeDestination]);
+
+  const routeDistanceMeters = useMemo(() => {
+    if (!Number.isFinite(routeDistanceKm)) return null;
+    return routeDistanceKm * 1000;
+  }, [routeDistanceKm]);
+
+  const routeDistanceLabel = useMemo(
+    () => formatDistanceLabel(routeDistanceKm),
+    [routeDistanceKm]
+  );
+
+  const destinationRoleLabel =
+    routeDestination?.role === "customer" ? "customer" : "destination";
 
 
 if (loading) {
@@ -286,12 +333,19 @@ if (loading) {
                 drivers={driverMarkers}
                 autoFit
                 center={mapCenter ? [mapCenter.lat, mapCenter.lng] : [6.5244, 3.3792]}
-                destination={fallbackDestination}
+                destination={routeDestination?.position || fallbackDestination}
+                showRoute={canShowRoute}
+                routeDistanceMeters={routeDistanceMeters}
               />
               <p className="muted tiny">
-                Add a Google Maps key for routing. Showing driver position only.
+                Route preview uses open-map data and reflects the latest driver update.
               </p>
             </>
+          )}
+          {routeDistanceLabel && (
+            <p className="muted tiny">
+              Distance to {destinationRoleLabel}: {routeDistanceLabel}
+            </p>
           )}
           <p className="muted tiny">
             Last updated: {vendor?.lastSeenAt ? new Date(vendor.lastSeenAt).toLocaleString() : "unknown"}
@@ -360,6 +414,7 @@ if (loading) {
     </div>
   );
 }
+
 
 
 

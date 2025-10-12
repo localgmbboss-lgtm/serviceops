@@ -2,7 +2,6 @@ import { Router } from "express";
 import Payment from "../models/Payment.js";
 import Expense from "../models/Expense.js";
 import Job from "../models/Jobs.js";
-import Driver from "../models/Driver.js";
 import Vendor from "../models/Vendor.js";
 import Settings from "../models/Settings.js";
 
@@ -30,8 +29,7 @@ const normalizeSplit = (raw, fallback) => {
   return Math.min(1, Math.max(0, num / 100));
 };
 
-const inferCity = ({ job, driver, vendor }) => {
-  if (driver?.city) return driver.city;
+const inferCity = ({ job, vendor }) => {
   if (vendor?.city) return vendor.city;
   if (typeof job?.pickupAddress === "string") {
     const [first] = job.pickupAddress.split(",");
@@ -67,31 +65,20 @@ router.get("/", async (req, res, next) => {
 
     const jobs = jobIds.length
       ? await Job.find({ _id: { $in: jobIds } })
-          .select("driverId vendorId pickupAddress")
+          .select("vendorId pickupAddress")
           .lean()
       : [];
 
-    const driverIds = [
-      ...new Set(jobs.map((j) => (j.driverId ? String(j.driverId) : null)).filter(Boolean)),
-    ];
     const vendorIds = [
       ...new Set(jobs.map((j) => (j.vendorId ? String(j.vendorId) : null)).filter(Boolean)),
     ];
 
-    const [drivers, vendors] = await Promise.all([
-      driverIds.length
-        ? Driver.find({ _id: { $in: driverIds } })
-            .select("name city earningsSplit")
-            .lean()
-        : [],
-      vendorIds.length
-        ? Vendor.find({ _id: { $in: vendorIds } })
-            .select("name city earningsSplit")
-            .lean()
-        : [],
-    ]);
+    const vendors = vendorIds.length
+      ? await Vendor.find({ _id: { $in: vendorIds } })
+          .select("name city earningsSplit updatesPaused active")
+          .lean()
+      : [];
 
-    const driverMap = new Map(drivers.map((d) => [String(d._id), d]));
     const vendorMap = new Map(vendors.map((v) => [String(v._id), v]));
     const jobMap = new Map(jobs.map((j) => [String(j._id), j]));
 
@@ -110,34 +97,32 @@ router.get("/", async (req, res, next) => {
       0.6
     );
 
-    const driverTotals = new Map();
+    const vendorTotals = new Map();
     const cityTotals = new Map();
     let payoutsTotal = 0;
 
     totalsByJob.forEach((amount, jobId) => {
       const job = jobMap.get(jobId) || null;
-      const driverId = job?.driverId ? String(job.driverId) : null;
       const vendorId = job?.vendorId ? String(job.vendorId) : null;
-      const driver = driverId ? driverMap.get(driverId) : null;
       const vendor = vendorId ? vendorMap.get(vendorId) : null;
 
       const split = normalizeSplit(
-        driver?.earningsSplit ?? vendor?.earningsSplit,
+        vendor?.earningsSplit,
         defaultSplit
       );
             const owed = amount * split;
             payoutsTotal += owed;
 
-      const key = driverId || (vendorId ? `vendor:${vendorId}` : "unassigned");
-      if (!driverTotals.has(key)) {
-        driverTotals.set(key, {
-          driverId: driverId || vendorId || "unassigned",
-          name: driver?.name || vendor?.name || "Unassigned",
-          city: inferCity({ job, driver, vendor }),
+      const key = vendorId || "unassigned";
+      if (!vendorTotals.has(key)) {
+        vendorTotals.set(key, {
+          vendorId: vendorId || "unassigned",
+          name: vendor?.name || job?.vendorName || "Unassigned",
+          city: inferCity({ job, vendor }),
           amount: 0,
         });
       }
-      const entry = driverTotals.get(key);
+      const entry = vendorTotals.get(key);
             entry.amount += owed;
 
       const city = entry.city || "-";
@@ -154,7 +139,7 @@ router.get("/", async (req, res, next) => {
       revenue: { total: toCurrency(revenueTotal) },
       payouts: {
         total: toCurrency(payoutsTotal),
-        byDriver: Array.from(driverTotals.values()).sort(
+        byVendor: Array.from(vendorTotals.values()).sort(
           (a, b) => b.amount - a.amount
         ),
       },

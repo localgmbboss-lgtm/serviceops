@@ -1,6 +1,6 @@
 import { Router } from "express";
 import Job from "../models/Jobs.js";
-import Driver from "../models/Driver.js";
+import Vendor from "../models/Vendor.js";
 import Feedback from "../models/Feedback.js";
 
 const router = Router();
@@ -39,7 +39,7 @@ router.get("/summary", async (_req, res, next) => {
 /**
  * GET /api/reports/range
  * Query: from=YYYY-MM-DD, to=YYYY-MM-DD, service?, city?
- * Returns: { from, to, totals, byService, byCity, topDrivers, satisfaction }
+ * Returns: { from, to, totals, byService, byCity, topVendors, satisfaction }
  */
 router.get("/range", async (req, res, next) => {
   try {
@@ -52,26 +52,26 @@ router.get("/range", async (req, res, next) => {
     const match = { created: { $gte: from, $lte: to } };
     if (service) match.serviceType = service;
 
-    // Base pipeline with optional city filter via driver lookup
+    // Base pipeline with optional city filter via vendor lookup
     const pipeline = [
       { $match: match },
       {
         $lookup: {
-          from: "drivers",
-          localField: "driverId",
+          from: "vendors",
+          localField: "vendorId",
           foreignField: "_id",
-          as: "driver",
+          as: "vendor",
         },
       },
-      { $unwind: { path: "$driver", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$vendor", preserveNullAndEmptyArrays: true } },
     ];
-    if (city) pipeline.push({ $match: { "driver.city": city } });
+    if (city) pipeline.push({ $match: { "vendor.city": city } });
     pipeline.push({
       $project: {
         status: 1,
         serviceType: 1,
         quotedPrice: 1,
-        driverCity: "$driver.city",
+        vendorCity: "$vendor.city",
       },
     });
 
@@ -91,16 +91,16 @@ router.get("/range", async (req, res, next) => {
 
     const byCity = {};
     for (const j of jobs) {
-      const k = j.driverCity || "-";
+      const k = j.vendorCity || "-";
       byCity[k] = (byCity[k] || 0) + 1;
     }
 
-    // Top drivers by completed & revenue
-    const topDrivers = await Job.aggregate([
+    // Top vendors by completed & revenue
+    const topVendors = await Job.aggregate([
       { $match: { ...match, status: "Completed" } },
       {
         $group: {
-          _id: "$driverId",
+          _id: "$vendorId",
           jobs: { $sum: 1 },
           revenue: { $sum: { $ifNull: ["$quotedPrice", 0] } },
         },
@@ -109,19 +109,19 @@ router.get("/range", async (req, res, next) => {
       { $limit: 5 },
       {
         $lookup: {
-          from: "drivers",
+          from: "vendors",
           localField: "_id",
           foreignField: "_id",
-          as: "driver",
+          as: "vendor",
         },
       },
-      { $unwind: { path: "$driver", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$vendor", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 0,
-          driverId: "$_id",
-          name: "$driver.name",
-          city: "$driver.city",
+          vendorId: "$_id",
+          name: "$vendor.name",
+          city: "$vendor.city",
           jobs: 1,
           revenue: 1,
         },
@@ -138,7 +138,7 @@ router.get("/range", async (req, res, next) => {
       private: fb.filter((x) => x.rating < 5).length,
     };
 
-    res.json({ from, to, totals, byService, byCity, topDrivers, satisfaction });
+    res.json({ from, to, totals, byService, byCity, topVendors, satisfaction });
   } catch (e) {
     next(e);
   }
@@ -188,16 +188,16 @@ router.get("/dashboard", async (_req, res, next) => {
       { $match: { created: { $gte: trendFrom, $lte: now } } },
       {
         $lookup: {
-          from: "drivers",
-          localField: "driverId",
+          from: "vendors",
+          localField: "vendorId",
           foreignField: "_id",
-          as: "driver",
+          as: "vendor",
         },
       },
-      { $unwind: { path: "$driver", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$vendor", preserveNullAndEmptyArrays: true } },
       {
         $group: {
-          _id: { day: dayFmt, city: "$driver.city" },
+          _id: { day: dayFmt, city: "$vendor.city" },
           count: { $sum: 1 },
         },
       },
@@ -236,7 +236,7 @@ router.get("/dashboard", async (_req, res, next) => {
       },
       {
         $group: {
-          _id: "$driverId",
+          _id: "$vendorId",
           jobs: { $sum: 1 },
           revenue: { $sum: { $ifNull: ["$quotedPrice", 0] } },
         },
@@ -245,19 +245,19 @@ router.get("/dashboard", async (_req, res, next) => {
       { $limit: 5 },
       {
         $lookup: {
-          from: "drivers",
+          from: "vendors",
           localField: "_id",
           foreignField: "_id",
-          as: "driver",
+          as: "vendor",
         },
       },
-      { $unwind: { path: "$driver", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$vendor", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 0,
-          driverId: "$_id",
-          name: "$driver.name",
-          city: "$driver.city",
+          vendorId: "$_id",
+          name: "$vendor.name",
+          city: "$vendor.city",
           jobs: 1,
           revenue: 1,
         },

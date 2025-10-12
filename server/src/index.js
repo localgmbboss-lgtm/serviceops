@@ -2,9 +2,10 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { createServer } from "http";
 import { connectDB } from "./lib/db.js";
+import { initRealtime } from "./realtime/index.js";
 
-import drivers from "./routes/drivers.js";
 import jobs from "./routes/jobs.js";
 import customers from "./routes/customers.js";
 import feedback from "./routes/feedback.js";
@@ -22,6 +23,7 @@ import outbox from "./routes/outbox.js";
 import vendorAuth from "./routes/vendorAuth.js";
 import vendorFeed from "./routes/vendorFeed.js";
 import vendorPortal from "./routes/vendorPortal.js";
+import vendorDocuments from "./routes/vendorDocuments.js";
 import customerAuth from "./routes/customerAuth.js";
 import adminAuth from "./routes/adminAuth.js";
 import vendors from "./routes/vendors.js";
@@ -29,6 +31,7 @@ import vendors from "./routes/vendors.js";
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration -----------------------------------------------------
@@ -66,9 +69,11 @@ const allowedOrigins = new Set([
   ...configuredOrigins,
 ]);
 
+const allowAllOrigins = process.env.CORS_ALLOW_ALL === "true";
+
 const corsOptions = {
   origin: (origin, cb) => {
-    if (process.env.CORS_ALLOW_ALL === "true") return cb(null, true);
+    if (allowAllOrigins) return cb(null, true);
 
     const normalizedOrigin = normalizeOrigin(origin);
 
@@ -105,13 +110,13 @@ app.use(express.json());
 app.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 app.use("/api/documents", documents);
 app.use("/api/settings", settings);
-app.use("/api/drivers", drivers);
 app.use("/api/jobs", jobs);
 app.use("/api/customers", customers);
 app.use("/api/feedback", feedback);
 app.use("/api/reports", reports);
 app.use("/api/financials", financials);
 app.use("/api/expenses", expenses);
+app.use("/api/vendor/documents", vendorDocuments);
 app.use("/api/vendor", vendorRouter);
 app.use("/api/admin/auth", adminAuth);
 app.use("/api/admin", admin);
@@ -135,7 +140,14 @@ app.use((err, _req, res, _next) => {
 
 (async () => {
   await connectDB(process.env.MONGO_URI);
-  app.listen(PORT, () => {
+
+  const realtime = initRealtime(httpServer, {
+    allowedOrigins: [...allowedOrigins],
+    allowAllOrigins,
+  });
+  app.locals.io = realtime;
+
+  httpServer.listen(PORT, () => {
     const env = process.env.NODE_ENV || "development";
     console.log(`API listening on port ${PORT} (env: ${env})`);
 
@@ -149,3 +161,12 @@ app.use((err, _req, res, _next) => {
     }
   });
 })();
+
+
+
+
+
+
+
+
+

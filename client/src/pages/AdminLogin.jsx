@@ -5,8 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import "./AdminLogin.css";
 
 export default function AdminLogin() {
-  const DEFAULT_ADMIN = { email: "admin@serviceops.dev", password: "Admin#1234" };
-  const [form, setForm] = useState({ ...DEFAULT_ADMIN });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -54,9 +53,6 @@ export default function AdminLogin() {
         <p className="admin-login-subtitle">
           Access the dispatch dashboard with your admin credentials.
         </p>
-        <div className="admin-login-hint">
-          <strong>Demo credentials</strong>: {DEFAULT_ADMIN.email} / {DEFAULT_ADMIN.password}
-        </div>
 
         {error && <div className="admin-login-alert">{error}</div>}
         {success && (
@@ -102,9 +98,3 @@ export default function AdminLogin() {
     </div>
   );
 }
-
-
-
-
-
-

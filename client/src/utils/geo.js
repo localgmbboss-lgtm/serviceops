@@ -1,3 +1,6 @@
+// utils/geo.js
+// Helper utilities to pick coordinates from messy objects and normalize them.
+
 const toFiniteNumber = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const num = typeof value === "number" ? value : Number(value);
@@ -27,6 +30,7 @@ const coordinateFromPaths = (source, latPaths, lngPaths) => {
   return lat !== null && lng !== null ? { lat, lng } : null;
 };
 
+// --- Customer coordinate candidate paths
 const CUSTOMER_LAT_PATHS = [
   ["pickupLat"],
   ["pickup", "lat"],
@@ -51,6 +55,7 @@ const CUSTOMER_LNG_PATHS = [
   ["customer", "lng"],
 ];
 
+// --- Dropoff coordinate candidate paths
 const DROPOFF_LAT_PATHS = [
   ["dropoffLat"],
   ["dropoff", "lat"],
@@ -69,6 +74,30 @@ const DROPOFF_LNG_PATHS = [
   ["dropoffCoordinates", "lng"],
 ];
 
+// --- Vendor coordinate candidate paths
+const VENDOR_LAT_PATHS = [
+  ["lat"],
+  ["latitude"],
+  ["currentLat"],
+  ["position", "lat"],
+  ["location", "lat"],
+  ["coords", "lat"],
+  ["coordinate", "lat"],
+];
+
+const VENDOR_LNG_PATHS = [
+  ["lng"],
+  ["lon"],
+  ["long"],
+  ["longitude"],
+  ["currentLng"],
+  ["position", "lng"],
+  ["location", "lng"],
+  ["coords", "lng"],
+  ["coordinate", "lng"],
+];
+
+// --- Driver-specific candidate paths (robust)
 const DRIVER_LAT_PATHS = [
   ["lat"],
   ["latitude"],
@@ -77,6 +106,9 @@ const DRIVER_LAT_PATHS = [
   ["location", "lat"],
   ["coords", "lat"],
   ["coordinate", "lat"],
+  ["vehicleLocation", "lat"],
+  ["currentLocation", "lat"],
+  ["lastKnownLocation", "lat"],
 ];
 
 const DRIVER_LNG_PATHS = [
@@ -89,15 +121,65 @@ const DRIVER_LNG_PATHS = [
   ["location", "lng"],
   ["coords", "lng"],
   ["coordinate", "lng"],
+  ["vehicleLocation", "lng"],
+  ["currentLocation", "lng"],
+  ["lastKnownLocation", "lng"],
 ];
 
+// Exposed helpers - use coordinateFromPaths with the candidate lists:
 export const deriveCustomerCoordinates = (job) =>
   coordinateFromPaths(job, CUSTOMER_LAT_PATHS, CUSTOMER_LNG_PATHS);
 
 export const deriveDropoffCoordinates = (job) =>
   coordinateFromPaths(job, DROPOFF_LAT_PATHS, DROPOFF_LNG_PATHS);
 
+export const deriveVendorCoordinates = (vendor) =>
+  coordinateFromPaths(vendor, VENDOR_LAT_PATHS, VENDOR_LNG_PATHS);
+
+// NEW: deriveDriverCoordinates: explicit driver paths (safer than aliasing)
 export const deriveDriverCoordinates = (driver) =>
   coordinateFromPaths(driver, DRIVER_LAT_PATHS, DRIVER_LNG_PATHS);
 
+// keep numeric helper exported
 export { toFiniteNumber };
+
+const EARTH_RADIUS_KM = 6371;
+
+export const haversineKm = (lat1, lng1, lat2, lng2) => {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  if (
+    [lat1, lng1, lat2, lng2].some(
+      (value) => value === null || value === undefined || Number.isNaN(value)
+    )
+  ) {
+    return null;
+  }
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return EARTH_RADIUS_KM * c;
+};
+
+export const distanceBetweenPointsKm = (origin, destination) => {
+  if (!origin || !destination) return null;
+  const lat1 = toFiniteNumber(origin.lat);
+  const lng1 = toFiniteNumber(origin.lng);
+  const lat2 = toFiniteNumber(destination.lat);
+  const lng2 = toFiniteNumber(destination.lng);
+  if (
+    lat1 === null ||
+    lng1 === null ||
+    lat2 === null ||
+    lng2 === null
+  ) {
+    return null;
+  }
+  const km = haversineKm(lat1, lng1, lat2, lng2);
+  return Number.isFinite(km) ? km : null;
+};
