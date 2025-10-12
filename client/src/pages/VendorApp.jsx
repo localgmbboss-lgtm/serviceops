@@ -143,6 +143,7 @@ export default function VendorApp() {
   const openJobsInitializedRef = useRef(false);
   const assignedSnapshotRef = useRef(new Map());
   const assignedInitializedRef = useRef(false);
+  const alertsSnapshotRef = useRef(new Set());
   const [geoPromptDismissed, setGeoPromptDismissed] = useState(() => {
     if (typeof window === "undefined") return false;
     try {
@@ -157,6 +158,8 @@ export default function VendorApp() {
   const [assignedPage, setAssignedPage] = useState(0);
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [noteTranslations, setNoteTranslations] = useState({});
+  const [requestingLocation, setRequestingLocation] = useState(false);
+  const [locationError, setLocationError] = useState("");
 
   const handleToggleNoteLanguage = async (event, job) => {
     event?.stopPropagation?.();
@@ -247,8 +250,14 @@ export default function VendorApp() {
         `/api/vendor/feed/open${cityFilter ? "?city=1" : ""}`
       );
       const assignedReq = vendorApi.get("/api/vendor/feed/assigned");
+      const alertsReq = vendorApi.get("/api/vendor/feed/alerts");
 
-      const [m, o, a] = await Promise.all([meReq, openReq, assignedReq]);
+      const [m, o, a, alertsResp] = await Promise.all([
+        meReq,
+        openReq,
+        assignedReq,
+        alertsReq,
+      ]);
 
       const vendorProfile = m?.data?.vendor || {};
       const vendorLat = toFiniteNumber(vendorProfile.lat);
@@ -258,6 +267,44 @@ export default function VendorApp() {
       setOpenJobs(enrichJobsWithDistance(o.data || [], vendorLat, vendorLng));
       setAssigned(enrichJobsWithDistance(a.data || [], vendorLat, vendorLng));
       setLastUpdated(new Date());
+
+      const alerts = Array.isArray(alertsResp?.data) ? alertsResp.data : [];
+      if (alerts.length > 0) {
+        alerts.forEach((alert) => {
+          if (!alert || typeof alert !== "object") return;
+          const alertId =
+            alert.id || alert._id || alert.meta?.dedupeKey || null;
+          if (!alertId) return;
+          if (alertsSnapshotRef.current.has(alertId)) return;
+          alertsSnapshotRef.current.add(alertId);
+          if (alertsSnapshotRef.current.size > 200) {
+            const trimmed = Array.from(alertsSnapshotRef.current).slice(-120);
+            alertsSnapshotRef.current = new Set(trimmed);
+          }
+
+          const meta =
+            alert.meta && typeof alert.meta === "object"
+              ? { ...alert.meta }
+              : {};
+          if (!meta.role) meta.role = "vendor";
+          if (!meta.kind) meta.kind = "ping";
+          if (!meta.route) meta.route = "/vendor/app";
+          if (!meta.jobId && alert.jobId) meta.jobId = alert.jobId;
+
+          publish({
+            id: alertId,
+            title: alert.title || "Dispatch alert",
+            body: alert.body || "",
+            severity: alert.severity || "info",
+            createdAt: alert.createdAt || new Date().toISOString(),
+            meta,
+            dedupeKey:
+              typeof meta.dedupeKey === "string"
+                ? meta.dedupeKey
+                : `vendor:alert:${alertId}`,
+          });
+        });
+      }
     } catch (e) {
       const status = e?.response?.status;
       const msg = e?.response?.data?.message || "Failed to load vendor feed";
@@ -508,6 +555,46 @@ export default function VendorApp() {
     toFiniteNumber(me?.lat) !== null && toFiniteNumber(me?.lng) !== null;
   const showGeoPrompt = !hasGeo && !geoPromptDismissed;
 
+  const requestLocationAccess = () => {
+    if (requestingLocation) return;
+    setLocationError("");
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationError("Location access is not supported in this browser.");
+      return;
+    }
+    setRequestingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = Number(position.coords.latitude.toFixed(6));
+        const lng = Number(position.coords.longitude.toFixed(6));
+        try {
+          await vendorApi.patch("/api/vendor/auth/profile", {
+            lat,
+            lng,
+          });
+          setLocationError("");
+          await load();
+        } catch (error) {
+          setLocationError(
+            error?.response?.data?.message ||
+              error?.message ||
+              "We couldn't save your location. Try again."
+          );
+        } finally {
+          setRequestingLocation(false);
+        }
+      },
+      (error) => {
+        setLocationError(
+          error?.message ||
+            "We couldn't read your location. Check your permission settings and try again."
+        );
+        setRequestingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    );
+  };
+
   useEffect(() => {
     if (!hasGeo) {
       return;
@@ -535,6 +622,7 @@ export default function VendorApp() {
 
   const dismissGeoPrompt = () => {
     setGeoPromptDismissed(true);
+    setLocationError("");
     if (typeof window !== "undefined") {
       try {
         window.localStorage.setItem(GEO_PROMPT_STORAGE_KEY, "1");
@@ -621,6 +709,9 @@ export default function VendorApp() {
         lastSyncLabel={lastSyncLabel}
         showGeoPrompt={showGeoPrompt}
         onDismissGeoPrompt={dismissGeoPrompt}
+        onRequestLocation={requestLocationAccess}
+        requestingLocation={requestingLocation}
+        locationError={locationError}
         autoRefresh={autoRefresh}
         onToggleAutoRefresh={setAutoRefresh}
         cityFilter={cityFilter}

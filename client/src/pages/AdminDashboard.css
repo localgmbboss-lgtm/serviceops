@@ -409,6 +409,14 @@
   background: transparent;
 }
 
+.admindash .trends-card .legend {
+  color: rgba(203, 213, 225, 0.9);
+}
+
+.admindash .trends-card .muted {
+  color: rgba(148, 163, 184, 0.85);
+}
+
 .admindash .chart-canvas {
   width: 100%;
   height: var(--chart-h);
@@ -436,6 +444,10 @@
 
 .admindash .dot.green {
   background: var(--color-success)
+}
+
+.admindash .dot.blue {
+  background: #2563eb
 }
 
 .admindash .dot.gray {

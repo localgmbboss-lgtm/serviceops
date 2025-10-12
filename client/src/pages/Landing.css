@@ -1101,8 +1101,15 @@
         grid-template-columns: 1fr;
     }
 
+    .hero-left {
+        order: 1;
+    }
+
     .hero-right--ride {
-        display: none;
+        order: 2;
+        display: flex;
+        width: 100%;
+        margin-top: 16px;
     }
 
     .hero-form {
@@ -1130,7 +1137,8 @@
     }
 
     .hero-field__suffix {
-        display: none;
+        display: inline-flex;
+        margin-left: 4px;
     }
 }
 .landing {

@@ -6,6 +6,7 @@ import Bid from "../models/Bid.js";
 import Vendor from "../models/Vendor.js";
 import { refreshVendorCompliance } from "../lib/compliance.js";
 import { requireVendorAuth } from "./vendorAuth.js";
+import VendorNotification from "../models/VendorNotification.js";
 
 const router = Router();
 
@@ -248,6 +249,47 @@ router.get("/assigned", requireVendorAuth, async (req, res, next) => {
   }));
 
   res.json(jobsWithDistance);
+});
+
+router.get("/alerts", requireVendorAuth, async (req, res, next) => {
+  try {
+    const limitRaw = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(Math.max(limitRaw, 1), 50)
+      : 20;
+
+    const alerts = await VendorNotification.find({
+      vendorId: req.vendorId,
+      read: { $ne: true },
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    if (alerts.length > 0) {
+      const ids = alerts.map((doc) => doc._id);
+      await VendorNotification.updateMany(
+        { _id: { $in: ids }, read: { $ne: true } },
+        { $set: { read: true, readAt: new Date() } }
+      );
+    }
+
+    res.json(
+      alerts.map((doc) => ({
+        id: doc._id.toString(),
+        jobId: doc.jobId ? doc.jobId.toString() : null,
+        title: doc.title,
+        body: doc.body,
+        severity: doc.severity || "info",
+        source: doc.source || "system",
+        createdAt: doc.createdAt,
+        meta: doc.meta || {},
+        read: false,
+      }))
+    );
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.patch(

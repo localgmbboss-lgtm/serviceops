@@ -6,6 +6,9 @@ export default function VendorHeroHeader({
   lastSyncLabel,
   showGeoPrompt,
   onDismissGeoPrompt,
+  onRequestLocation,
+  requestingLocation,
+  locationError,
   autoRefresh,
   onToggleAutoRefresh,
   cityFilter,
@@ -23,16 +26,38 @@ export default function VendorHeroHeader({
         {showGeoPrompt && (
           <div className="va-alert info va-alert--dismissible" role="status">
             <div className="va-alert__body">
-              Add your location in the vendor profile to unlock distance-based
-              estimates.
+              <strong>Enable location</strong> to unlock distance estimates,
+              smarter ETAs, and nearby job sorting.
+              {locationError ? (
+                <p className="va-alert__caption" role="alert">
+                  {locationError}
+                </p>
+              ) : (
+                <p className="va-alert__caption">
+                  We only store your base coordinates to improve dispatch
+                  matching.
+                </p>
+              )}
             </div>
-            <button
-              type="button"
-              className="va-alert__dismiss"
-              onClick={onDismissGeoPrompt}
-            >
-              Cancel
-            </button>
+            <div className="va-alert__actions">
+              {onRequestLocation ? (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={onRequestLocation}
+                  disabled={requestingLocation}
+                >
+                  {requestingLocation ? "Requesting..." : "Enable location"}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="va-alert__dismiss"
+                onClick={onDismissGeoPrompt}
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -67,6 +92,9 @@ VendorHeroHeader.propTypes = {
   lastSyncLabel: PropTypes.string.isRequired,
   showGeoPrompt: PropTypes.bool,
   onDismissGeoPrompt: PropTypes.func,
+  onRequestLocation: PropTypes.func,
+  requestingLocation: PropTypes.bool,
+  locationError: PropTypes.string,
   autoRefresh: PropTypes.bool,
   onToggleAutoRefresh: PropTypes.func,
   cityFilter: PropTypes.bool,
@@ -77,6 +105,9 @@ VendorHeroHeader.defaultProps = {
   vendorName: "",
   showGeoPrompt: false,
   onDismissGeoPrompt: undefined,
+  onRequestLocation: undefined,
+  requestingLocation: false,
+  locationError: "",
   autoRefresh: true,
   onToggleAutoRefresh: undefined,
   cityFilter: false,
