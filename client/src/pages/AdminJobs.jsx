@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import JobTable from "../components/JobTable";
 import JobCreate from "../components/JobCreate";
@@ -10,6 +11,7 @@ import "./AdminJobs.css";
 const STATUSES = ["Unassigned", "Assigned", "OnTheWay", "Arrived", "Completed"];
 
 export default function AdminJobs() {
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [banner, setBanner] = useState("");
   const [toast, setToast] = useState("");
@@ -298,6 +300,14 @@ export default function AdminJobs() {
     }
   };
 
+  const handleViewJob = useCallback(
+    (job) => {
+      if (!job?._id) return;
+      navigate(`/jobs/${job._id}`);
+    },
+    [navigate]
+  );
+
   return (
     <div className="admin-jobs-container" aria-busy={loading}>
       {banner && (
@@ -446,11 +456,11 @@ export default function AdminJobs() {
             <div className="admin-jobs-scroll-x">
               <JobTable
                 jobs={filteredJobs}
-                drivers={[]}
                 onUpdateJob={onUpdateJob}
                 soloMode={soloMode}
                 onOpenBidding={onOpenBidding}
                 onShowLinks={onShowLinks}
+                onViewJob={handleViewJob}
               />
             </div>
           </div>

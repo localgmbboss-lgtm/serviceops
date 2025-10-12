@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   PiSteeringWheelBold,
   PiWrenchBold,
@@ -9,6 +10,10 @@ import {
   PiPhoneCallBold,
   PiStarBold,
   PiToolboxBold,
+  PiLightningBold,
+  PiMapPinBold,
+  PiNavigationArrowBold,
+  PiHandshakeBold,
 } from "react-icons/pi";
 import { loadGoogleMaps } from "../lib/loadGoogleMaps";
 import img1 from "../images/img1.jpg";
@@ -26,12 +31,6 @@ const aboutParagraphs = [
   "Transparent pricing, live updates, and digital paperwork every step of the way.",
   "Same-day vendor payouts with digital invoicing and status tracking that closes every loop.",
   "Dedicated escalation desk and recovery specialists on-call whenever a job needs extra muscle.",
-];
-
-const aboutHighlights = [
-  "Statewide coverage with on-demand vendor bench strength.",
-  "Light, medium, and heavy-duty rigs staged for rapid dispatch.",
-  "Digital paperwork, photos, and signatures synced to your portal.",
 ];
 
 const aboutStats = [
@@ -86,6 +85,8 @@ const aboutSpotlights = [
       "Bench vendors auto-notified if the closest unit declines.",
       "Ops desk escalates the job at the 90-second mark.",
     ],
+    image: img4,
+    imageAlt: "Dispatcher coordinating tow assignments from the command desk",
   },
   {
     id: "quality",
@@ -99,6 +100,8 @@ const aboutSpotlights = [
       "Operators upload hook-up and drop-off photos before closing.",
       "Claims workflow triggers instantly if anything looks off.",
     ],
+    image: img5,
+    imageAlt: "Tow operator documenting a vehicle prior to transport",
   },
   {
     id: "visibility",
@@ -112,6 +115,8 @@ const aboutSpotlights = [
       "Customer status pages refresh with ETAs every 30 seconds.",
       "SMS, email, and portal alerts mirror the same timeline.",
     ],
+    image: img6,
+    imageAlt: "Live tracking map displayed inside the ServiceOps office",
   },
 ];
 
@@ -120,26 +125,30 @@ const playbookSteps = [
     title: "Rapid intake",
     caption:
       "Digital intake captures location, vehicle, and photos in under 60 seconds.",
+    icon: PiLightningBold,
   },
   {
     title: "Smart match",
     caption:
       "We ping the closest certified unit with the right rig and recovery tools.",
+    icon: PiNavigationArrowBold,
   },
   {
     title: "Live tracking",
     caption:
       "Customers and fleets follow the truck on the map with ETA pushes.",
+    icon: PiMapPinBold,
   },
   {
     title: "Secure hand-off",
     caption:
       "Driver confirms delivery, uploads photos, and the ops desk closes the ticket.",
+    icon: PiHandshakeBold,
   },
 ];
 
 const galleryImages = [
-  { src: img1, alt: "Titan Tow Force operator securing a vehicle" },
+  { src: img1, alt: "ServiceOps operator securing a vehicle" },
   { src: img2, alt: "Tow truck staged for a highway recovery" },
   { src: img3, alt: "Roadside assistance preparing equipment" },
   { src: img4, alt: "Heavy-duty tow on a commercial rig" },
@@ -242,7 +251,7 @@ export default function Landing() {
     if (typeof window === "undefined") return undefined;
     const timer = window.setInterval(() => {
       setActiveSpotlight((prev) => (prev + 1) % spotlightCount);
-    }, 6500);
+    }, 4000);
     return () => window.clearInterval(timer);
   }, [spotlightPaused, spotlightCount]);
 
@@ -269,6 +278,20 @@ export default function Landing() {
   };
 
   const locationIcon = useMemo(() => (hasGeoError ? "!" : "@"), [hasGeoError]);
+  const aboutTiles = useMemo(
+    () =>
+      aboutParagraphs.map((copy, idx) => ({
+        copy,
+        number: `0${idx + 1}`,
+        image: galleryImages[idx % galleryImages.length],
+      })),
+    []
+  );
+  const activeSpotlightImage = activeSpotlightItem?.image;
+  const activeSpotlightAlt = activeSpotlightItem?.imageAlt;
+  const revealTransition = { duration: 0.6, ease: [0.22, 1, 0.36, 1] };
+  const metricTransition = { duration: 0.35, ease: [0.22, 1, 0.36, 1] };
+  const bodyTransition = { duration: 0.4, ease: [0.22, 1, 0.36, 1] };
 
   return (
     <div className="landing">
@@ -293,7 +316,7 @@ export default function Landing() {
             Towing and roadside help, ready when you are
           </h1>
           <p className="hero-sub hero-sub--ride">
-            Titan Tow Force delivers fast dispatch, honest pricing, and
+            ServiceOps delivers fast dispatch, honest pricing, and
             certified operators across Castle Rock and the surrounding
             corridors.
           </p>
@@ -342,34 +365,75 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="landing-about card">
-        <div className="landing-about__intro">
+      <motion.section
+        className="landing-about card"
+        initial={{ opacity: 0, y: 32 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.25 }}
+        transition={revealTransition}
+      >
+        <motion.div
+          className="landing-about__intro"
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ ...revealTransition, delay: 0.05 }}
+        >
           <div className="landing-about__headline">
-            <span className="eyebrow">why drivers pick titan</span>
-            <h2>About Titan Tow Force</h2>
+            <span className="eyebrow">why drivers pick ServiceOps</span>
+            <h2>About ServiceOps</h2>
             <p className="muted">
               Built on honest pricing, dependable equipment, and a crew that
               treats every customer like family.
             </p>
           </div>
           {/* landing-about__meta removed to follow your request */}
-        </div>
+        </motion.div>
 
         <div className="landing-about__body">
-          <div className="landing-about__grid">
-            {aboutParagraphs.map((copy, idx) => (
-              <article key={idx} className="about-card">
-                <span className="about-card__number">0{idx + 1}</span>
-                <p>{copy}</p>
-              </article>
+          <motion.div
+            className="landing-about__grid"
+            initial={{ opacity: 0, y: 28 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ ...revealTransition, delay: 0.1 }}
+          >
+            {aboutTiles.map((tile, idx) => (
+              <motion.article
+                key={tile.number}
+                className="about-card"
+                initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{
+                  ...revealTransition,
+                  delay: 0.12 + idx * 0.08,
+                }}
+              >
+                <div className="about-card__media">
+                  <img
+                    src={tile.image.src}
+                    alt={tile.image.alt}
+                    loading="lazy"
+                  />
+                </div>
+                <div className="about-card__content">
+                  <span className="about-card__number">{tile.number}</span>
+                  <p>{tile.copy}</p>
+                </div>
+              </motion.article>
             ))}
-          </div>
-          <div
+          </motion.div>
+          <motion.div
             className="about-visual"
             onMouseEnter={() => setSpotlightPaused(true)}
             onMouseLeave={() => setSpotlightPaused(false)}
             onFocusCapture={() => setSpotlightPaused(true)}
             onBlurCapture={() => setSpotlightPaused(false)}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ ...revealTransition, delay: 0.18 }}
           >
             <div className="about-visual__pulse" aria-hidden="true" />
             <div
@@ -378,30 +442,63 @@ export default function Landing() {
               aria-live="polite"
               role="group"
             >
-              <div
-                key={activeSpotlightItem?.id || "spotlight"}
-                className="about-showcase__metric"
-              >
-                <span className="about-showcase__metric-value">
-                  {activeSpotlightItem?.metric}
-                </span>
-                <span className="about-showcase__metric-label">
-                  {activeSpotlightItem?.metricLabel}
-                </span>
-              </div>
-              <div className="about-showcase__body">
-                <h4>{activeSpotlightItem?.title}</h4>
-                <p>{activeSpotlightItem?.description}</p>
-                <ul className="about-showcase__list">
-                  {activeSpotlightItem?.bullets.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={`metric-${activeSpotlightItem?.id || "spotlight"}`}
+                  className="about-showcase__metric"
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={metricTransition}
+                >
+                  <span className="about-showcase__metric-value">
+                    {activeSpotlightItem?.metric}
+                  </span>
+                  <span className="about-showcase__metric-label">
+                    {activeSpotlightItem?.metricLabel}
+                  </span>
+                </motion.div>
+              </AnimatePresence>
+              <AnimatePresence mode="wait">
+                {activeSpotlightImage ? (
+                  <motion.figure
+                    key={`photo-${activeSpotlightItem?.id || "spotlight"}`}
+                    className="about-showcase__photo"
+                    initial={{ opacity: 0, scale: 0.94 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ ...revealTransition, duration: 0.5 }}
+                  >
+                    <img
+                      src={activeSpotlightImage}
+                      alt={activeSpotlightAlt || ""}
+                      loading="lazy"
+                    />
+                  </motion.figure>
+                ) : null}
+              </AnimatePresence>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={`body-${activeSpotlightItem?.id || "spotlight"}`}
+                  className="about-showcase__body"
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -18 }}
+                  transition={bodyTransition}
+                >
+                  <h4>{activeSpotlightItem?.title}</h4>
+                  <p>{activeSpotlightItem?.description}</p>
+                  <ul className="about-showcase__list">
+                    {activeSpotlightItem?.bullets.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </motion.div>
+              </AnimatePresence>
               <div
                 className="about-showcase__tabs"
                 role="tablist"
-                aria-label="Titan Tow Force highlights"
+                aria-label="ServiceOps highlights"
               >
                 {aboutSpotlights.map((item, idx) => (
                   <button
@@ -418,7 +515,7 @@ export default function Landing() {
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         <div className="landing-about__panel landing-about__panel--wide">
@@ -444,7 +541,14 @@ export default function Landing() {
                 <li key={step.title}>
                   <span className="about-step">{idx + 1}</span>
                   <div>
-                    <strong>{step.title}</strong>
+                    <strong className="about-step__headline">
+                      {step.icon ? (
+                        <span className="about-step__icon" aria-hidden="true">
+                          <step.icon />
+                        </span>
+                      ) : null}
+                      {step.title}
+                    </strong>
                     <p>{step.caption}</p>
                   </div>
                 </li>
@@ -482,24 +586,7 @@ export default function Landing() {
             </div>
           </div>
         </div>
-      </section>
-
-      <section className="landing-gallery card">
-        <div className="landing-gallery__head">
-          <h3>On the road with our team</h3>
-          <p className="muted">
-            A look at recent recoveries and roadside assists from the Titan Tow
-            Force crew.
-          </p>
-        </div>
-        <div className="landing-gallery__grid">
-          {galleryImages.map((img) => (
-            <figure key={img.src} className="landing-gallery__item">
-              <img src={img.src} alt={img.alt} loading="lazy" />
-            </figure>
-          ))}
-        </div>
-      </section>
+      </motion.section>
 
       <section className="entry-grid">
         <Link className="entry card" to="/customer/login">
@@ -539,7 +626,7 @@ export default function Landing() {
           <div>
             <h4>Nationwide partners</h4>
             <p className="muted">
-              Trusted operators backed by Titan Tow Force standards.
+              Trusted operators backed by ServiceOps standards.
             </p>
           </div>
         </div>
@@ -558,7 +645,7 @@ export default function Landing() {
         <div className="final-left">
           <h2>Need a truck right now?</h2>
           <p className="muted">
-            Call 303-900-5503 for direct dispatch with Titan Tow Force.
+            Call 303-900-5503 for direct dispatch with ServiceOps.
           </p>
         </div>
         <div className="final-right">

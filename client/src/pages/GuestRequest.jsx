@@ -281,7 +281,7 @@ export default function GuestRequest({
   requireEmail = true,
 } = {}) {
   const navigate = useNavigate();
-  const { user, token, isCustomer, login } = useAuth();
+  const { user, isCustomer } = useAuth();
   const [formData, setFormData] = useState(() => ({
     ...DEFAULT_GUEST_FORM,
     ...initialValues,
@@ -379,14 +379,6 @@ export default function GuestRequest({
         coordinates: { lat: loc.lat(), lng: loc.lng() },
       }));
     }
-  };
-
-  const handleMapLocationSelect = (position, address = null) => {
-    setFormData((p) => ({
-      ...p,
-      coordinates: { lat: position.lat(), lng: position.lng() },
-      address: address || p.address,
-    }));
   };
 
   const handleDistanceCalculated = (distanceInfo) => {

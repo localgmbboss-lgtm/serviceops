@@ -87,6 +87,7 @@ export function NotificationsProvider({ children }) {
 
   const [store, setStore] = React.useState(emptyState);
   const [hydratedKey, setHydratedKey] = React.useState(storageKey);
+  const audioCtxRef = React.useRef(null);
 
   React.useEffect(() => {
     try {
@@ -129,15 +130,121 @@ export function NotificationsProvider({ children }) {
     }
   }, [store, storageKey, hydratedKey]);
 
-  const publish = React.useCallback((notification) => {
-    if (!notification) return;
-    setStore((prev) => applyNotification(prev, notification));
+  const playChime = React.useCallback(async () => {
+    if (typeof window === "undefined") return;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtxRef.current) {
+      try {
+        audioCtxRef.current = new Ctx();
+      } catch (error) {
+        return;
+      }
+    }
+    const ctx = audioCtxRef.current;
+    try {
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const start = ctx.currentTime + 0.01;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.4);
+      osc.start(start);
+      osc.stop(start + 0.42);
+    } catch (error) {
+      // ignore audio playback failures
+    }
   }, []);
 
-  const publishMany = React.useCallback((list) => {
-    if (!Array.isArray(list) || list.length === 0) return;
-    setStore((prev) => list.reduce((acc, item) => applyNotification(acc, item), prev));
-  }, []);
+  const triggerSystemNotification = React.useCallback(
+    (entry) => {
+      if (
+        !entry ||
+        typeof window === "undefined" ||
+        !("Notification" in window)
+      ) {
+        return;
+      }
+
+      const showNotification = () => {
+        try {
+          const notification = new Notification(entry.title || "ServiceOps", {
+            body: entry.body || "",
+            tag: entry.dedupeKey || entry.id,
+          });
+          playChime();
+          window.setTimeout(() => {
+            try {
+              notification.close();
+            } catch (error) {
+              // ignore
+            }
+          }, 8000);
+        } catch (error) {
+          // permission denied or other browser limitation
+        }
+      };
+
+      if (Notification.permission === "granted") {
+        showNotification();
+      } else if (Notification.permission === "default") {
+        Notification.requestPermission()
+          .then((permission) => {
+            if (permission === "granted") {
+              showNotification();
+            }
+          })
+          .catch(() => {});
+      }
+    },
+    [playChime]
+  );
+
+  const addNotification = React.useCallback(
+    (incoming) => {
+      if (!incoming) return null;
+      const entry = normalizeNotification(incoming);
+      let added = false;
+      setStore((prev) => {
+        const next = applyNotification(prev, entry);
+        if (next === prev) return prev;
+        added = true;
+        return next;
+      });
+      return added ? entry : null;
+    },
+    []
+  );
+
+  const publish = React.useCallback(
+    (notification) => {
+      const entry = addNotification(notification);
+      if (entry) {
+        triggerSystemNotification(entry);
+      }
+    },
+    [addNotification, triggerSystemNotification]
+  );
+
+  const publishMany = React.useCallback(
+    (list) => {
+      if (!Array.isArray(list) || list.length === 0) return;
+      const added = [];
+      list.forEach((item) => {
+        const entry = addNotification(item);
+        if (entry) added.push(entry);
+      });
+      added.forEach((entry) => triggerSystemNotification(entry));
+    },
+    [addNotification, triggerSystemNotification]
+  );
 
   const markAllRead = React.useCallback(() => {
     setStore((prev) => {

@@ -91,6 +91,12 @@ export default function NotificationsCenter() {
   );
 
   const hasNotifications = sorted.length > 0;
+  const defaultDashboard =
+    user?.role === "admin"
+      ? "/admin"
+      : user?.role === "vendor"
+      ? "/vendor/app"
+      : "/customer/home";
 
   // Confirm before clearing everything
   const handleClearAll = useCallback(() => {
@@ -111,11 +117,9 @@ export default function NotificationsCenter() {
       } catch (e) {
         // ignore
       }
-      if (target) {
-        navigate(target);
-      }
+      navigate(target || defaultDashboard);
     },
-    [markRead, navigate]
+    [markRead, navigate, defaultDashboard]
   );
 
   const signedOutView = (
@@ -140,10 +144,7 @@ export default function NotificationsCenter() {
     <div className="notifications-empty">
       <h2>No new notifications</h2>
       <p>We will let you know when there is action on your jobs or bids.</p>
-      <Link
-        className="btn ghost"
-        to={user?.role === "vendor" ? "/vendor/app" : "/customer/home"}
-      >
+      <Link className="btn ghost" to={defaultDashboard}>
         Back to dashboard
       </Link>
     </div>

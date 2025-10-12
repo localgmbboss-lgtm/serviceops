@@ -10,6 +10,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 // Import pages
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminJobs from "./pages/AdminJobs";
+import AdminJobDetail from "./pages/AdminJobDetail";
 import AdminReports from "./pages/AdminReports";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminFinancials from "./pages/AdminFinancials";
@@ -76,6 +77,14 @@ export default function App() {
                 element={
                   <ProtectedRoute requiredRole="admin" fallbackPath="/admin/login">
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/jobs/:jobId"
+                element={
+                  <ProtectedRoute requiredRole="admin" fallbackPath="/admin/login">
+                    <AdminJobDetail />
                   </ProtectedRoute>
                 }
               />

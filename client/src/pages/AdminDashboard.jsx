@@ -49,7 +49,6 @@ export default function AdminDashboard() {
   const [docs, setDocs] = useState([]);
   const [dash, setDash] = useState(null);
   const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
   const [slice, setSlice] = useState("month");
 
   // trigger re-draw of canvases on window resize
@@ -66,12 +65,11 @@ export default function AdminDashboard() {
 
   async function load() {
     try {
-      setLoading(true);
-    const [s, v, dc, db] = await Promise.all([
-      api.get("/api/reports/summary"),
-      api.get("/api/admin/vendors"),
-      api.get("/api/documents"),
-      api.get("/api/reports/dashboard"),
+      const [s, v, dc, db] = await Promise.all([
+        api.get("/api/reports/summary"),
+        api.get("/api/admin/vendors"),
+        api.get("/api/documents"),
+        api.get("/api/reports/dashboard"),
     ]);
     setSummary(s.data);
     setVendors(Array.isArray(v.data) ? v.data : []);
@@ -80,8 +78,6 @@ export default function AdminDashboard() {
       setErr("");
     } catch (e) {
       setErr(e?.response?.data?.message || "Failed to load dashboard");
-    } finally {
-      setLoading(false);
     }
   }
   useEffect(() => {
@@ -224,19 +220,6 @@ export default function AdminDashboard() {
           <p className="page-sub">
             Mission control for live ops, revenue, and compliance.
           </p>
-        </div>
-        <div className="head-actions">
-          <button className="btn refresh-btn" onClick={load} disabled={loading}>
-            {loading ? (
-              <span className="btn-loader"></span>
-            ) : (
-              <span className="refresh-icon"></span>
-            )}
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
-          <Link className="btn ghost settings-btn" to="/admin/settings">
-             Settings
-          </Link>
         </div>
       </header>
 

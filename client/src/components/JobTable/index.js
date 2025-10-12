@@ -31,6 +31,7 @@ export default function JobTable({
   soloMode = false,
   onOpenBidding,
   onShowLinks,
+  onViewJob,
   itemsPerPage = 10,
 }) {
   const [openFor, setOpenFor] = useState(null);
@@ -540,13 +541,17 @@ export default function JobTable({
                           )}
 
                           <div className="jobtable-detail-actions">
-                            <button
-                              className="jobtable-btn jobtable-btn-ghost"
-                              onClick={(event) => {
-                                event.stopPropagation();
+                          <button
+                            className="jobtable-btn jobtable-btn-ghost"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (onViewJob) {
+                                onViewJob(job);
+                              } else {
                                 window.open(`${window.location.origin}/jobs/${job._id}`, "_blank");
-                              }}
-                            >
+                              }
+                            }}
+                          >
                               View Full Details
                             </button>
                           </div>

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import "./AdminSettings.css";
 
@@ -44,6 +44,9 @@ export default function AdminSettings() {
       const { data } = await api.put("/api/settings", body);
       setS(data);
       setErr("");
+      // Surface a quick confirmation in the dev console so admins know the payload persisted.
+      // eslint-disable-next-line no-console
+      console.log("[AdminSettings] Settings successfully updated:", data);
     } catch (error) {
       setErr(error?.response?.data?.message || "Failed to save");
     } finally {
