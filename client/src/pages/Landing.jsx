@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   PiSteeringWheelBold,
   PiWrenchBold,
@@ -162,6 +162,31 @@ export default function Landing() {
   const [activeImage, setActiveImage] = useState(0);
   const [activeSpotlight, setActiveSpotlight] = useState(0);
   const [spotlightPaused, setSpotlightPaused] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+  const [allowInViewAnimations, setAllowInViewAnimations] = useState(false);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setAllowInViewAnimations(false);
+      return;
+    }
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      setAllowInViewAnimations(true);
+      return;
+    }
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const applyPreference = (mq) => {
+      setAllowInViewAnimations(!mq.matches);
+    };
+    applyPreference(mediaQuery);
+    const listener = (event) => applyPreference(event);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", listener);
+      return () => mediaQuery.removeEventListener("change", listener);
+    }
+    mediaQuery.addListener(listener);
+    return () => mediaQuery.removeListener(listener);
+  }, [prefersReducedMotion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -289,9 +314,47 @@ export default function Landing() {
   );
   const activeSpotlightImage = activeSpotlightItem?.image;
   const activeSpotlightAlt = activeSpotlightItem?.imageAlt;
-  const revealTransition = { duration: 0.6, ease: [0.22, 1, 0.36, 1] };
-  const metricTransition = { duration: 0.35, ease: [0.22, 1, 0.36, 1] };
-  const bodyTransition = { duration: 0.4, ease: [0.22, 1, 0.36, 1] };
+  const revealTransition = useMemo(
+    () => ({ duration: 0.6, ease: [0.22, 1, 0.36, 1] }),
+    []
+  );
+  const metricTransition = useMemo(
+    () => ({ duration: 0.35, ease: [0.22, 1, 0.36, 1] }),
+    []
+  );
+  const bodyTransition = useMemo(
+    () => ({ duration: 0.4, ease: [0.22, 1, 0.36, 1] }),
+    []
+  );
+  const getInViewMotion = useCallback(
+    ({ y = 24, amount = 0.3, delay = 0, includeScale = false } = {}) => {
+      const transition = { ...revealTransition, delay };
+      if (!allowInViewAnimations) {
+        return {
+          initial: false,
+          animate: {
+            opacity: 1,
+            y: 0,
+            ...(includeScale ? { scale: 1 } : {}),
+          },
+          transition,
+        };
+      }
+      const initial = { opacity: 0, y };
+      const whileInView = { opacity: 1, y: 0 };
+      if (includeScale) {
+        initial.scale = 0.96;
+        whileInView.scale = 1;
+      }
+      return {
+        initial,
+        whileInView,
+        viewport: { once: true, amount },
+        transition,
+      };
+    },
+    [allowInViewAnimations, revealTransition]
+  );
 
   return (
     <div className="landing">
@@ -367,17 +430,11 @@ export default function Landing() {
 
       <motion.section
         className="landing-about card"
-        initial={{ opacity: 0, y: 32 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.25 }}
-        transition={revealTransition}
+        {...getInViewMotion({ y: 32, amount: 0.25 })}
       >
         <motion.div
           className="landing-about__intro"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ ...revealTransition, delay: 0.05 }}
+          {...getInViewMotion({ y: 24, amount: 0.3, delay: 0.05 })}
         >
           <div className="landing-about__headline">
             <span className="eyebrow">why drivers pick ServiceOps</span>
@@ -393,22 +450,18 @@ export default function Landing() {
         <div className="landing-about__body">
           <motion.div
             className="landing-about__grid"
-            initial={{ opacity: 0, y: 28 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ ...revealTransition, delay: 0.1 }}
+            {...getInViewMotion({ y: 28, amount: 0.3, delay: 0.1 })}
           >
             {aboutTiles.map((tile, idx) => (
               <motion.article
                 key={tile.number}
                 className="about-card"
-                initial={{ opacity: 0, y: 24, scale: 0.96 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{
-                  ...revealTransition,
+                {...getInViewMotion({
+                  y: 24,
+                  amount: 0.2,
                   delay: 0.12 + idx * 0.08,
-                }}
+                  includeScale: true,
+                })}
               >
                 <div className="about-card__media">
                   <img
@@ -430,10 +483,7 @@ export default function Landing() {
             onMouseLeave={() => setSpotlightPaused(false)}
             onFocusCapture={() => setSpotlightPaused(true)}
             onBlurCapture={() => setSpotlightPaused(false)}
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.35 }}
-            transition={{ ...revealTransition, delay: 0.18 }}
+            {...getInViewMotion({ y: 24, amount: 0.35, delay: 0.18 })}
           >
             <div className="about-visual__pulse" aria-hidden="true" />
             <div

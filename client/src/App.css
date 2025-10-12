@@ -959,18 +959,4 @@ h3 {
   }
 }
 
-@media (max-width: 480px) {
-  .brand-link {
-    font-size: 1rem;
-  }
-  .brand-dot {
-    width: 16px;
-    height: 16px;
-  }
-}
-
-
-
-
-
 

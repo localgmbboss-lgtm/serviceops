@@ -7,6 +7,7 @@ import Job from "../models/Jobs.js";
 import Vendor from "../models/Vendor.js"; // Changed from Driver to Vendor
 import Customer from "../models/Customer.js";
 import { notifySMS } from "../lib/notifier.js";
+import VendorNotification from "../models/VendorNotification.js";
 import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
 const router = Router();
 
@@ -535,15 +536,12 @@ router.post("/:id/ping-vendors", async (req, res, next) => {
 
     const vendors = await Vendor.find({
       _id: { $in: validVendorIds },
-      phone: { $exists: true, $ne: null, $ne: "" },
     })
-      .select("_id name phone")
+      .select("_id name phone updatesPaused")
       .lean();
 
     if (!vendors.length) {
-      return res
-        .status(404)
-        .json({ message: "No vendors with contact information available" });
+      return res.status(404).json({ message: "No vendors found for ping." });
     }
 
     const baseMessage =
@@ -552,23 +550,82 @@ router.post("/:id/ping-vendors", async (req, res, next) => {
         : `Job ${job.serviceType || ""} near ${job.pickupAddress || "customer"} needs assistance.`;
 
     const results = [];
+    const notificationDocs = [];
     for (const vendor of vendors) {
-      try {
-        const body = `${baseMessage}
+      const jobLabel = `#${String(job._id).slice(-6).toUpperCase()}`;
+      const notificationBody = [
+        baseMessage,
+        job.pickupAddress ? `Pickup: ${job.pickupAddress}` : null,
+        `Status: ${job.status || "Unassigned"}`,
+        `Job ${jobLabel}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      notificationDocs.push({
+        vendorId: vendor._id,
+        jobId: job._id,
+        source: "admin_ping",
+        title: job.serviceType
+          ? `${job.serviceType} dispatch ping`
+          : "Dispatch ping",
+        body: notificationBody,
+        severity: "warning",
+        meta: {
+          role: "vendor",
+          kind: "ping",
+          jobId: job._id,
+          status: job.status || "Unassigned",
+          route: "/vendor/app",
+          jobLabel,
+          vendorName: vendor.name || null,
+        },
+      });
+
+      const hasPhone =
+        typeof vendor.phone === "string" && vendor.phone.trim().length > 0;
+      if (!hasPhone) {
+        results.push({
+          vendorId: vendor._id,
+          ok: true,
+          queuedId: null,
+          channels: { sms: false, inApp: true },
+          note: "No phone on file; sent in-app notification only.",
+        });
+        continue;
+      }
+
+      const smsBody = `${baseMessage}
 Status: ${job.status || "Unassigned"}
 Respond in the ServiceOps vendor portal if available.`;
-        const { ok, queuedId } = await notifySMS(vendor.phone, body, job._id);
+      try {
+        const { ok, queuedId } = await notifySMS(
+          vendor.phone,
+          smsBody,
+          job._id
+        );
         results.push({
           vendorId: vendor._id,
           ok: Boolean(ok),
           queuedId: queuedId || null,
+          channels: { sms: Boolean(ok), inApp: true },
         });
       } catch (error) {
         results.push({
           vendorId: vendor._id,
           ok: false,
           error: error?.message || "Failed to notify vendor",
+          channels: { sms: false, inApp: true },
         });
+      }
+    }
+
+    if (notificationDocs.length) {
+      try {
+        await VendorNotification.insertMany(notificationDocs, {
+          ordered: false,
+        });
+      } catch (insertError) {
+        // swallow insert errors to avoid blocking SMS results
       }
     }
 

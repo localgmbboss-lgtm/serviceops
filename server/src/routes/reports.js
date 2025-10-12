@@ -226,6 +226,42 @@ router.get("/dashboard", async (_req, res, next) => {
       if (idx >= 0) series[r.city][idx] = r.count;
     });
 
+    // Daily completed jobs vs revenue trend (14 days)
+    const workAgg = await Job.aggregate([
+      {
+        $match: {
+          created: { $gte: trendFrom, $lte: now },
+          status: "Completed",
+        },
+      },
+      {
+        $group: {
+          _id: dayFmt,
+          jobs: { $sum: 1 },
+          revenue: { $sum: { $ifNull: ["$quotedPrice", 0] } },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          day: "$_id",
+          jobs: 1,
+          revenue: 1,
+        },
+      },
+      { $sort: { day: 1 } },
+    ]);
+
+    const jobsSeries = labels.map(() => 0);
+    const revenueSeries = labels.map(() => 0);
+    workAgg.forEach((r) => {
+      const idx = labels.indexOf(r.day);
+      if (idx >= 0) {
+        jobsSeries[idx] = r.jobs;
+        revenueSeries[idx] = Number(r.revenue || 0);
+      }
+    });
+
     // Top performers (30 days, completed)
     const perfAgg = await Job.aggregate([
       {
@@ -277,6 +313,11 @@ router.get("/dashboard", async (_req, res, next) => {
     res.json({
       revenue,
       cityTrend: { labels, series },
+      workVsRevenue: {
+        labels,
+        jobs: jobsSeries,
+        revenue: revenueSeries,
+      },
       topPerformers: perfAgg,
       satisfaction,
     });

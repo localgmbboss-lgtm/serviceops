@@ -273,7 +273,7 @@ export default function VendorProfile() {
   const requirements = compliance?.requirements || [];
   const missingDocs = compliance?.missing || [];
 
-  const supportEmail = "support@serviceops.app";
+  const supportEmail = "localgmboss@gmail.com";
   const supportPhoneTel = "+15551234567";
   const supportPhoneLabel = "+1 (555) 123-4567";
 

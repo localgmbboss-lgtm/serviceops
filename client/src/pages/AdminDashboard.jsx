@@ -116,8 +116,8 @@ export default function AdminDashboard() {
   // Satisfaction donut chart
   const satCanvasRef = useRef(null);
 
-  // <-- ADDED: city canvas ref to fix the missing-ref runtime error
-  const cityCanvasRef = useRef(null);
+  // Work vs revenue trend canvas
+  const workCanvasRef = useRef(null);
 
   useEffect(() => {
     if (!dash?.satisfaction || !satCanvasRef.current) return;
@@ -153,56 +153,138 @@ export default function AdminDashboard() {
     ctx.fillText(`5* vs private`, cx, cy + 22);
   }, [dash, viewportW]);
 
-  // Simple Jobs-by-City bar chart effect (prevents runtime errors when rendering)
+  // Work vs revenue dual line chart (14-day window)
   useEffect(() => {
-    if (!cityCanvasRef.current) return;
-    const canvas = cityCanvasRef.current;
+    if (!workCanvasRef.current) return;
+    const trend = dash?.workVsRevenue;
+    const canvas = workCanvasRef.current;
     const { ctx, cssW, cssH } = sizeCanvas(canvas);
     ctx.clearRect(0, 0, cssW, cssH);
 
-    const data = dash?.jobsByCity || dash?.jobs_by_city || []; // tolerate different shapes
-    if (!Array.isArray(data) || data.length === 0) {
-      ctx.fillStyle = "#6b7280";
+    const labels = Array.isArray(trend?.labels) ? trend.labels : [];
+    const jobsRaw = Array.isArray(trend?.jobs) ? trend.jobs : [];
+    const revenueRaw = Array.isArray(trend?.revenue) ? trend.revenue : [];
+
+    if (labels.length === 0 || jobsRaw.length === 0 || revenueRaw.length === 0) {
+      ctx.fillStyle = "#94a3b8";
       ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
       ctx.textAlign = "center";
-      ctx.fillText("No data", cssW / 2, cssH / 2);
+      ctx.fillText("No trend data yet", cssW / 2, cssH / 2);
       return;
     }
 
-    // Expect data items like { city: "Name", count: 12 } or { city: "X", jobs: 12 }
-    const points = data.map((d) => ({
-      label: d.city || d.name || "-",
-      value: Number(d.count ?? d.jobs ?? 0),
-    }));
+    const padding = { top: 28, right: 60, bottom: 40, left: 60 };
+    const chartW = Math.max(0, cssW - padding.left - padding.right);
+    const chartH = Math.max(0, cssH - padding.top - padding.bottom);
+    if (chartW === 0 || chartH === 0) return;
 
-    const maxV = Math.max(...points.map((p) => p.value), 1);
-    const padding = 28;
-    const availableW = cssW - padding * 2;
-    const gap = 12;
-    const barWidth = Math.max(8, (availableW - gap * (points.length - 1)) / points.length);
-    const bottomY = cssH - 28;
+    const jobs = labels.map((_, idx) => Number(jobsRaw[idx] || 0));
+    const revenueK = labels.map((_, idx) => Number(revenueRaw[idx] || 0) / 1000);
 
-    // draw labels and bars
-    points.forEach((p, i) => {
-      const x = padding + i * (barWidth + gap);
-      const h = (p.value / maxV) * (cssH - 80);
-      // bar
-      ctx.fillStyle = "#3b82f6";
-      ctx.fillRect(x, bottomY - h, barWidth, h);
-      // value text
-      ctx.fillStyle = "#111827";
-      ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto";
-      ctx.textAlign = "center";
-      ctx.fillText(p.value.toString(), x + barWidth / 2, bottomY - h - 8);
-      // label (wrap/clip)
-      ctx.fillStyle = "#6b7280";
-      ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto";
+    const maxScale = Math.max(...jobs, ...revenueK, 1);
+    const stepX = labels.length > 1 ? chartW / (labels.length - 1) : 0;
+
+    // Axes
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, padding.top);
+    ctx.lineTo(padding.left, padding.top + chartH);
+    ctx.lineTo(padding.left + chartW, padding.top + chartH);
+    ctx.stroke();
+
+    // Y ticks & grid
+    const ticks = 4;
+    ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto";
+    ctx.fillStyle = "#cbd5f5";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i <= ticks; i++) {
+      const value = (maxScale / ticks) * i;
+      const y = padding.top + chartH - (value / maxScale) * chartH;
       ctx.fillText(
-        p.label.length > 10 ? p.label.slice(0, 10) + "…" : p.label,
-        x + barWidth / 2,
-        bottomY + 16
+        value >= 10 ? Math.round(value).toString() : value.toFixed(1),
+        padding.left - 10,
+        y
       );
+      if (i !== 0) {
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.18)";
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + chartW, y);
+        ctx.stroke();
+      }
+    }
+
+    // X labels (adaptive skipping)
+    const labelSkip = labels.length > 7 ? Math.ceil(labels.length / 7) : 1;
+    ctx.fillStyle = "#cbd5f5";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const formatter = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
     });
+    labels.forEach((label, idx) => {
+      if (idx % labelSkip !== 0 && idx !== labels.length - 1) return;
+      const x = padding.left + stepX * idx;
+      const [yy, mm, dd] = label.split("-").map((s) => parseInt(s, 10));
+      const dateObj = new Date(yy, (mm || 1) - 1, dd || 1);
+      ctx.fillText(formatter.format(dateObj), x, padding.top + chartH + 10);
+    });
+
+    const toPoints = (series) =>
+      series.map((value, idx) => {
+        const x = padding.left + stepX * idx;
+        const y = padding.top + chartH - (value / maxScale) * chartH;
+        return { x, y };
+      });
+
+    const drawSeries = (series, color, fill) => {
+      if (!series.length) return;
+      const points = toPoints(series);
+
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      points.forEach((pt, idx) => {
+        if (idx === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.stroke();
+
+      if (fill) {
+        const gradient = ctx.createLinearGradient(
+          0,
+          padding.top,
+          0,
+          padding.top + chartH
+        );
+        gradient.addColorStop(0, fill);
+        gradient.addColorStop(1, "rgba(255,255,255,0)");
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        points.forEach((pt, idx) => {
+          if (idx === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        });
+        ctx.lineTo(points[points.length - 1].x, padding.top + chartH);
+        ctx.lineTo(points[0].x, padding.top + chartH);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.fillStyle = color;
+      points.forEach((pt) => {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    };
+
+    drawSeries(revenueK, "rgba(37, 99, 235, 1)", "rgba(37, 99, 235, 0.16)");
+    drawSeries(jobs, "rgba(34, 197, 94, 1)");
   }, [dash, viewportW]);
 
   const snap = dash?.revenue?.[slice] || {
@@ -401,9 +483,16 @@ export default function AdminDashboard() {
       <section className="grid2">
         <div className="card trends-card">
           <div className="card-head">
-            <h3 className="section-title">Jobs by City (14 days)</h3>
+            <h3 className="section-title">Work vs Revenue (14 days)</h3>
           </div>
-          <canvas ref={cityCanvasRef} className="chart-canvas" />
+          <canvas ref={workCanvasRef} className="chart-canvas" />
+          <div className="legend">
+            <span className="dot blue"></span> Revenue ($k)
+            <span className="dot green"></span> Completed Jobs
+          </div>
+          <p className="muted small tip">
+            Revenue plotted in thousands for a shared scale.
+          </p>
         </div>
         <div className="card performers-card">
           <div className="card-head">

@@ -166,6 +166,19 @@
   flex: 1;
 }
 
+.va-alert__caption {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(15, 23, 42, 0.68);
+}
+
+.va-alert__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .va-alert__dismiss {
   appearance: none;
   border: 0;
