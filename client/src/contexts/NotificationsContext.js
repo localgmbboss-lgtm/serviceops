@@ -246,6 +246,40 @@ export function NotificationsProvider({ children }) {
     [addNotification, triggerSystemNotification]
   );
 
+  React.useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !("serviceWorker" in navigator) ||
+      typeof navigator.serviceWorker.addEventListener !== "function"
+    ) {
+      return undefined;
+    }
+
+    const handleMessage = (event) => {
+      const { data } = event;
+      if (!data || typeof data !== "object") return;
+      if (data.type === "PUSH_NOTIFICATION" && data.payload) {
+        const payload = data.payload;
+        addNotification({
+          title: payload.title,
+          body: payload.body,
+          severity: payload.meta?.severity || payload.severity || "info",
+          meta: payload.meta,
+          dedupeKey:
+            payload.meta?.dedupeKey ||
+            payload.meta?.notificationId ||
+            payload.dedupeKey,
+          createdAt: payload.createdAt,
+        });
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", handleMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleMessage);
+    };
+  }, [addNotification]);
+
   const markAllRead = React.useCallback(() => {
     setStore((prev) => {
       if (prev.notifications.every((n) => n.read)) return prev;

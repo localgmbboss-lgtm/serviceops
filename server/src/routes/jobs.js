@@ -9,6 +9,7 @@ import Customer from "../models/Customer.js";
 import { notifySMS } from "../lib/notifier.js";
 import VendorNotification from "../models/VendorNotification.js";
 import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
+import { sendVendorPushNotifications } from "../lib/push.js";
 const router = Router();
 
 const defaultClientBase = getClientBaseUrl();
@@ -621,11 +622,21 @@ Respond in the ServiceOps vendor portal if available.`;
 
     if (notificationDocs.length) {
       try {
-        await VendorNotification.insertMany(notificationDocs, {
-          ordered: false,
-        });
+        const inserted = await VendorNotification.insertMany(
+          notificationDocs,
+          {
+            ordered: false,
+          }
+        );
+        if (Array.isArray(inserted) && inserted.length) {
+          await sendVendorPushNotifications(inserted);
+        }
       } catch (insertError) {
-        // swallow insert errors to avoid blocking SMS results
+        const insertedDocs = insertError?.insertedDocs || [];
+        if (insertedDocs.length) {
+          await sendVendorPushNotifications(insertedDocs);
+        }
+        // swallow the error after attempting to notify subscribers
       }
     }
 

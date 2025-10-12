@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { createServer } from "http";
 import { connectDB } from "./lib/db.js";
 import { initRealtime } from "./realtime/index.js";
+import { configurePush } from "./lib/push.js";
 
 import jobs from "./routes/jobs.js";
 import customers from "./routes/customers.js";
@@ -27,8 +28,10 @@ import vendorDocuments from "./routes/vendorDocuments.js";
 import customerAuth from "./routes/customerAuth.js";
 import adminAuth from "./routes/adminAuth.js";
 import vendors from "./routes/vendors.js";
+import pushRoutes from "./routes/push.js";
 
 dotenv.config();
+configurePush();
 
 const app = express();
 const httpServer = createServer(app);
@@ -122,6 +125,7 @@ app.use("/api/admin/auth", adminAuth);
 app.use("/api/admin", admin);
 app.use("/api/public", publicRoutes);
 app.use("/api/exports", exportRoutes);
+app.use("/api/push", pushRoutes);
 app.use("/api/bids", bids);
 app.use("/api/outbox", outbox);
 app.use("/api/vendor/auth", vendorAuth);
