@@ -81,7 +81,9 @@ function useMissionControl() {
       setState(data || {});
       setError("");
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to load mission control");
+      setError(
+        err?.response?.data?.message || "Failed to load mission control"
+      );
     } finally {
       setLoading(false);
     }
@@ -107,8 +109,12 @@ function QueueRow({ item }) {
       : `+${Math.abs(minutesRemaining)}m`;
 
   return (
-    <tr className={atRisk ? "ops-queue__row ops-queue__row--risk" : "ops-queue__row"}>
-      <td>
+    <tr
+      className={
+        atRisk ? "ops-queue__row ops-queue__row--risk" : "ops-queue__row"
+      }
+    >
+      <td data-col="Job">
         <span className="ops-chip">
           {String(item.jobId).slice(-6).toUpperCase()}
         </span>
@@ -117,26 +123,26 @@ function QueueRow({ item }) {
           <span>{item.pickupAddress || "No pickup listed"}</span>
         </div>
       </td>
-      <td>
+      <td data-col="Priority">
         <span className={`ops-pill ops-pill--${item.priority}`}>
           {URGENCY_LABEL[item.urgency] || "Standard"}
         </span>
       </td>
-      <td>
-        <span className="ops-queue__status">{STATUS_LABEL[item.status] || item.status}</span>
+      <td data-col="Status">
+        <span className="ops-queue__status">
+          {STATUS_LABEL[item.status] || item.status}
+        </span>
         <span className="ops-queue__timer">
           Open <strong>{item.openMinutes}m</strong>
         </span>
       </td>
-      <td>
+      <td data-col="SLA">
         <div className="ops-queue__sla">
           <span className="ops-badge">{badge}</span>
-          <span className="ops-queue__sla-caption">
-            SLA {item.slaMinutes}m
-          </span>
+          <span className="ops-queue__sla-caption">SLA {item.slaMinutes}m</span>
         </div>
       </td>
-      <td>
+      <td data-col="Vendor">
         {item.vendorName ? (
           <div className="ops-queue__vendor">
             <strong>{item.vendorName}</strong>
@@ -186,8 +192,14 @@ function VendorScorecard({ card }) {
           <h3>{card.name}</h3>
           <span className="muted">{card.city || ""}</span>
         </div>
-        <span className={`ops-badge ops-badge--${card.stats.slaHitRate >= 80 ? "good" : "warn"}`}>
-          {card.stats.slaHitRate != null ? `${card.stats.slaHitRate}% SLA` : "No data"}
+        <span
+          className={`ops-badge ops-badge--${
+            card.stats.slaHitRate >= 80 ? "good" : "warn"
+          }`}
+        >
+          {card.stats.slaHitRate != null
+            ? `${card.stats.slaHitRate}% SLA`
+            : "No data"}
         </span>
       </header>
       <div className="ops-scorecard__grid">
@@ -205,14 +217,17 @@ function VendorScorecard({ card }) {
         </div>
         <div>
           <span className="ops-label">Avg rating</span>
-          <strong>{card.stats.avgRating != null ? card.stats.avgRating : ""}</strong>
+          <strong>
+            {card.stats.avgRating != null ? card.stats.avgRating : ""}
+          </strong>
         </div>
         <div>
           <span className="ops-label">Gross</span>
           <strong>${Math.round(card.stats.gross || 0).toLocaleString()}</strong>
         </div>
       </div>
-      {Array.isArray(card.compliance?.issues) && card.compliance.issues.length > 0 ? (
+      {Array.isArray(card.compliance?.issues) &&
+      card.compliance.issues.length > 0 ? (
         <div className="ops-scorecard__issues">
           <span className="ops-label">Compliance</span>
           <ul>
@@ -244,18 +259,10 @@ export default function AdminOpsCenter() {
   const complianceTotal = complianceItems.length;
   const scorecardTotal = scorecardItems.length;
 
-  useEffect(() => {
-    setQueuePage(1);
-  }, [queueTotal]);
-  useEffect(() => {
-    setRoutePage(1);
-  }, [routeTotal]);
-  useEffect(() => {
-    setCompliancePage(1);
-  }, [complianceTotal]);
-  useEffect(() => {
-    setScorecardPage(1);
-  }, [scorecardTotal]);
+  useEffect(() => setQueuePage(1), [queueTotal]);
+  useEffect(() => setRoutePage(1), [routeTotal]);
+  useEffect(() => setCompliancePage(1), [complianceTotal]);
+  useEffect(() => setScorecardPage(1), [scorecardTotal]);
 
   const pagedQueueItems = useMemo(
     () =>
@@ -304,8 +311,8 @@ export default function AdminOpsCenter() {
         <div>
           <h1>Mission Control</h1>
           <p>
-            Real-time health of your field ops: dispatch queue, escalations, assignments, and
-            compliance exceptions.
+            Real-time health of your field ops: dispatch queue, escalations,
+            assignments, and compliance exceptions.
           </p>
         </div>
         <div className="ops-header__meta">
@@ -313,7 +320,10 @@ export default function AdminOpsCenter() {
             Refresh
           </button>
           <span className="muted small">
-            Updated {state.generatedAt ? new Date(state.generatedAt).toLocaleTimeString() : "—"}
+            Updated{" "}
+            {state.generatedAt
+              ? new Date(state.generatedAt).toLocaleTimeString()
+              : "ï¿½"}
           </span>
         </div>
       </header>
@@ -350,7 +360,9 @@ export default function AdminOpsCenter() {
                     </td>
                   </tr>
                 ) : (
-                  pagedQueueItems.map((item) => <QueueRow key={item.jobId} item={item} />)
+                  pagedQueueItems.map((item) => (
+                    <QueueRow key={item.jobId} item={item} />
+                  ))
                 )}
               </tbody>
             </table>
@@ -368,11 +380,16 @@ export default function AdminOpsCenter() {
           <header>
             <div>
               <h2>Routing Suggestions</h2>
-              <p>Smart handoffs for unassigned work based on distance and backlog.</p>
+              <p>
+                Smart handoffs for unassigned work based on distance and
+                backlog.
+              </p>
             </div>
           </header>
           {routeTotal === 0 ? (
-            <p className="muted">No routing suggestions - every job has coverage.</p>
+            <p className="muted">
+              No routing suggestions - every job has coverage.
+            </p>
           ) : (
             <>
               <ul className="ops-suggest" aria-label="Routing suggestions">
@@ -410,12 +427,16 @@ export default function AdminOpsCenter() {
             <>
               <ul className="ops-compliance" aria-label="Compliance tasks">
                 {pagedCompliance.map((task, index) => (
-                  <li key={`${task.type}-${task.vendorId || "vendor"}-${index}`}>
+                  <li
+                    key={`${task.type}-${task.vendorId || "vendor"}-${index}`}
+                  >
                     <div>
                       <strong>{task.vendorName || "Vendor"}</strong>
                       <span className="muted">
                         {task.type === "expiry"
-                          ? `Expiring ${new Date(task.expiresAt).toLocaleDateString()}`
+                          ? `Expiring ${new Date(
+                              task.expiresAt
+                            ).toLocaleDateString()}`
                           : "Missing documentation"}
                       </span>
                     </div>
@@ -439,11 +460,16 @@ export default function AdminOpsCenter() {
         <header>
           <div>
             <h2>Vendor Scorecards (45 days)</h2>
-            <p>Arrival performance, SLA compliance, and customer feedback at a glance.</p>
+            <p>
+              Arrival performance, SLA compliance, and customer feedback at a
+              glance.
+            </p>
           </div>
         </header>
         {scorecardTotal === 0 ? (
-          <p className="muted">We need more job history to build meaningful scorecards.</p>
+          <p className="muted">
+            We need more job history to build meaningful scorecards.
+          </p>
         ) : (
           <>
             <div className="ops-scorecards">
@@ -464,18 +490,3 @@ export default function AdminOpsCenter() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
