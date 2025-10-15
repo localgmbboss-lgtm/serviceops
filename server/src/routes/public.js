@@ -3,7 +3,9 @@ import { Router } from "express";
 import crypto from "crypto";
 import Customer from "../models/Customer.js";
 import Job from "../models/Jobs.js";
+import AdminNotification from "../models/AdminNotification.js";
 import { getClientBaseUrl } from "../lib/clientUrl.js";
+import { sendAdminPushNotifications } from "../lib/push.js";
 
 const router = Router();
 
@@ -119,6 +121,30 @@ router.post("/jobs", async (req, res, next) => {
 
     // (Optional) TODO: broadcast to vendors here based on service + radius
     // e.g., await broadcastNewJob(job)
+
+    // Notify admins about the new customer request
+    try {
+      const adminNotification = await AdminNotification.create({
+        title: "New customer request",
+        body: `${serviceType} request from ${cust.name || name}`,
+        severity: "info",
+        jobId: job._id,
+        customerId: cust._id,
+        meta: {
+          role: "admin",
+          route: `/jobs/${job._id}`,
+          jobId: job._id,
+          customerId: cust._id,
+          serviceType,
+          pickupAddress: pickupAddress || null,
+          pickupLat: Number.isFinite(pickupLat) ? pickupLat : null,
+          pickupLng: Number.isFinite(pickupLng) ? pickupLng : null,
+        },
+      });
+      await sendAdminPushNotifications([adminNotification]);
+    } catch (notifyError) {
+      console.error("Failed to notify admins about new request:", notifyError);
+    }
 
     // 8) Respond with everything the client needs (fixes "undefined token" issues)
     return res.status(201).json({

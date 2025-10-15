@@ -16,6 +16,20 @@ const sanitize = (user) => ({
   role: user.role || "admin",
 });
 
+export function requireAdminAuth(req, res, next) {
+  try {
+    const auth = req.headers.authorization || "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+    if (!token) return res.status(401).json({ message: "Missing token" });
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.adminId = payload.sub || payload.id || null;
+    req.adminRole = payload.role || "admin";
+    next();
+  } catch {
+    res.status(401).json({ message: "Invalid token" });
+  }
+}
+
 router.post("/login", async (req, res, next) => {
   try {
     const { email, password } = req.body || {};

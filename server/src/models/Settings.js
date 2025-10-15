@@ -126,6 +126,74 @@ const SettingsSchema = new mongoose.Schema(
         },
       },
     },
+
+    // 8) Automation + messaging schedules
+    automation: {
+      alerts: {
+        customer: {
+          driverEtaMinutes: { type: Number, default: 10 },
+          followUpSurveyHours: { type: Number, default: 1 },
+          reengagementDays: { type: Number, default: 14 },
+          channels: {
+            sms: { type: Boolean, default: true },
+            email: { type: Boolean, default: true },
+            push: { type: Boolean, default: false },
+          },
+        },
+        vendor: {
+          jobAssigned: { type: Boolean, default: true },
+          slaReminderMinutes: { type: Number, default: 20 },
+          channels: {
+            sms: { type: Boolean, default: true },
+            email: { type: Boolean, default: false },
+            push: { type: Boolean, default: true },
+          },
+        },
+      },
+      digests: {
+        adminDaily: {
+          enabled: { type: Boolean, default: false },
+          time: { type: String, default: "07:30" },
+          channels: {
+            email: { type: Boolean, default: true },
+            sms: { type: Boolean, default: false },
+            push: { type: Boolean, default: false },
+          },
+        },
+        adminWeekly: {
+          enabled: { type: Boolean, default: true },
+          weekday: {
+            type: String,
+            enum: ["sun", "mon", "tue", "wed", "thu", "fri", "sat"],
+            default: "mon",
+          },
+          time: { type: String, default: "08:00" },
+          channels: {
+            email: { type: Boolean, default: true },
+            sms: { type: Boolean, default: false },
+            push: { type: Boolean, default: false },
+          },
+        },
+        vendorWeekly: {
+          enabled: { type: Boolean, default: true },
+          weekday: {
+            type: String,
+            enum: ["sun", "mon", "tue", "wed", "thu", "fri", "sat"],
+            default: "fri",
+          },
+          time: { type: String, default: "17:00" },
+          channels: {
+            email: { type: Boolean, default: true },
+            sms: { type: Boolean, default: false },
+            push: { type: Boolean, default: true },
+          },
+        },
+      },
+      compliance: {
+        autoNotifyMissingDocs: { type: Boolean, default: true },
+        remindBeforeExpiryDays: { type: Number, default: 7 },
+      },
+    },
   },
   {
     timestamps: true,

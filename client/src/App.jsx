@@ -18,6 +18,10 @@ import DocumentsHub from "./pages/DocumentsHub";
 import AdminLiveMap from "./pages/AdminLiveMap";
 import AdminSettings from "./pages/AdminSettings";
 import AdminVendors from "./pages/AdminVendors";
+import AdminOpsCenter from "./pages/AdminOpsCenter";
+import LeadPipeline from "./pages/LeadPipeline";
+import ReviewHub from "./pages/ReviewHub";
+import KnowledgeBase from "./pages/KnowledgeBase";
 import CustomerRequest from "./pages/CustomerRequest";
 import NotFound from "./pages/NotFound";
 import Unauthorized from "./pages/Unauthorized";
@@ -113,10 +117,42 @@ export default function App() {
                 }
               />
               <Route
+                path="/admin/ops"
+                element={
+                  <ProtectedRoute requiredRole="admin" fallbackPath="/admin/login">
+                    <AdminOpsCenter />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/crm/leads"
+                element={
+                  <ProtectedRoute requiredRole="admin" fallbackPath="/admin/login">
+                    <LeadPipeline />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/crm/reviews"
+                element={
+                  <ProtectedRoute requiredRole="admin" fallbackPath="/admin/login">
+                    <ReviewHub />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/admin/documents"
                 element={
                   <ProtectedRoute requiredRole="admin" fallbackPath="/admin/login">
                     <DocumentsHub />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/knowledge"
+                element={
+                  <ProtectedRoute requiredRole="admin" fallbackPath="/admin/login">
+                    <KnowledgeBase />
                   </ProtectedRoute>
                 }
               />

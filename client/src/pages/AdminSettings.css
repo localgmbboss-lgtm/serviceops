@@ -125,6 +125,57 @@
     transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
+.aset-automation-row {
+    gap: 18px;
+    align-items: stretch;
+}
+
+.aset-automation-card {
+    flex: 1 1 280px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 16px;
+    padding: 16px;
+    background: rgba(248, 250, 252, 0.9);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.04);
+    display: grid;
+    gap: 12px;
+}
+
+.aset-automation-card h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.aset-toggle-group {
+    display: grid;
+    gap: 8px;
+    align-content: flex-start;
+}
+
+.aset-toggle-group span {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+}
+
+.aset-toggle--inline {
+    justify-content: flex-start;
+}
+
+.aset-digest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.aset-automation-hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.4;
+}
+
 .aset input:focus {
     outline: none;
     border-color: var(--color-primary);

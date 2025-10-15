@@ -142,6 +142,116 @@
     opacity: 0.8;
 }
 
+.customer-home-container .custdash-scheduler {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+    display: grid;
+    gap: 18px;
+}
+
+.custdash-scheduler__head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.custdash-scheduler__head h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.custdash-scheduler__head p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    max-width: 520px;
+    line-height: 1.5;
+}
+
+.custdash-scheduler__picker {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 220px;
+}
+
+.custdash-scheduler__picker label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.custdash-scheduler__picker select {
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    padding: 10px 12px;
+    font-size: 0.9rem;
+}
+
+.custdash-scheduler__status {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.18);
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+}
+
+.custdash-scheduler__form {
+    display: grid;
+    gap: 14px;
+}
+
+.custdash-scheduler__grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.custdash-scheduler__grid label,
+.custdash-scheduler__notes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.custdash-scheduler__grid span,
+.custdash-scheduler__notes span {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+}
+
+.custdash-scheduler__grid input,
+.custdash-scheduler__notes textarea {
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    padding: 10px 12px;
+    font-size: 0.95rem;
+    background: rgba(248, 250, 252, 0.85);
+}
+
+.custdash-scheduler__notes textarea {
+    resize: vertical;
+}
+
+.custdash-scheduler__error {
+    margin: 0;
+    color: var(--color-danger, #dc2626);
+    font-size: 0.85rem;
+}
+
 /* Tabs */
 .customer-home-container .tabs-container {
     display: flex;

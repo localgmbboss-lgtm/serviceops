@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { createServer } from "http";
 import { connectDB } from "./lib/db.js";
 import { initRealtime } from "./realtime/index.js";
+import { configurePush } from "./lib/push.js";
 
 import jobs from "./routes/jobs.js";
 import customers from "./routes/customers.js";
@@ -27,8 +28,13 @@ import vendorDocuments from "./routes/vendorDocuments.js";
 import customerAuth from "./routes/customerAuth.js";
 import adminAuth from "./routes/adminAuth.js";
 import vendors from "./routes/vendors.js";
+import pushRoutes from "./routes/push.js";
+import ops from "./routes/ops.js";
+import crm from "./routes/crm.js";
+import knowledge from "./routes/knowledge.js";
 
 dotenv.config();
+configurePush();
 
 const app = express();
 const httpServer = createServer(app);
@@ -122,6 +128,7 @@ app.use("/api/admin/auth", adminAuth);
 app.use("/api/admin", admin);
 app.use("/api/public", publicRoutes);
 app.use("/api/exports", exportRoutes);
+app.use("/api/push", pushRoutes);
 app.use("/api/bids", bids);
 app.use("/api/outbox", outbox);
 app.use("/api/vendor/auth", vendorAuth);
@@ -129,6 +136,9 @@ app.use("/api/vendor/feed", vendorFeed);
 app.use("/api/vendor", vendorPortal);
 app.use("/api/customer/auth", customerAuth);
 app.use("/api/vendors", vendors);
+app.use("/api/ops", ops);
+app.use("/api/crm", crm);
+app.use("/api/knowledge", knowledge);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, _req, res, _next) => {

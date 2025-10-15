@@ -7,6 +7,11 @@ import Vendor from "../models/Vendor.js";
 import { refreshVendorCompliance } from "../lib/compliance.js";
 import { requireVendorAuth } from "./vendorAuth.js";
 import VendorNotification from "../models/VendorNotification.js";
+import {
+  isPushConfigured,
+  registerVendorSubscription,
+  unregisterSubscription,
+} from "../lib/push.js";
 
 const router = Router();
 
@@ -287,6 +292,48 @@ router.get("/alerts", requireVendorAuth, async (req, res, next) => {
         read: false,
       }))
     );
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/push/subscribe", requireVendorAuth, async (req, res, next) => {
+  try {
+    if (!isPushConfigured()) {
+      return res
+        .status(503)
+        .json({ message: "Push messaging is not configured." });
+    }
+
+    const { subscription, meta } = req.body || {};
+    if (
+      !subscription ||
+      !subscription.endpoint ||
+      !subscription.keys?.p256dh ||
+      !subscription.keys?.auth
+    ) {
+      return res.status(400).json({ message: "Invalid push subscription." });
+    }
+
+    const doc = await registerVendorSubscription(req.vendorId, {
+      subscription,
+      meta,
+    });
+
+    res.status(201).json({ ok: true, id: doc._id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/push/unsubscribe", requireVendorAuth, async (req, res, next) => {
+  try {
+    const { endpoint } = req.body || {};
+    if (!endpoint) {
+      return res.status(400).json({ message: "Endpoint is required." });
+    }
+    await unregisterSubscription(endpoint);
+    res.json({ ok: true });
   } catch (error) {
     next(error);
   }
