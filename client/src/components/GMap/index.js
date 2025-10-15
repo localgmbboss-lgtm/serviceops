@@ -160,6 +160,7 @@ export default function GMap({
   showRoute = false,
   zoom = 12,
   landmarks = [],
+  onRouteResult = null,
 }) {
   const mapEl = useRef(null);
   const mapRef = useRef(null);
@@ -169,6 +170,7 @@ export default function GMap({
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState("");
   const [directionsReady, setDirectionsReady] = useState(false);
+  const lastRouteSignatureRef = useRef(null);
 
   const origin = useMemo(() => {
     const d = vendors.find(
@@ -446,6 +448,12 @@ export default function GMap({
     }
     if (!showRoute || !origin || !destinationPosition) {
       rend.setDirections({ routes: [] });
+      if (onRouteResult) {
+        if (lastRouteSignatureRef.current !== "no-route") {
+          lastRouteSignatureRef.current = "no-route";
+          onRouteResult(null);
+        }
+      }
       return;
     }
 
@@ -458,12 +466,49 @@ export default function GMap({
     svc.route(req, (result, status) => {
       if (status === g.maps.DirectionsStatus.OK) {
         rend.setDirections(result);
+        if (onRouteResult) {
+          const primaryRoute = result?.routes?.[0];
+          const signature =
+            primaryRoute?.overview_polyline?.points ||
+            `${primaryRoute?.summary || "route"}::${
+              primaryRoute?.legs?.[0]?.distance?.value || 0
+            }::${
+              primaryRoute?.legs?.[0]?.duration?.value || 0
+            }`;
+          if (lastRouteSignatureRef.current !== signature) {
+            lastRouteSignatureRef.current = signature;
+            onRouteResult(result);
+          }
+        }
       } else {
         console.warn("Directions request failed:", status);
         rend.setDirections({ routes: [] });
+        if (onRouteResult) {
+          const errorSignature = `error:${status}`;
+          if (lastRouteSignatureRef.current !== errorSignature) {
+            lastRouteSignatureRef.current = errorSignature;
+            onRouteResult(null);
+          }
+        }
       }
     });
-  }, [ready, directionsReady, vendors, destinationPosition, destinationLabel, destinationTitle, destinationColor, destinationTextColor, destinationAvatar, normalizedLandmarks, center, zoom, origin, showRoute]);
+  }, [
+    ready,
+    directionsReady,
+    vendors,
+    destinationPosition,
+    destinationLabel,
+    destinationTitle,
+    destinationColor,
+    destinationTextColor,
+    destinationAvatar,
+    normalizedLandmarks,
+    center,
+    zoom,
+    origin,
+    showRoute,
+    onRouteResult,
+  ]);
 
   return (
     <div className="gmap-wrap">

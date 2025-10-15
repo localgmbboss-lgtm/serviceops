@@ -103,10 +103,10 @@ export default function AdminReports() {
   if (city) qs.set("city", city);
 
   const exportUrl = `${api.defaults.baseURL || ""}/api/exports/jobs.csv?${qs}`;
-  const cityParam = city ? `&city=${encodeURIComponent(city)}` : "";
-  const printUrl = `/api/reports/print?from=${from}&to=${to}${
-    service ? `&service=${encodeURIComponent(service)}` : ""
-  }${cityParam}`;
+  const printParams = new URLSearchParams({ from, to });
+  if (service) printParams.set("service", service);
+  if (city) printParams.set("city", city);
+  const printHref = `/print-report?${printParams.toString()}`;
 
   const insights = useMemo(() => {
     if (!data) return [];
@@ -167,7 +167,7 @@ export default function AdminReports() {
             <a className="btn ghost" href={exportUrl} target="_blank" rel="noreferrer">
               Export CSV
             </a>
-            <a className="btn primary" href={printUrl} target="_blank" rel="noreferrer">
+            <a className="btn primary" href={printHref} target="_blank" rel="noreferrer">
               Print PDF
             </a>
           </div>

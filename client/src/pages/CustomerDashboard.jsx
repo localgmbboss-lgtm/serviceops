@@ -61,6 +61,11 @@ export default function CustomerDashboard() {
 
   const [history, setHistory] = useState([]);
   const [err, setErr] = useState("");
+  const [routeSummary, setRouteSummary] = useState({
+    distanceText: null,
+    durationText: null,
+    distanceMeters: null,
+  });
   const historyRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -123,7 +128,7 @@ export default function CustomerDashboard() {
   const jobNumber = job?._id
     ? `#${job._id.slice(-6).toUpperCase()}`
     : "Pending";
-  const etaText = job?.estimatedDuration || "Calculating";
+  const etaText = routeSummary.durationText || job?.estimatedDuration || "Calculating";
 
   useEffect(() => {
     if (!job?._id || !job?.status) return;
@@ -316,18 +321,109 @@ export default function CustomerDashboard() {
     );
   }, [primaryDriverPosition, routeDestination]);
 
-  const routeDistanceMeters = useMemo(() => {
+  const fallbackRouteDistanceMeters = useMemo(() => {
     if (!Number.isFinite(routeDistanceKm)) return null;
     return routeDistanceKm * 1000;
   }, [routeDistanceKm]);
 
+  const handleRouteResult = useCallback((result) => {
+    if (!result?.routes?.length) {
+      setRouteSummary((prev) => {
+        if (
+          !prev.distanceText &&
+          !prev.durationText &&
+          !prev.distanceMeters
+        ) {
+          return prev;
+        }
+        return {
+          distanceText: null,
+          durationText: null,
+          distanceMeters: null,
+        };
+      });
+      return;
+    }
+    const leg = result.routes?.[0]?.legs?.[0];
+    const next = {
+      distanceText: leg?.distance?.text || null,
+      durationText: leg?.duration?.text || null,
+      distanceMeters: Number.isFinite(leg?.distance?.value)
+        ? leg.distance.value
+        : null,
+    };
+    setRouteSummary((prev) =>
+      prev.distanceText === next.distanceText &&
+      prev.durationText === next.durationText &&
+      prev.distanceMeters === next.distanceMeters
+        ? prev
+        : next
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!canShowRoute) {
+      setRouteSummary((prev) => {
+        if (
+          !prev.distanceText &&
+          !prev.durationText &&
+          !prev.distanceMeters
+        ) {
+          return prev;
+        }
+        return {
+          distanceText: null,
+          durationText: null,
+          distanceMeters: null,
+        };
+      });
+    }
+  }, [canShowRoute]);
+
+  useEffect(() => {
+    if (!hasGoogle) {
+      setRouteSummary((prev) => {
+        if (
+          !prev.distanceText &&
+          !prev.durationText &&
+          !prev.distanceMeters
+        ) {
+          return prev;
+        }
+        return {
+          distanceText: null,
+          durationText: null,
+          distanceMeters: null,
+        };
+      });
+    }
+  }, [hasGoogle]);
+
   const routeDistanceLabel = useMemo(
-    () => formatDistanceLabel(routeDistanceKm),
-    [routeDistanceKm]
+    () =>
+      routeSummary.distanceText ||
+      formatDistanceLabel(routeDistanceKm),
+    [routeSummary.distanceText, routeDistanceKm]
+  );
+
+  const effectiveRouteDistanceMeters = useMemo(
+    () => routeSummary.distanceMeters ?? fallbackRouteDistanceMeters,
+    [routeSummary.distanceMeters, fallbackRouteDistanceMeters]
   );
 
   const destinationRoleLabel =
     routeDestination?.role === "customer" ? "customer" : "destination";
+
+  const googleDirectionsUrl = useMemo(() => {
+    if (!primaryDriverPosition || !routeDestination?.position) return null;
+    const params = new URLSearchParams({
+      api: "1",
+      origin: `${primaryDriverPosition.lat},${primaryDriverPosition.lng}`,
+      destination: `${routeDestination.position.lat},${routeDestination.position.lng}`,
+      travelmode: "driving",
+    });
+    return `https://www.google.com/maps/dir/?${params.toString()}`;
+  }, [primaryDriverPosition, routeDestination]);
 
   const copyStatusLink = async () => {
     if (!job?._id) return;
@@ -537,6 +633,16 @@ export default function CustomerDashboard() {
             <div className="custdash-map__header">
               <h3>Live map</h3>
               <span className="custdash-chip">Updated every few seconds</span>
+              {googleDirectionsUrl && (
+                <a
+                  className="custdash-map__cta"
+                  href={googleDirectionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open in Google Maps
+                </a>
+              )}
             </div>
             <div
               className="custdash-map__canvas"
@@ -551,6 +657,7 @@ export default function CustomerDashboard() {
                   showRoute={canShowRoute}
                   center={mapCenter || undefined}
                   zoom={13}
+                  onRouteResult={handleRouteResult}
                 />
               ) : (
                 <>
@@ -564,7 +671,7 @@ export default function CustomerDashboard() {
                     }
                     destination={routeDestination?.position || fallbackDestination}
                     showRoute={canShowRoute}
-                    routeDistanceMeters={routeDistanceMeters}
+                    routeDistanceMeters={effectiveRouteDistanceMeters}
                   />
                   <p className="muted tiny">
                     Route preview uses open-map data and reflects the latest driver update.

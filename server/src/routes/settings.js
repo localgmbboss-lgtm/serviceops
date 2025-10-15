@@ -37,6 +37,171 @@ const sanitizeVendorDocuments = (documents = []) => {
 
 const allowedEnforcements = new Set(["off", "submission", "verified"]);
 
+const automationDefaults = {
+  alerts: {
+    customer: {
+      driverEtaMinutes: 10,
+      followUpSurveyHours: 1,
+      reengagementDays: 14,
+      channels: { sms: true, email: true, push: false },
+    },
+    vendor: {
+      jobAssigned: true,
+      slaReminderMinutes: 20,
+      channels: { sms: true, email: false, push: true },
+    },
+  },
+  digests: {
+    adminDaily: {
+      enabled: false,
+      time: "07:30",
+      channels: { email: true, sms: false, push: false },
+    },
+    adminWeekly: {
+      enabled: true,
+      weekday: "mon",
+      time: "08:00",
+      channels: { email: true, sms: false, push: false },
+    },
+    vendorWeekly: {
+      enabled: true,
+      weekday: "fri",
+      time: "17:00",
+      channels: { email: true, sms: false, push: true },
+    },
+  },
+  compliance: {
+    autoNotifyMissingDocs: true,
+    remindBeforeExpiryDays: 7,
+  },
+};
+
+const normalizeChannels = (channels = {}, defaults = {}) => ({
+  sms:
+    channels.sms !== undefined ? Boolean(channels.sms) : Boolean(defaults.sms),
+  email:
+    channels.email !== undefined
+      ? Boolean(channels.email)
+      : Boolean(defaults.email),
+  push:
+    channels.push !== undefined ? Boolean(channels.push) : Boolean(defaults.push),
+});
+
+const normalizeAutomation = (automation = {}) => {
+  const alerts = automation.alerts || {};
+  const digests = automation.digests || {};
+  const complianceAutomation = automation.compliance || {};
+
+  return {
+    alerts: {
+      customer: {
+        driverEtaMinutes:
+          toNumber(
+            alerts.customer?.driverEtaMinutes,
+            automationDefaults.alerts.customer.driverEtaMinutes
+          ) || automationDefaults.alerts.customer.driverEtaMinutes,
+        followUpSurveyHours:
+          toNumber(
+            alerts.customer?.followUpSurveyHours,
+            automationDefaults.alerts.customer.followUpSurveyHours
+          ) || automationDefaults.alerts.customer.followUpSurveyHours,
+        reengagementDays:
+          toNumber(
+            alerts.customer?.reengagementDays,
+            automationDefaults.alerts.customer.reengagementDays
+          ) || automationDefaults.alerts.customer.reengagementDays,
+        channels: normalizeChannels(
+          alerts.customer?.channels,
+          automationDefaults.alerts.customer.channels
+        ),
+      },
+      vendor: {
+        jobAssigned:
+          alerts.vendor?.jobAssigned !== undefined
+            ? Boolean(alerts.vendor.jobAssigned)
+            : automationDefaults.alerts.vendor.jobAssigned,
+        slaReminderMinutes:
+          toNumber(
+            alerts.vendor?.slaReminderMinutes,
+            automationDefaults.alerts.vendor.slaReminderMinutes
+          ) || automationDefaults.alerts.vendor.slaReminderMinutes,
+        channels: normalizeChannels(
+          alerts.vendor?.channels,
+          automationDefaults.alerts.vendor.channels
+        ),
+      },
+    },
+    digests: {
+      adminDaily: {
+        enabled:
+          digests.adminDaily?.enabled !== undefined
+            ? Boolean(digests.adminDaily.enabled)
+            : automationDefaults.digests.adminDaily.enabled,
+        time:
+          typeof digests.adminDaily?.time === "string" &&
+          digests.adminDaily.time
+            ? digests.adminDaily.time
+            : automationDefaults.digests.adminDaily.time,
+        channels: normalizeChannels(
+          digests.adminDaily?.channels,
+          automationDefaults.digests.adminDaily.channels
+        ),
+      },
+      adminWeekly: {
+        enabled:
+          digests.adminWeekly?.enabled !== undefined
+            ? Boolean(digests.adminWeekly.enabled)
+            : automationDefaults.digests.adminWeekly.enabled,
+        weekday:
+          typeof digests.adminWeekly?.weekday === "string" &&
+          digests.adminWeekly.weekday
+            ? digests.adminWeekly.weekday
+            : automationDefaults.digests.adminWeekly.weekday,
+        time:
+          typeof digests.adminWeekly?.time === "string" &&
+          digests.adminWeekly.time
+            ? digests.adminWeekly.time
+            : automationDefaults.digests.adminWeekly.time,
+        channels: normalizeChannels(
+          digests.adminWeekly?.channels,
+          automationDefaults.digests.adminWeekly.channels
+        ),
+      },
+      vendorWeekly: {
+        enabled:
+          digests.vendorWeekly?.enabled !== undefined
+            ? Boolean(digests.vendorWeekly.enabled)
+            : automationDefaults.digests.vendorWeekly.enabled,
+        weekday:
+          typeof digests.vendorWeekly?.weekday === "string" &&
+          digests.vendorWeekly.weekday
+            ? digests.vendorWeekly.weekday
+            : automationDefaults.digests.vendorWeekly.weekday,
+        time:
+          typeof digests.vendorWeekly?.time === "string" &&
+          digests.vendorWeekly.time
+            ? digests.vendorWeekly.time
+            : automationDefaults.digests.vendorWeekly.time,
+        channels: normalizeChannels(
+          digests.vendorWeekly?.channels,
+          automationDefaults.digests.vendorWeekly.channels
+        ),
+      },
+    },
+    compliance: {
+      autoNotifyMissingDocs:
+        complianceAutomation.autoNotifyMissingDocs !== undefined
+          ? Boolean(complianceAutomation.autoNotifyMissingDocs)
+          : automationDefaults.compliance.autoNotifyMissingDocs,
+      remindBeforeExpiryDays:
+        toNumber(
+          complianceAutomation.remindBeforeExpiryDays,
+          automationDefaults.compliance.remindBeforeExpiryDays
+        ) || automationDefaults.compliance.remindBeforeExpiryDays,
+    },
+  };
+};
+
 const serializeSettings = (settingsDoc) => {
   const settings = settingsDoc.toObject({ virtuals: false });
   const intervals = settings.intervals || {};
@@ -47,6 +212,8 @@ const serializeSettings = (settingsDoc) => {
 
   const compliance = settings.compliance || {};
   const vendorCompliance = compliance.vendor || {};
+
+  const automation = normalizeAutomation(settings.automation);
 
   return {
     ...settings,
@@ -63,6 +230,7 @@ const serializeSettings = (settingsDoc) => {
         documents: sanitizeVendorDocuments(vendorCompliance.documents),
       },
     },
+    automation,
   };
 };
 
@@ -147,6 +315,68 @@ router.put("/", async (req, res, next) => {
         autoSuspendOnExpiry,
         documents,
       };
+    }
+
+    if (payload.automation) {
+      const currentAutomation = settings.automation
+        ? settings.automation.toObject
+          ? settings.automation.toObject()
+          : { ...settings.automation }
+        : {};
+
+      const incoming = payload.automation || {};
+      const mergedPayload = {
+        alerts: {
+          customer: {
+            ...currentAutomation.alerts?.customer,
+            ...incoming.alerts?.customer,
+            channels: {
+              ...currentAutomation.alerts?.customer?.channels,
+              ...incoming.alerts?.customer?.channels,
+            },
+          },
+          vendor: {
+            ...currentAutomation.alerts?.vendor,
+            ...incoming.alerts?.vendor,
+            channels: {
+              ...currentAutomation.alerts?.vendor?.channels,
+              ...incoming.alerts?.vendor?.channels,
+            },
+          },
+        },
+        digests: {
+          adminDaily: {
+            ...currentAutomation.digests?.adminDaily,
+            ...incoming.digests?.adminDaily,
+            channels: {
+              ...currentAutomation.digests?.adminDaily?.channels,
+              ...incoming.digests?.adminDaily?.channels,
+            },
+          },
+          adminWeekly: {
+            ...currentAutomation.digests?.adminWeekly,
+            ...incoming.digests?.adminWeekly,
+            channels: {
+              ...currentAutomation.digests?.adminWeekly?.channels,
+              ...incoming.digests?.adminWeekly?.channels,
+            },
+          },
+          vendorWeekly: {
+            ...currentAutomation.digests?.vendorWeekly,
+            ...incoming.digests?.vendorWeekly,
+            channels: {
+              ...currentAutomation.digests?.vendorWeekly?.channels,
+              ...incoming.digests?.vendorWeekly?.channels,
+            },
+          },
+        },
+        compliance: {
+          ...currentAutomation.compliance,
+          ...incoming.compliance,
+        },
+      };
+
+      settings.automation = normalizeAutomation(mergedPayload);
     }
 
     const saved = await settings.save();

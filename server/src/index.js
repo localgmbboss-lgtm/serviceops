@@ -29,6 +29,9 @@ import customerAuth from "./routes/customerAuth.js";
 import adminAuth from "./routes/adminAuth.js";
 import vendors from "./routes/vendors.js";
 import pushRoutes from "./routes/push.js";
+import ops from "./routes/ops.js";
+import crm from "./routes/crm.js";
+import knowledge from "./routes/knowledge.js";
 
 dotenv.config();
 configurePush();
@@ -133,6 +136,9 @@ app.use("/api/vendor/feed", vendorFeed);
 app.use("/api/vendor", vendorPortal);
 app.use("/api/customer/auth", customerAuth);
 app.use("/api/vendors", vendors);
+app.use("/api/ops", ops);
+app.use("/api/crm", crm);
+app.use("/api/knowledge", knowledge);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, _req, res, _next) => {

@@ -577,10 +577,6 @@
   box-shadow: 0 18px 32px rgba(15, 23, 42, 0.08);
 }
 
-.va-job__map .gmap-container {
-  border-radius: 0;
-}
-
 .va-job__map-meta {
   display: flex;
   flex-wrap: wrap;
@@ -589,17 +585,20 @@
   gap: 12px;
   padding: 12px 16px;
   font-size: 13px;
-  color: rgba(15, 23, 42, 0.75);
+  color: rgba(15, 23, 42, 0.78);
   background: rgba(15, 23, 42, 0.05);
 }
 
-.va-job__map-link {
-  color: var(--color-primary, #2563eb);
-  font-weight: 600;
+.va-job__map-canvas {
+  width: 100%;
+  height: 240px;
+  background: #f8fafc;
 }
 
-.va-job__map-link:hover {
-  text-decoration: underline;
+.va-job__map-canvas .gmap-container,
+.va-job__map-canvas .lm-map {
+  height: 100%;
+  border-radius: 0;
 }
 
 .va-job__map-placeholder {
@@ -1117,25 +1116,6 @@
   }
 }
 
-/* Compact "Get directions" CTA used in assigned tab (replaces embedded map) */
-.va-job__map {
-  margin-top: 16px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--surface-soft, rgba(255, 255, 255, 0.96));
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  padding: 12px;
-}
-
-.va-job__map-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
 /* primary CTA style for the maps link */
 .va-job__map-button {
   display: inline-flex;
@@ -1170,17 +1150,6 @@
     justify-content: center;
     padding: 10px 14px;
   }
-}
-
-/* keep the placeholder styling consistent */
-.va-job__map-placeholder {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px dashed rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--color-text-muted);
-  font-size: 13px;
 }
 
 .va-support {

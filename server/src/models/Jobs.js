@@ -1,5 +1,67 @@
 import mongoose from "mongoose";
 
+const schedulingConfirmationSchema = new mongoose.Schema(
+  {
+    at: { type: Date, default: Date.now },
+    actor: {
+      type: String,
+      enum: ["customer", "admin", "vendor", "system"],
+      default: "system",
+    },
+    channel: {
+      type: String,
+      enum: ["email", "sms", "phone", "in_app", "system"],
+      default: "system",
+    },
+    note: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
+const schedulingOptionSchema = new mongoose.Schema(
+  {
+    start: { type: Date },
+    end: { type: Date },
+    proposedBy: {
+      type: String,
+      enum: ["customer", "admin", "vendor", "system"],
+      default: "system",
+    },
+    note: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
+const schedulingSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ["none", "requested", "confirmed", "rescheduled", "cancelled"],
+      default: "none",
+    },
+    requestedWindowStart: { type: Date },
+    requestedWindowEnd: { type: Date },
+    confirmedWindowStart: { type: Date },
+    confirmedWindowEnd: { type: Date },
+    timezone: { type: String, trim: true },
+    customerNotes: { type: String, trim: true },
+    lastUpdatedBy: {
+      type: String,
+      enum: ["customer", "admin", "vendor", "system"],
+      default: "customer",
+    },
+    confirmations: {
+      type: [schedulingConfirmationSchema],
+      default: [],
+    },
+    options: {
+      type: [schedulingOptionSchema],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
 const JobSchema = new mongoose.Schema(
   {
     // Core relations
@@ -150,6 +212,16 @@ const JobSchema = new mongoose.Schema(
     customerReview: { type: String },
     vendorRating: { type: Number, min: 1, max: 5 },
     vendorFeedback: { type: String },
+
+    // Customer scheduling preferences & confirmations
+    scheduling: {
+      type: schedulingSchema,
+      default: () => ({
+        status: "none",
+        confirmations: [],
+        options: [],
+      }),
+    },
 
     // Timestamps for status changes
     assignedAt: { type: Date },

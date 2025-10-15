@@ -6,6 +6,14 @@ clientsClaim();
 precacheAndRoute(self.__WB_MANIFEST || []);
 
 const APP_SHELL = "serviceops-app-shell-v1";
+const API_CACHE = "serviceops-api-v1";
+const CACHED_ENDPOINTS = [
+  "/api/ops/mission-control",
+  "/api/crm/leads",
+  "/api/crm/reviews",
+  "/api/knowledge",
+  "/api/settings",
+];
 const swClients = self.clients;
 
 self.addEventListener("install", (event) => {
@@ -150,9 +158,45 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  if (CACHED_ENDPOINTS.some((endpoint) => url.pathname.startsWith(endpoint))) {
+    event.respondWith(staleWhileRevalidate(event, request));
+    return;
+  }
+
   if (request.mode === "navigate") {
     event.respondWith(
       caches.match("index.html").then((cachedResponse) => cachedResponse || fetch(request))
     );
   }
 });
+
+async function staleWhileRevalidate(event, request) {
+  const cache = await caches.open(API_CACHE);
+  const cachedResponse = await cache.match(request);
+
+  const fetchPromise = fetch(request).then((response) => {
+    if (response && response.ok) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  }).catch(() => null);
+
+  if (cachedResponse) {
+    event.waitUntil(fetchPromise);
+    return cachedResponse;
+  }
+
+  const networkResponse = await fetchPromise;
+  if (networkResponse) {
+    return networkResponse;
+  }
+
+  return new Response(
+    JSON.stringify({ ok: false, offline: true, message: "Offline mode: cached data unavailable." }),
+    {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+}
+

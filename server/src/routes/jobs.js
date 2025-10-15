@@ -87,6 +87,174 @@ const haversineKm = (aLat, aLng, bLat, bLng) => {
   return R * c;
 };
 
+const SCHEDULING_STATUSES = new Set([
+  "none",
+  "requested",
+  "confirmed",
+  "rescheduled",
+  "cancelled",
+]);
+
+const sanitizeSchedulingPayload = (payload = {}, base = null) => {
+  if (!payload || typeof payload !== "object") return null;
+
+  const next = base
+    ? {
+        status: base.status || "none",
+        requestedWindowStart: base.requestedWindowStart
+          ? new Date(base.requestedWindowStart)
+          : null,
+        requestedWindowEnd: base.requestedWindowEnd
+          ? new Date(base.requestedWindowEnd)
+          : null,
+        confirmedWindowStart: base.confirmedWindowStart
+          ? new Date(base.confirmedWindowStart)
+          : null,
+        confirmedWindowEnd: base.confirmedWindowEnd
+          ? new Date(base.confirmedWindowEnd)
+          : null,
+        timezone: base.timezone || null,
+        customerNotes: base.customerNotes || "",
+        lastUpdatedBy: base.lastUpdatedBy || "system",
+        confirmations: Array.isArray(base.confirmations)
+          ? base.confirmations.map((entry) => ({
+              at: entry.at ? new Date(entry.at) : new Date(),
+              actor: entry.actor || "system",
+              channel: entry.channel || "system",
+              note: entry.note || "",
+            }))
+          : [],
+        options: Array.isArray(base.options)
+          ? base.options.map((option) => ({
+              start: option.start ? new Date(option.start) : null,
+              end: option.end ? new Date(option.end) : null,
+              note: option.note || "",
+              proposedBy: option.proposedBy || "system",
+            }))
+          : [],
+      }
+    : {
+        status: "none",
+        confirmations: [],
+        options: [],
+        timezone: null,
+        customerNotes: "",
+        lastUpdatedBy: "system",
+      };
+  let changed = false;
+
+  const toDate = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const maybeDateField = (key, aliases = []) => {
+    const possibleKeys = [key, ...aliases];
+    for (const alias of possibleKeys) {
+      if (Object.prototype.hasOwnProperty.call(payload, alias)) {
+        const val = payload[alias];
+        if (val === null) {
+          next[key] = null;
+          changed = true;
+          return;
+        }
+        const date = toDate(val);
+        if (date) {
+          next[key] = date;
+          changed = true;
+          return;
+        }
+      }
+    }
+  };
+
+  maybeDateField("requestedWindowStart", ["requestedStart", "windowStart"]);
+  maybeDateField("requestedWindowEnd", ["requestedEnd", "windowEnd"]);
+  maybeDateField("confirmedWindowStart", [
+    "confirmedStart",
+    "scheduledStart",
+  ]);
+  maybeDateField("confirmedWindowEnd", ["confirmedEnd", "scheduledEnd"]);
+
+  if (Object.prototype.hasOwnProperty.call(payload, "timezone")) {
+    next.timezone =
+      typeof payload.timezone === "string"
+        ? payload.timezone.trim() || null
+        : null;
+    changed = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "customerNotes")) {
+    next.customerNotes =
+      typeof payload.customerNotes === "string"
+        ? payload.customerNotes.trim()
+        : "";
+    changed = true;
+  }
+
+  if (payload.lastUpdatedBy) {
+    next.lastUpdatedBy = String(payload.lastUpdatedBy);
+    changed = true;
+  }
+
+  if (payload.status && SCHEDULING_STATUSES.has(String(payload.status))) {
+    next.status = String(payload.status);
+    changed = true;
+  } else if (!base && (next.requestedWindowStart || next.requestedWindowEnd)) {
+    next.status = "requested";
+    changed = true;
+  }
+
+  if (Array.isArray(payload.confirmations)) {
+    next.confirmations = payload.confirmations
+      .map((entry) => {
+        const at = toDate(entry.at) || new Date();
+        return {
+          at,
+          actor:
+            typeof entry.actor === "string"
+              ? entry.actor.trim()
+              : "system",
+          channel:
+            typeof entry.channel === "string"
+              ? entry.channel.trim()
+              : "system",
+          note: typeof entry.note === "string" ? entry.note.trim() : "",
+        };
+      })
+      .filter(Boolean);
+    changed = true;
+  } else if (payload.confirmations === null) {
+    next.confirmations = [];
+    changed = true;
+  }
+
+  if (Array.isArray(payload.options)) {
+    next.options = payload.options
+      .map((option) => {
+        const start = toDate(option.start);
+        const end = toDate(option.end);
+        return {
+          start,
+          end,
+          note: typeof option.note === "string" ? option.note.trim() : "",
+          proposedBy:
+            typeof option.proposedBy === "string"
+              ? option.proposedBy.trim()
+              : "system",
+        };
+      })
+      .filter((option) => option.start || option.end);
+    changed = true;
+  } else if (payload.options === null) {
+    next.options = [];
+    changed = true;
+  }
+
+  return changed ? next : null;
+};
+
 // ---------- LIST (optional filters: ?status=...&q=...) ----------
 router.get("/", async (req, res, next) => {
   try {
@@ -279,6 +447,11 @@ router.post("/", async (req, res, next) => {
       priority: body.priority === "urgent" ? "urgent" : "normal",
     };
 
+    const schedulingPayload = sanitizeSchedulingPayload(body.scheduling);
+    if (schedulingPayload) {
+      jobPayload.scheduling = schedulingPayload;
+    }
+
     if (vendorDoc) {
       jobPayload.vendorId = vendorDoc._id;
       jobPayload.vendorName = vendorDoc.name || null;
@@ -362,6 +535,25 @@ router.patch("/:id", async (req, res, next) => {
       }
     }
 
+    if (Object.prototype.hasOwnProperty.call(payload, "scheduling")) {
+      if (payload.scheduling === null) {
+        unset.scheduling = "";
+      } else {
+        const currentScheduling = job.scheduling
+          ? (typeof job.scheduling.toObject === "function"
+              ? job.scheduling.toObject()
+              : job.scheduling)
+          : null;
+        const schedulingUpdate = sanitizeSchedulingPayload(
+          payload.scheduling,
+          currentScheduling
+        );
+        if (schedulingUpdate) {
+          set.scheduling = schedulingUpdate;
+        }
+      }
+    }
+
     if (Object.prototype.hasOwnProperty.call(payload, "status")) {
       const nextStatus = payload.status;
       if (!STATUSES.includes(nextStatus)) {
@@ -415,6 +607,38 @@ router.patch("/:id", async (req, res, next) => {
     res.json(refreshed);
   } catch (e) {
     next(e);
+  }
+});
+
+router.post("/:id/scheduling", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    assertId(id);
+
+    const job = await Job.findById(id);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    const payload = req.body || {};
+    const currentScheduling = job.scheduling
+      ? (typeof job.scheduling.toObject === "function"
+          ? job.scheduling.toObject()
+          : job.scheduling)
+      : null;
+    const schedulingUpdate = sanitizeSchedulingPayload(
+      payload,
+      currentScheduling
+    );
+
+    if (!schedulingUpdate) {
+      return res.status(400).json({ message: "No scheduling changes supplied" });
+    }
+
+    job.scheduling = schedulingUpdate;
+    await job.save();
+
+    res.json(job.toObject());
+  } catch (error) {
+    next(error);
   }
 });
 

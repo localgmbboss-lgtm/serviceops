@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { vendorApi } from "../lib/vendorApi";
 import { useNotifications } from "../contexts/NotificationsContext";
 import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
+import GMap from "../components/GMap";
+import LiveMap from "../components/LiveMap";
+import { getGoogleMapsKey } from "../config/env.js";
 import "./VendorApp.css";
 
 const KM_TO_MI = 0.621371;
@@ -158,6 +161,9 @@ export default function VendorApp() {
   const [assignedPage, setAssignedPage] = useState(0);
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [noteTranslations, setNoteTranslations] = useState({});
+  const [jobRouteSummaries, setJobRouteSummaries] = useState({});
+  const mapsKey = getGoogleMapsKey();
+  const hasGoogle = Boolean(mapsKey);
   const [requestingLocation, setRequestingLocation] = useState(false);
   const [locationError, setLocationError] = useState("");
 
@@ -631,6 +637,36 @@ export default function VendorApp() {
     }
   };
 
+  const handleJobRouteResult = useCallback((jobId, result) => {
+    if (!jobId) return;
+    setJobRouteSummaries((prev) => {
+      if (!result?.routes?.length) {
+        if (!prev[jobId]) return prev;
+        const next = { ...prev };
+        delete next[jobId];
+        return next;
+      }
+      const leg = result.routes?.[0]?.legs?.[0];
+      const nextEntry = {
+        distanceText: leg?.distance?.text || null,
+        durationText: leg?.duration?.text || null,
+        distanceMeters: Number.isFinite(leg?.distance?.value)
+          ? leg.distance.value
+          : null,
+      };
+      const prevEntry = prev[jobId];
+      if (
+        prevEntry &&
+        prevEntry.distanceText === nextEntry.distanceText &&
+        prevEntry.durationText === nextEntry.durationText &&
+        prevEntry.distanceMeters === nextEntry.distanceMeters
+      ) {
+        return prev;
+      }
+      return { ...prev, [jobId]: nextEntry };
+    });
+  }, []);
+
   const openBidSheet = (job) => {
     const eta = suggestedEta(job);
     const price = suggestedPrice(job);
@@ -1061,7 +1097,9 @@ export default function VendorApp() {
                     const pickupCoords = derivePickupCoordinates(job);
                     const routeFallbackCopy = !vendorCoordinates
                       ? "Add your base location in your vendor profile to unlock turn-by-turn directions."
-                      : "Waiting on the customer to share a precise pickup coordinate.";
+                      : !pickupCoords
+                      ? "Waiting on the customer to share a precise pickup coordinate."
+                      : "Route preview is unavailable right now.";
                     const mapsLink = pickupCoords
                       ? `https://www.google.com/maps/dir/?api=1${
                           vendorCoordinates
@@ -1098,6 +1136,21 @@ export default function VendorApp() {
                     const statusClass = statusLabel
                       .toLowerCase()
                       .replace(/\s+/g, "");
+                    const jobRouteSummary = jobRouteSummaries[job._id] || null;
+                    const routeDistanceText =
+                      jobRouteSummary?.distanceText ||
+                      (Number.isFinite(job.distanceKm)
+                        ? formatDistance(job.distanceKm)
+                        : null);
+                    const routeDurationText =
+                      jobRouteSummary?.durationText ||
+                      (travelMinutes ? `${travelMinutes} min` : null);
+                    const routeMetaText =
+                      routeDistanceText && routeDurationText
+                        ? `${routeDistanceText} \u2022 ${routeDurationText}`
+                        : routeDistanceText ||
+                          routeDurationText ||
+                          routeFallbackCopy;
                     return (
                       <li
                         key={job._id}
@@ -1164,30 +1217,73 @@ export default function VendorApp() {
                             </div>
                           ) : null}
 
-                          {/* REPLACED: embedded map -> Compact "Get directions" button for assigned jobs */}
                           {expanded ? (
-                            mapsLink ? (
+                            vendorCoordinates && pickupCoords ? (
                               <div className="va-job__map">
                                 <div className="va-job__map-meta">
-                                  <span>
-                                    {travelMinutes
-                                      ? `Approx drive ${travelMinutes} min`
-                                      : routeFallbackCopy}
-                                  </span>
-
-                                  <a
-                                    href={mapsLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="va-job__map-button"
-                                    onClick={(e) => {
-                                      // prevent parent li from collapsing when clicking CTA
-                                      e.stopPropagation();
-                                    }}
-                                  >
-                                    Get directions
-                                    <span aria-hidden="true">&rarr;</span>
-                                  </a>
+                                  <span>{routeMetaText}</span>
+                                  {mapsLink && (
+                                    <a
+                                      href={mapsLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="va-job__map-button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      Open in Google Maps
+                                      <span aria-hidden="true">&rarr;</span>
+                                    </a>
+                                  )}
+                                </div>
+                                <div className="va-job__map-canvas">
+                                  {hasGoogle ? (
+                                    <GMap
+                                      vendors={[
+                                        {
+                                          lat: vendorCoordinates.lat,
+                                          lng: vendorCoordinates.lng,
+                                          label: "YOU",
+                                          name: me?.name || "You",
+                                        },
+                                      ]}
+                                      destination={{
+                                        position: pickupCoords,
+                                        label: "JOB",
+                                        role: "pickup",
+                                        title:
+                                          job.pickupAddress || "Pickup",
+                                        color: "#f97316",
+                                        textColor: "#0f172a",
+                                      }}
+                                      showRoute
+                                      zoom={13}
+                                      onRouteResult={(result) =>
+                                        handleJobRouteResult(job._id, result)
+                                      }
+                                    />
+                                  ) : (
+                                    <LiveMap
+                                      drivers={[
+                                        {
+                                          _id: "me",
+                                          lat: vendorCoordinates.lat,
+                                          lng: vendorCoordinates.lng,
+                                          name: me?.name || "You",
+                                        },
+                                      ]}
+                                      destination={pickupCoords}
+                                      showRoute
+                                      autoFit
+                                      routeDistanceMeters={
+                                        jobRouteSummary?.distanceMeters ??
+                                        (Number.isFinite(job.distanceKm)
+                                          ? job.distanceKm * 1000
+                                          : null)
+                                      }
+                                    />
+                                  )}
                                 </div>
                               </div>
                             ) : (
@@ -1196,7 +1292,6 @@ export default function VendorApp() {
                               </div>
                             )
                           ) : null}
-                          {/* END replacement */}
                         </div>
 
                         <div className="va-job__cta va-job__cta--stack">

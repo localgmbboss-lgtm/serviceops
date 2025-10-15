@@ -40,6 +40,7 @@ export default function AdminSettings() {
         reviews: s.reviews,
         commission: s.commission,
         compliance: s.compliance,
+        automation: s.automation,
       };
       const { data } = await api.put("/api/settings", body);
       setS(data);
@@ -477,6 +478,294 @@ export default function AdminSettings() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      </section>
+
+      <section className="card aset-section">
+        <div className="aset-section-head">
+          <h2 className="section-title">Alerts & Automations</h2>
+          <p className="section-subtext">
+            Control proactive notifications, scheduled digests, and compliance nudges that keep
+            operators in sync without extra clicks.
+          </p>
+        </div>
+        <div className="row aset-automation-row">
+          <div className="aset-automation-card">
+            <h3>Customer touchpoints</h3>
+            <label>
+              <span>Driver ETA reminder (minutes)</span>
+              <input
+                type="number"
+                min="0"
+                value={s.automation?.alerts?.customer?.driverEtaMinutes ?? 10}
+                onChange={(event) =>
+                  setK(
+                    "automation.alerts.customer.driverEtaMinutes",
+                    Number(event.target.value) || 0
+                  )
+                }
+              />
+            </label>
+            <label>
+              <span>Post-service survey (hours)</span>
+              <input
+                type="number"
+                min="0"
+                value={s.automation?.alerts?.customer?.followUpSurveyHours ?? 1}
+                onChange={(event) =>
+                  setK(
+                    "automation.alerts.customer.followUpSurveyHours",
+                    Number(event.target.value) || 0
+                  )
+                }
+              />
+            </label>
+            <label>
+              <span>Re-engagement cadence (days)</span>
+              <input
+                type="number"
+                min="0"
+                value={s.automation?.alerts?.customer?.reengagementDays ?? 14}
+                onChange={(event) =>
+                  setK(
+                    "automation.alerts.customer.reengagementDays",
+                    Number(event.target.value) || 0
+                  )
+                }
+              />
+            </label>
+            <div className="aset-toggle-group">
+              <span>Channels</span>
+              <label className="aset-toggle">
+                <input
+                  type="checkbox"
+                  checked={s.automation?.alerts?.customer?.channels?.sms ?? true}
+                  onChange={(event) =>
+                    setK("automation.alerts.customer.channels.sms", event.target.checked)
+                  }
+                />
+                SMS
+              </label>
+              <label className="aset-toggle">
+                <input
+                  type="checkbox"
+                  checked={s.automation?.alerts?.customer?.channels?.email ?? true}
+                  onChange={(event) =>
+                    setK("automation.alerts.customer.channels.email", event.target.checked)
+                  }
+                />
+                Email
+              </label>
+              <label className="aset-toggle">
+                <input
+                  type="checkbox"
+                  checked={s.automation?.alerts?.customer?.channels?.push ?? false}
+                  onChange={(event) =>
+                    setK("automation.alerts.customer.channels.push", event.target.checked)
+                  }
+                />
+                Push
+              </label>
+            </div>
+          </div>
+
+          <div className="aset-automation-card">
+            <h3>Vendor nudges</h3>
+            <label className="aset-toggle aset-toggle--inline">
+              <input
+                type="checkbox"
+                checked={s.automation?.alerts?.vendor?.jobAssigned ?? true}
+                onChange={(event) =>
+                  setK("automation.alerts.vendor.jobAssigned", event.target.checked)
+                }
+              />
+              Notify on new assignment
+            </label>
+            <label>
+              <span>SLA reminder (minutes)</span>
+              <input
+                type="number"
+                min="0"
+                value={s.automation?.alerts?.vendor?.slaReminderMinutes ?? 20}
+                onChange={(event) =>
+                  setK(
+                    "automation.alerts.vendor.slaReminderMinutes",
+                    Number(event.target.value) || 0
+                  )
+                }
+              />
+            </label>
+            <div className="aset-toggle-group">
+              <span>Channels</span>
+              <label className="aset-toggle">
+                <input
+                  type="checkbox"
+                  checked={s.automation?.alerts?.vendor?.channels?.sms ?? true}
+                  onChange={(event) =>
+                    setK("automation.alerts.vendor.channels.sms", event.target.checked)
+                  }
+                />
+                SMS
+              </label>
+              <label className="aset-toggle">
+                <input
+                  type="checkbox"
+                  checked={s.automation?.alerts?.vendor?.channels?.email ?? false}
+                  onChange={(event) =>
+                    setK("automation.alerts.vendor.channels.email", event.target.checked)
+                  }
+                />
+                Email
+              </label>
+              <label className="aset-toggle">
+                <input
+                  type="checkbox"
+                  checked={s.automation?.alerts?.vendor?.channels?.push ?? true}
+                  onChange={(event) =>
+                    setK("automation.alerts.vendor.channels.push", event.target.checked)
+                  }
+                />
+                Push
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="row aset-automation-row">
+          <div className="aset-automation-card">
+            <h3>Scheduled digests</h3>
+            <label className="aset-toggle aset-toggle--inline">
+              <input
+                type="checkbox"
+                checked={s.automation?.digests?.adminDaily?.enabled ?? false}
+                onChange={(event) =>
+                  setK("automation.digests.adminDaily.enabled", event.target.checked)
+                }
+              />
+              Daily admin snapshot
+            </label>
+            <label>
+              <span>Daily send time</span>
+              <input
+                type="time"
+                value={s.automation?.digests?.adminDaily?.time || "07:30"}
+                onChange={(event) =>
+                  setK("automation.digests.adminDaily.time", event.target.value)
+                }
+              />
+            </label>
+            <label className="aset-toggle aset-toggle--inline">
+              <input
+                type="checkbox"
+                checked={s.automation?.digests?.adminWeekly?.enabled ?? true}
+                onChange={(event) =>
+                  setK("automation.digests.adminWeekly.enabled", event.target.checked)
+                }
+              />
+              Weekly executive roll-up
+            </label>
+            <div className="aset-digest-grid">
+              <label>
+                <span>Day</span>
+                <select
+                  value={s.automation?.digests?.adminWeekly?.weekday || "mon"}
+                  onChange={(event) =>
+                    setK("automation.digests.adminWeekly.weekday", event.target.value)
+                  }
+                >
+                  <option value="sun">Sunday</option>
+                  <option value="mon">Monday</option>
+                  <option value="tue">Tuesday</option>
+                  <option value="wed">Wednesday</option>
+                  <option value="thu">Thursday</option>
+                  <option value="fri">Friday</option>
+                  <option value="sat">Saturday</option>
+                </select>
+              </label>
+              <label>
+                <span>Time</span>
+                <input
+                  type="time"
+                  value={s.automation?.digests?.adminWeekly?.time || "08:00"}
+                  onChange={(event) =>
+                    setK("automation.digests.adminWeekly.time", event.target.value)
+                  }
+                />
+              </label>
+            </div>
+            <div className="aset-toggle-group">
+              <span>Vendor weekly</span>
+              <label className="aset-toggle aset-toggle--inline">
+                <input
+                  type="checkbox"
+                  checked={s.automation?.digests?.vendorWeekly?.enabled ?? true}
+                  onChange={(event) =>
+                    setK("automation.digests.vendorWeekly.enabled", event.target.checked)
+                  }
+                />
+                Enabled
+              </label>
+              <label>
+                <span>Send on</span>
+                <select
+                  value={s.automation?.digests?.vendorWeekly?.weekday || "fri"}
+                  onChange={(event) =>
+                    setK("automation.digests.vendorWeekly.weekday", event.target.value)
+                  }
+                >
+                  <option value="sun">Sunday</option>
+                  <option value="mon">Monday</option>
+                  <option value="tue">Tuesday</option>
+                  <option value="wed">Wednesday</option>
+                  <option value="thu">Thursday</option>
+                  <option value="fri">Friday</option>
+                  <option value="sat">Saturday</option>
+                </select>
+              </label>
+              <label>
+                <span>Time</span>
+                <input
+                  type="time"
+                  value={s.automation?.digests?.vendorWeekly?.time || "17:00"}
+                  onChange={(event) =>
+                    setK("automation.digests.vendorWeekly.time", event.target.value)
+                  }
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="aset-automation-card">
+            <h3>Compliance workflows</h3>
+            <label className="aset-toggle aset-toggle--inline">
+              <input
+                type="checkbox"
+                checked={s.automation?.compliance?.autoNotifyMissingDocs ?? true}
+                onChange={(event) =>
+                  setK("automation.compliance.autoNotifyMissingDocs", event.target.checked)
+                }
+              />
+              Auto-notify missing documents
+            </label>
+            <label>
+              <span>Reminder before expiry (days)</span>
+              <input
+                type="number"
+                min="0"
+                value={s.automation?.compliance?.remindBeforeExpiryDays ?? 7}
+                onChange={(event) =>
+                  setK(
+                    "automation.compliance.remindBeforeExpiryDays",
+                    Number(event.target.value) || 0
+                  )
+                }
+              />
+            </label>
+            <p className="aset-automation-hint">
+              Vendors will receive a warning through the selected channels, and entries will surface
+              inside Mission Control until resolved.
+            </p>
           </div>
         </div>
       </section>

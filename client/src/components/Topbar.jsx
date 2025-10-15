@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LuSettings } from "react-icons/lu";
+import { LuSettings, LuChevronLeft, LuChevronRight } from "react-icons/lu";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationsContext";
 import brandMark from "../assets/brand-mark.png";
@@ -8,6 +8,8 @@ import {
   ensureAdminPushSubscription,
   ensureVendorPushSubscription,
 } from "../lib/pushNotifications.js";
+
+const NAV_SCROLL_ID = "topbar-nav-items";
 
 export default function Topbar() {
   const loc = useLocation();
@@ -18,7 +20,13 @@ export default function Topbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [userMenuPosition, setUserMenuPosition] = useState(null);
   const [isHidden, setIsHidden] = useState(false);
+  const [navScrollState, setNavScrollState] = useState({
+    isOverflow: false,
+    canScrollStart: false,
+    canScrollEnd: false,
+  });
   const navRef = useRef(null);
+  const navScrollRef = useRef(null);
   const toggleRef = useRef(null);
   const userMenuRef = useRef(null);
   const userMenuButtonRef = useRef(null);
@@ -42,6 +50,71 @@ export default function Topbar() {
   );
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  const updateNavScrollState = useCallback(() => {
+    const scrollEl = navScrollRef.current;
+    if (!scrollEl) {
+      setNavScrollState((prev) =>
+        prev.isOverflow || prev.canScrollStart || prev.canScrollEnd
+          ? { isOverflow: false, canScrollStart: false, canScrollEnd: false }
+          : prev
+      );
+      return;
+    }
+    if (typeof window !== "undefined") {
+      const compact = window.innerWidth <= 900;
+      if (menuOpen || compact) {
+        setNavScrollState((prev) =>
+          prev.isOverflow || prev.canScrollStart || prev.canScrollEnd
+            ? { isOverflow: false, canScrollStart: false, canScrollEnd: false }
+            : prev
+        );
+        return;
+      }
+    }
+    const maxScrollLeft = scrollEl.scrollWidth - scrollEl.clientWidth;
+    const threshold = 8;
+    const isOverflow = maxScrollLeft > threshold;
+    const canScrollStart = scrollEl.scrollLeft > threshold;
+    const canScrollEnd = scrollEl.scrollLeft < maxScrollLeft - threshold;
+    setNavScrollState((prev) => {
+      if (
+        prev.isOverflow === isOverflow &&
+        prev.canScrollStart === canScrollStart &&
+        prev.canScrollEnd === canScrollEnd
+      ) {
+        return prev;
+      }
+      return { isOverflow, canScrollStart, canScrollEnd };
+    });
+  }, [menuOpen]);
+
+  const scrollNavBy = useCallback((direction) => {
+    const el = navScrollRef.current;
+    if (!el) return;
+    const amount = el.clientWidth ? el.clientWidth * 0.8 : 240;
+    el.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  }, []);
+
+  const handleNavWheel = useCallback(
+    (event) => {
+      if (!navScrollState.isOverflow || menuOpen) return;
+      const el = navScrollRef.current;
+      if (!el) return;
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        return;
+      }
+      event.preventDefault();
+      el.scrollBy({
+        left: event.deltaY,
+        behavior: "smooth",
+      });
+    },
+    [menuOpen, navScrollState.isOverflow]
+  );
 
   useEffect(() => {
     closeMenu();
@@ -205,12 +278,16 @@ export default function Topbar() {
     if (!user) return guestLinks;
     if (isAdmin) {
       return [
+        { to: "/admin/ops", label: "Ops Center" },
         { to: "/jobs", label: "Jobs" },
+        { to: "/admin/crm/leads", label: "Leads" },
+        { to: "/admin/crm/reviews", label: "Reviews" },
         { to: "/reports", label: "Reports" },
+        { to: "/financials", label: "Financials" },
         { to: "/admin/vendors", label: "Vendors" },
         { to: "/admin/documents", label: "Docs" },
+        { to: "/admin/knowledge", label: "Knowledge" },
         { to: "/admin/map", label: "Live Map" },
-        { to: "/financials", label: "Financials" },
       ];
     }
     if (isVendor) {
@@ -227,6 +304,43 @@ export default function Topbar() {
     }
     return [];
   }, [user, isAdmin, isVendor, isCustomer, guestLinks]);
+
+  const navScrollWrapperClassName = useMemo(() => {
+    const classes = ["nav-scroll-wrapper"];
+    if (navScrollState.isOverflow) {
+      classes.push("nav-scroll-wrapper--overflow");
+      if (navScrollState.canScrollStart) classes.push("nav-scroll-wrapper--show-left");
+      if (navScrollState.canScrollEnd) classes.push("nav-scroll-wrapper--show-right");
+    }
+    return classes.join(" ");
+  }, [navScrollState]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const scrollEl = navScrollRef.current;
+    const handleScroll = () => updateNavScrollState();
+    updateNavScrollState();
+    if (scrollEl) {
+      scrollEl.addEventListener("scroll", handleScroll);
+    }
+    window.addEventListener("resize", handleScroll);
+    let resizeObserver;
+    if (scrollEl && typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(handleScroll);
+      resizeObserver.observe(scrollEl);
+    }
+    return () => {
+      if (scrollEl) {
+        scrollEl.removeEventListener("scroll", handleScroll);
+      }
+      window.removeEventListener("resize", handleScroll);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, [navItems, menuOpen, updateNavScrollState]);
+
+  useEffect(() => {
+    updateNavScrollState();
+  }, [loc.pathname, updateNavScrollState]);
 
   const topbarClassName = user ? "topbar topbar--authed" : "topbar";
 
@@ -296,27 +410,61 @@ export default function Topbar() {
           aria-label="Primary navigation"
           ref={navRef}
         >
-          {navItems.map((item) =>
-            user ? (
+          <div className={navScrollWrapperClassName}>
+            {navScrollState.isOverflow ? (
               <button
-                key={item.to}
                 type="button"
-                className={isActivePath(item.to) ? "nav-link active" : "nav-link"}
-                onClick={() => handleNavigation(item.to)}
+                className="nav-scroll-btn nav-scroll-btn--left"
+                onClick={() => scrollNavBy("left")}
+                aria-label="Scroll navigation left"
+                aria-controls={NAV_SCROLL_ID}
+                disabled={!navScrollState.canScrollStart}
               >
-                {item.label}
+                <LuChevronLeft aria-hidden="true" />
               </button>
-            ) : (
-              <Link
-                key={item.to}
-                to={item.to}
-                className="nav-link"
-                onClick={closeMenu}
+            ) : null}
+            <div
+              id={NAV_SCROLL_ID}
+              className="nav-scroll"
+              ref={navScrollRef}
+              role="presentation"
+              onWheel={handleNavWheel}
+            >
+              {navItems.map((item) =>
+                user ? (
+                  <button
+                    key={item.to}
+                    type="button"
+                    className={isActivePath(item.to) ? "nav-link active" : "nav-link"}
+                    onClick={() => handleNavigation(item.to)}
+                  >
+                    {item.label}
+                  </button>
+                ) : (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className="nav-link"
+                    onClick={closeMenu}
+                  >
+                    {item.label}
+                  </Link>
+                )
+              )}
+            </div>
+            {navScrollState.isOverflow ? (
+              <button
+                type="button"
+                className="nav-scroll-btn nav-scroll-btn--right"
+                onClick={() => scrollNavBy("right")}
+                aria-label="Scroll navigation right"
+                aria-controls={NAV_SCROLL_ID}
+                disabled={!navScrollState.canScrollEnd}
               >
-                {item.label}
-              </Link>
-            )
-          )}
+                <LuChevronRight aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
           {user && (
             <div className="nav-mobile-actions">
               {isAdmin ? (
