@@ -8,8 +8,12 @@ import Vendor from "../models/Vendor.js"; // Changed from Driver to Vendor
 import Customer from "../models/Customer.js";
 import { notifySMS } from "../lib/notifier.js";
 import VendorNotification from "../models/VendorNotification.js";
+import AdminNotification from "../models/AdminNotification.js";
 import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
-import { sendVendorPushNotifications } from "../lib/push.js";
+import {
+  sendAdminPushNotifications,
+  sendVendorPushNotifications,
+} from "../lib/push.js";
 const router = Router();
 
 const defaultClientBase = getClientBaseUrl();
@@ -465,6 +469,31 @@ router.post("/", async (req, res, next) => {
     }
 
     const job = await Job.create(jobPayload);
+
+    try {
+      const customer = await Customer.findById(job.customerId).lean();
+      const adminNotification = await AdminNotification.create({
+        title: "New job created",
+        body: `${job.serviceType || "Service request"} for ${
+          customer?.name || "customer"
+        }`,
+        severity: "info",
+        jobId: job._id,
+        customerId: job.customerId || null,
+        meta: {
+          role: "admin",
+          route: `/jobs/${job._id}`,
+          jobId: job._id,
+          customerId: job.customerId || null,
+          serviceType: job.serviceType || null,
+          pickupAddress: job.pickupAddress || null,
+          priority: job.priority || "normal",
+        },
+      });
+      await sendAdminPushNotifications([adminNotification]);
+    } catch (notifyError) {
+      console.error("Failed to notify admins about new job", notifyError);
+    }
 
     res.status(201).json(job);
   } catch (e) {
