@@ -680,6 +680,14 @@
   color: #111827;
 }
 
+.va-job__messaging {
+  margin: 16px 0;
+}
+
+.va-job__messaging .message-panel {
+  box-shadow: none;
+}
+
 .va-job__cta {
   display: inline-flex;
   align-items: center;

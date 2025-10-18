@@ -268,6 +268,7 @@ export default function Topbar() {
 
   const guestLinks = useMemo(
     () => [
+      { to: "/admin/login", label: "Admin login" },
       { to: "/customer/login", label: "Customer login" },
       { to: "/vendor/login", label: "Vendor login" },
     ],

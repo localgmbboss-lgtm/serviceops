@@ -198,11 +198,6 @@ export default function CustomerHome() {
     };
   }, [jobs, publish]);
 
-  const activeJobs = useMemo(
-    () => (jobs || []).filter((job) => job.status !== "Completed"),
-    [jobs]
-  );
-
   const grouped = useMemo(() => {
     const byStatus = { Active: [], Completed: [] };
     (jobs || []).forEach((j) =>

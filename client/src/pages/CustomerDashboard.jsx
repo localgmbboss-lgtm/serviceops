@@ -12,6 +12,8 @@ import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
+import MessagingPanel from "../components/MessagingPanel";
+import { useJobMessaging } from "../hooks/useJobMessaging";
 import { useNotifications } from "../contexts/NotificationsContext";
 import {
   LuCar,
@@ -92,6 +94,16 @@ export default function CustomerDashboard() {
   const hasGoogle = Boolean(mapsKey);
 
   const { customer, job, driver } = state;
+  const {
+    messages: chatMessages,
+    participants: chatParticipants,
+    sendMessage: sendChatMessage,
+    sending: chatSending,
+    loading: chatLoading,
+    error: chatError,
+    canMessage: chatEnabled,
+    realtimeReady: chatRealtimeReady,
+  } = useJobMessaging({ jobId: job?._id, role: "customer" });
   const { publish } = useNotifications();
   const previousStatusRef = useRef(null);
   const previousDriverRef = useRef(null);
@@ -112,6 +124,17 @@ export default function CustomerDashboard() {
       ? `${driver.city} - ${driver.phone || "No phone on file"}`
       : driver.phone || "No phone on file"
     : "We'll notify you as soon as a driver accepts.";
+  const vendorDisplayName = useMemo(
+    () => chatParticipants?.vendor?.name || driver?.name || "",
+    [chatParticipants?.vendor?.name, driver?.name]
+  );
+  const chatSubtitle = useMemo(() => {
+    if (!job) return "";
+    if (chatEnabled && vendorDisplayName) {
+      return `Share updates with ${vendorDisplayName}`;
+    }
+    return "";
+  }, [chatEnabled, job, vendorDisplayName]);
 
   const currentStage = job?.status || "Unassigned";
   const activeIndex = Math.max(STAGES.indexOf(currentStage), 0);
@@ -552,7 +575,7 @@ export default function CustomerDashboard() {
                 />
               </div>
 
-              <ul className="custdash-flow__steps" role="list">
+              <ul className="custdash-flow__steps">
                 {STAGES.map((s, i) => {
                   const done = i < activeIndex;
                   const active = i === activeIndex;
@@ -799,6 +822,22 @@ export default function CustomerDashboard() {
             ))}
           </div>
         </section>
+
+        {job && (
+          <MessagingPanel
+            title="Message your vendor"
+            subtitle={chatSubtitle}
+            messages={chatMessages}
+            participants={chatParticipants}
+            actorRole="customer"
+            canMessage={chatEnabled}
+            onSend={sendChatMessage}
+            sending={chatSending}
+            loading={chatLoading}
+            error={chatError}
+            realtimeReady={chatRealtimeReady}
+          />
+        )}
 
         <section
           ref={historyRef}

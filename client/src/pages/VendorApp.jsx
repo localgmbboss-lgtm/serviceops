@@ -5,6 +5,8 @@ import { useNotifications } from "../contexts/NotificationsContext";
 import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
+import MessagingPanel from "../components/MessagingPanel";
+import { useJobMessaging } from "../hooks/useJobMessaging";
 import { getGoogleMapsKey } from "../config/env.js";
 import "./VendorApp.css";
 
@@ -166,6 +168,37 @@ export default function VendorApp() {
   const hasGoogle = Boolean(mapsKey);
   const [requestingLocation, setRequestingLocation] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const expandedAssignedJob = useMemo(
+    () =>
+      assigned.find((job) => job && job._id === expandedJobId) || null,
+    [assigned, expandedJobId]
+  );
+  const {
+    messages: vendorMessages,
+    participants: vendorParticipants,
+    sendMessage: sendVendorMessage,
+    sending: vendorSending,
+    loading: vendorMessagesLoading,
+    error: vendorMessagesError,
+    canMessage: vendorCanMessage,
+    realtimeReady: vendorRealtimeReady,
+  } = useJobMessaging({
+    jobId: expandedAssignedJob?._id,
+    role: "vendor",
+  });
+  const vendorChatSubtitle = useMemo(() => {
+    if (!expandedAssignedJob) return "";
+    const customerName =
+      vendorParticipants?.customer?.name ||
+      expandedAssignedJob.customerName ||
+      expandedAssignedJob.contactName ||
+      "your customer";
+    return vendorCanMessage ? `Share updates with ${customerName}` : "";
+  }, [
+    expandedAssignedJob,
+    vendorCanMessage,
+    vendorParticipants?.customer?.name,
+  ]);
 
   const handleToggleNoteLanguage = async (event, job) => {
     event?.stopPropagation?.();
@@ -1214,6 +1247,30 @@ export default function VendorApp() {
                                   )}
                                 </div>
                               ))}
+                            </div>
+                          ) : null}
+
+                          {expanded &&
+                          expandedAssignedJob &&
+                          job._id === expandedAssignedJob._id ? (
+                            <div
+                              className="va-job__messaging"
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <MessagingPanel
+                                title="Message the customer"
+                                subtitle={vendorChatSubtitle}
+                                messages={vendorMessages}
+                                participants={vendorParticipants}
+                                actorRole="vendor"
+                                canMessage={vendorCanMessage}
+                                onSend={sendVendorMessage}
+                                sending={vendorSending}
+                                loading={vendorMessagesLoading}
+                                error={vendorMessagesError}
+                                realtimeReady={vendorRealtimeReady}
+                              />
                             </div>
                           ) : null}
 

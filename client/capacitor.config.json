@@ -1,0 +1,9 @@
+{
+  "appId": "com.serviceops.app",
+  "appName": "ServiceOps",
+  "webDir": "build",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

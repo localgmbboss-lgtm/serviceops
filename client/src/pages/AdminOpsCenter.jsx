@@ -249,10 +249,19 @@ export default function AdminOpsCenter() {
   const [compliancePage, setCompliancePage] = useState(1);
   const [scorecardPage, setScorecardPage] = useState(1);
 
-  const queueItems = state.queue || [];
-  const routeItems = state.routeSuggestions || [];
-  const complianceItems = state.complianceTasks || [];
-  const scorecardItems = state.vendorScorecards || [];
+  const queueItems = useMemo(() => state.queue ?? [], [state.queue]);
+  const routeItems = useMemo(
+    () => state.routeSuggestions ?? [],
+    [state.routeSuggestions]
+  );
+  const complianceItems = useMemo(
+    () => state.complianceTasks ?? [],
+    [state.complianceTasks]
+  );
+  const scorecardItems = useMemo(
+    () => state.vendorScorecards ?? [],
+    [state.vendorScorecards]
+  );
 
   const queueTotal = queueItems.length;
   const routeTotal = routeItems.length;

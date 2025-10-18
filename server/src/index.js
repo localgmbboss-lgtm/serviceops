@@ -2,6 +2,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { createServer } from "http";
 import { connectDB } from "./lib/db.js";
 import { initRealtime } from "./realtime/index.js";
@@ -25,6 +27,7 @@ import vendorAuth from "./routes/vendorAuth.js";
 import vendorFeed from "./routes/vendorFeed.js";
 import vendorPortal from "./routes/vendorPortal.js";
 import vendorDocuments from "./routes/vendorDocuments.js";
+import messages from "./routes/messages.js";
 import customerAuth from "./routes/customerAuth.js";
 import adminAuth from "./routes/adminAuth.js";
 import vendors from "./routes/vendors.js";
@@ -39,6 +42,8 @@ configurePush();
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // CORS configuration -----------------------------------------------------
 const normalizeOrigin = (origin) => {
@@ -112,6 +117,12 @@ app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"), {
+    fallthrough: true,
+  })
+);
 
 app.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 app.use("/api/documents", documents);
@@ -135,6 +146,7 @@ app.use("/api/vendor/auth", vendorAuth);
 app.use("/api/vendor/feed", vendorFeed);
 app.use("/api/vendor", vendorPortal);
 app.use("/api/customer/auth", customerAuth);
+app.use("/api/messages", messages);
 app.use("/api/vendors", vendors);
 app.use("/api/ops", ops);
 app.use("/api/crm", crm);

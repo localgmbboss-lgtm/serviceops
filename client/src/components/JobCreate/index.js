@@ -226,6 +226,9 @@ export default function JobCreate({ onCreated }) {
       <h3>Create job</h3>
 
       {err && <div className="jobcreate-alert error">{err}</div>}
+      {vendorsError && (
+        <div className="jobcreate-alert error">{vendorsError}</div>
+      )}
       {success && (
         <div className="jobcreate-alert success">
           <p>
