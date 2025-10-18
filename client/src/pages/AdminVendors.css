@@ -416,3 +416,30 @@
     background: rgba(16, 185, 129, 0.18);
     color: #047857;
 }
+
+.avendors-override-btn {
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    color: var(--ink);
+}
+
+.avendors-override-btn:hover:not(:disabled) {
+    background: var(--color-surface-soft);
+}
+
+.avendors-override-btn.is-enabled {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.15);
+    color: #047857;
+}
+
+.avendors-override-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

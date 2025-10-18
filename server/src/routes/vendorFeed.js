@@ -60,6 +60,13 @@ async function loadVendorWithCompliance(vendorId) {
   const vendor = await Vendor.findById(vendorId).lean();
   if (!vendor) return null;
 
+  if (vendor.complianceOverride === true) {
+    if (!vendor.compliance) vendor.compliance = {};
+    vendor.compliance.allowed = true;
+    vendor.compliance.override = true;
+    return vendor;
+  }
+
   if (vendor?.compliance?.allowed || vendor?.complianceStatus === "compliant") {
     return vendor;
   }

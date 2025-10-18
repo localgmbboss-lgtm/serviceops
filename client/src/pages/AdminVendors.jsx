@@ -23,13 +23,21 @@ const complianceSnapshot = (vendor) => {
   const missing = Array.isArray(vendor?.compliance?.missing)
     ? vendor.compliance.missing
     : [];
-  const label = status.replace(/_/g, " ");
-  const badgeClass =
+  const overrideActive =
+    vendor?.complianceOverride === true ||
+    vendor?.compliance?.override === true;
+  let label = status.replace(/_/g, " ");
+  let badgeClass =
     status === "compliant"
       ? "badge ok"
       : status === "non_compliant"
       ? "badge bad"
       : "badge warn";
+
+  if (overrideActive) {
+    label = `${label} • override`;
+    badgeClass = "badge warn";
+  }
 
   return {
     status,
@@ -37,6 +45,7 @@ const complianceSnapshot = (vendor) => {
     badgeClass,
     missingCount: missing.length,
     missing,
+    overrideActive,
   };
 };
 
@@ -51,13 +60,16 @@ export default function AdminVendors() {
   const [err, setErr] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [overridePending, setOverridePending] = useState(null);
 
-  const load = async () => {
+  const load = async ({ keepPage = false } = {}) => {
     try {
       const response = await api.get("/api/admin/vendors/overview");
       setItems(response.data || []);
       setErr("");
-      setPage(1);
+      if (!keepPage) {
+        setPage(1);
+      }
     } catch (error) {
       setErr(error?.response?.data?.message || "Failed to load vendors");
     }
@@ -165,6 +177,24 @@ export default function AdminVendors() {
     }
   };
 
+  const toggleComplianceOverride = async (vendor, enabled) => {
+    if (!vendor?._id) return;
+    setOverridePending(vendor._id);
+    try {
+      await api.patch(`/api/admin/vendors/${vendor._id}`, {
+        complianceOverride: enabled,
+      });
+      await load({ keepPage: true });
+    } catch (error) {
+      setErr(
+        error?.response?.data?.message ||
+          "Failed to update compliance override"
+      );
+    } finally {
+      setOverridePending(null);
+    }
+  };
+
   const handlePageSizeChange = (event) => {
     setPageSize(Number(event.target.value));
   };
@@ -263,6 +293,7 @@ export default function AdminVendors() {
                 <th>Phone</th>
                 <th>Docs</th>
                 <th>Compliance</th>
+                <th>Override</th>
                 <th>Completed</th>
                 <th>Avg Rating</th>
                 <th>Revenue</th>
@@ -295,6 +326,26 @@ export default function AdminVendors() {
                         </span>
                       )}
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        className={
+                          "avendors-override-btn" +
+                          (vendor.complianceOverride ? " is-enabled" : "")
+                        }
+                        onClick={() =>
+                          toggleComplianceOverride(vendor, !vendor.complianceOverride)
+                        }
+                        disabled={overridePending === vendor._id}
+                        aria-pressed={vendor.complianceOverride ? "true" : "false"}
+                      >
+                        {overridePending === vendor._id
+                          ? "Saving..."
+                          : vendor.complianceOverride
+                          ? "Revoke override"
+                          : "Allow override"}
+                      </button>
+                    </td>
                     <td>{(stats.completed || 0).toLocaleString()}</td>
                     <td>{formatRating(stats.avgRating)}</td>
                     <td>{formatCurrency(stats.revenue)}</td>
@@ -304,7 +355,7 @@ export default function AdminVendors() {
               })}
               {pagination.pageItems.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="muted">
+                  <td colSpan="10" className="muted">
                     No vendors
                   </td>
                 </tr>
@@ -347,6 +398,29 @@ export default function AdminVendors() {
                     <dd>
                       <span className={compliance.badgeClass}>{compliance.label}</span>
                       {compliance.missingCount > 0 ? ` - ${compliance.missingCount} missing` : ""}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Override</dt>
+                    <dd>
+                      <button
+                        type="button"
+                        className={
+                          "avendors-override-btn" +
+                          (vendor.complianceOverride ? " is-enabled" : "")
+                        }
+                        onClick={() =>
+                          toggleComplianceOverride(vendor, !vendor.complianceOverride)
+                        }
+                        disabled={overridePending === vendor._id}
+                        aria-pressed={vendor.complianceOverride ? "true" : "false"}
+                      >
+                        {overridePending === vendor._id
+                          ? "Saving..."
+                          : vendor.complianceOverride
+                          ? "Revoke override"
+                          : "Allow override"}
+                      </button>
                     </dd>
                   </div>
                   <div>
