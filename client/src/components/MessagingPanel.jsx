@@ -69,13 +69,24 @@ export default function MessagingPanel({
     return "You";
   }, [actorRole, participants.customer?.name, participants.vendor?.name]);
 
-  const otherParticipant = useMemo(
-    () =>
-      actorRole === "customer"
-        ? participants.vendor
-        : participants.customer,
-    [actorRole, participants.customer, participants.vendor]
-  );
+const otherParticipant = useMemo(
+  () =>
+    actorRole === "customer"
+      ? participants.vendor
+      : participants.customer,
+  [actorRole, participants.customer, participants.vendor]
+);
+
+  const composerPlaceholder = useMemo(() => {
+    if (!canMessage) return "Messaging is unavailable for this job.";
+    if (actorRole === "customer" && !participants?.vendor) {
+      return "Type a message for the ServiceOps team...";
+    }
+    if (actorRole === "vendor" && !participants?.customer) {
+      return "Type a message for dispatch...";
+    }
+    return "Type a message...";
+  }, [actorRole, canMessage, participants?.customer, participants?.vendor]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -205,14 +216,14 @@ export default function MessagingPanel({
         {loading ? (
           <div className="message-panel__empty">
             <div className="spinner" aria-hidden="true" />
-            <p>Loading conversation…</p>
+            <p>Loading conversation...</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="message-panel__empty">
             <p>
-              {canMessage
-                ? "No messages yet. Share details or photos once you're ready."
-                : "Messaging will open automatically once a vendor is assigned."}
+            {canMessage
+              ? "No messages yet. Share details or photos once you're ready."
+              : "Messaging is unavailable for this job."}
             </p>
           </div>
         ) : (
@@ -315,11 +326,7 @@ export default function MessagingPanel({
             id="message-draft"
             value={draft}
             onChange={handleDraftChange}
-            placeholder={
-              canMessage
-                ? "Type a message for your vendor…"
-                : "Messaging is locked until your vendor is assigned."
-            }
+            placeholder={composerPlaceholder}
             disabled={!canMessage || sending}
             rows={3}
           />
@@ -359,7 +366,7 @@ export default function MessagingPanel({
                   (draft.trim().length === 0 && files.length === 0)
                 }
               >
-                {sending ? "Sending…" : "Send"}
+                {sending ? "Sending..." : "Send"}
               </button>
             </div>
           </div>

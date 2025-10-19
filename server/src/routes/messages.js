@@ -173,8 +173,8 @@ router.get(
       res.json({
         messages: messages.map(sanitizeMessage),
         canMessage:
-          Boolean(conversationContext.vendorId) &&
-          (conversationContext.isCustomer || conversationContext.isVendor),
+          Boolean(conversationContext.isCustomer) ||
+          Boolean(conversationContext.isVendor),
         actor: {
           role: actor.role,
           id: actor.id,
