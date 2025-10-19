@@ -5,7 +5,7 @@ import { useNotifications } from "../contexts/NotificationsContext";
 import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
-import MessagingPanel from "../components/MessagingPanel";
+import ChatOverlay from "../components/ChatOverlay";
 import { useJobMessaging } from "../hooks/useJobMessaging";
 import { getGoogleMapsKey } from "../config/env.js";
 import "./VendorApp.css";
@@ -182,6 +182,9 @@ export default function VendorApp() {
     error: vendorMessagesError,
     canMessage: vendorCanMessage,
     realtimeReady: vendorRealtimeReady,
+    typingIndicators: vendorTypingIndicators,
+    emitTyping: emitVendorTyping,
+    unreadCount: vendorUnreadCount,
   } = useJobMessaging({
     jobId: expandedAssignedJob?._id,
     role: "vendor",
@@ -1258,7 +1261,7 @@ export default function VendorApp() {
                               onClick={(event) => event.stopPropagation()}
                               onKeyDown={(event) => event.stopPropagation()}
                             >
-                              <MessagingPanel
+                              <ChatOverlay
                                 title="Message the customer"
                                 subtitle={vendorChatSubtitle}
                                 messages={vendorMessages}
@@ -1270,6 +1273,9 @@ export default function VendorApp() {
                                 loading={vendorMessagesLoading}
                                 error={vendorMessagesError}
                                 realtimeReady={vendorRealtimeReady}
+                                typingIndicators={vendorTypingIndicators}
+                                onTyping={emitVendorTyping}
+                                unreadCount={vendorUnreadCount}
                               />
                             </div>
                           ) : null}
@@ -1567,6 +1573,9 @@ export default function VendorApp() {
     </div>
   );
 }
+
+
+
 
 
 

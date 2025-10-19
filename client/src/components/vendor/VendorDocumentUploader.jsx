@@ -70,6 +70,10 @@ export default function VendorDocumentUploader({
     () => normalizeAccepts(requirement.accepts),
     [requirement.accepts]
   );
+  const requiresExpiry = requirement?.expires === true;
+  const expiryLabel = requiresExpiry
+    ? "Expiration date"
+    : "Expiration date (optional)";
 
   const existingUrl = existingDocument?.url
     ? toAbsoluteUrl(existingDocument.url)
@@ -115,7 +119,7 @@ export default function VendorDocumentUploader({
       setError("Enter the document or certificate number.");
       return;
     }
-    if (requirement.expires && !expiresAt) {
+    if (requiresExpiry && !expiresAt) {
       setError("Provide the expiration date for this document.");
       return;
     }
@@ -137,6 +141,7 @@ export default function VendorDocumentUploader({
       }
       if (expiresAt) {
         formData.append("expiresAt", expiresAt);
+        formData.append("expiringDate", expiresAt);
       }
 
       await vendorApi.post("/api/vendor/documents", formData, {
@@ -162,7 +167,7 @@ export default function VendorDocumentUploader({
     !busy &&
     file &&
     documentNumber.trim() &&
-    (!requirement.expires || expiresAt) &&
+    (!requiresExpiry || expiresAt) &&
     confirmation;
 
   return (
@@ -201,17 +206,20 @@ export default function VendorDocumentUploader({
                 disabled={busy}
               />
             </label>
-            {requirement.expires && (
-              <label className="field">
-                <span className="field-label">Expiration date</span>
-                <input
-                  value={expiresAt}
-                  onChange={(event) => setExpiresAt(event.target.value)}
-                  type="date"
-                  disabled={busy}
-                />
-              </label>
-            )}
+            <label className="field">
+              <span className="field-label">{expiryLabel}</span>
+              <input
+                value={expiresAt}
+                onChange={(event) => setExpiresAt(event.target.value)}
+                type="date"
+                disabled={busy}
+              />
+              {!requiresExpiry && (
+                <span className="field-hint">
+                  Optional — add an expiration date if this document has one.
+                </span>
+              )}
+            </label>
           </div>
 
           <label className="field">

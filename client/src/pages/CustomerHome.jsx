@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationsContext";
+import { ensureCustomerPushSubscription } from "../lib/pushNotifications";
 import "./CustomerHome.css";
 
 export default function CustomerHome() {
@@ -18,6 +19,13 @@ export default function CustomerHome() {
   const jobsInitializedRef = useRef(false);
   const bidSnapshotRef = useRef(new Map());
   const bidsInitializedRef = useRef(false);
+  const pushAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (pushAttemptedRef.current) return;
+    pushAttemptedRef.current = true;
+    ensureCustomerPushSubscription({ source: "customer-home" }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;

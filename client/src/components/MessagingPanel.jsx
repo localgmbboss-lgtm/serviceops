@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LuX } from "react-icons/lu";
 import "./MessagingPanel.css";
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -8,16 +9,30 @@ const formatTimestamp = (iso) => {
   try {
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   } catch {
     return "";
   }
 };
 
-const roleLabel = (role) => {
+const roleLabel = (role, viewerLabel) => {
+  if (viewerLabel && role !== "system") return viewerLabel;
   if (role === "customer") return "You";
   if (role === "vendor") return "Vendor";
   return "System";
+};
+
+const initialsFor = (name = "") => {
+  const pieces = String(name)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!pieces.length) return "?";
+  if (pieces.length === 1) return pieces[0].slice(0, 2).toUpperCase();
+  return `${pieces[0][0]}${pieces[pieces.length - 1][0]}`.toUpperCase();
 };
 
 export default function MessagingPanel({
@@ -32,6 +47,9 @@ export default function MessagingPanel({
   loading = false,
   error = "",
   realtimeReady = false,
+  typingIndicators = {},
+  onTyping,
+  onClose,
 }) {
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState([]);
@@ -51,17 +69,26 @@ export default function MessagingPanel({
     return "You";
   }, [actorRole, participants.customer?.name, participants.vendor?.name]);
 
+  const otherParticipant = useMemo(
+    () =>
+      actorRole === "customer"
+        ? participants.vendor
+        : participants.customer,
+    [actorRole, participants.customer, participants.vendor]
+  );
+
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages.length, sending]);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       previews.forEach((preview) => URL.revokeObjectURL(preview.url));
-    };
-  }, [previews]);
+    },
+    [previews]
+  );
 
   const handleFileChange = (event) => {
     const incoming = Array.from(event.target.files || []).slice(0, 6);
@@ -73,6 +100,7 @@ export default function MessagingPanel({
     setFiles(incoming);
     setPreviews(nextPreviews);
     setLocalError("");
+    onTyping?.(true);
   };
 
   const removeFileAt = (index) => {
@@ -82,6 +110,12 @@ export default function MessagingPanel({
     if (removed) URL.revokeObjectURL(removed.url);
     setFiles(nextFiles);
     setPreviews(nextPreviews);
+  };
+
+  const handleDraftChange = (event) => {
+    const value = event.target.value.slice(0, MAX_MESSAGE_LENGTH);
+    setDraft(value);
+    onTyping?.(Boolean(value));
   };
 
   const submit = async (event) => {
@@ -103,6 +137,7 @@ export default function MessagingPanel({
         fileInputRef.current.value = "";
       }
       setLocalError("");
+      onTyping?.(false);
     } catch (err) {
       setLocalError(
         err?.response?.data?.message ||
@@ -124,8 +159,16 @@ export default function MessagingPanel({
     return "";
   }, [canMessage, participants.vendor?.name, subtitle]);
 
+  const othersTyping = useMemo(() => {
+    const indicator =
+      actorRole === "customer"
+        ? typingIndicators?.vendor
+        : typingIndicators?.customer;
+    return Boolean(indicator);
+  }, [actorRole, typingIndicators]);
+
   return (
-    <section className="message-panel card">
+    <section className="message-panel">
       <header className="message-panel__header">
         <div>
           <h3>{title}</h3>
@@ -133,14 +176,28 @@ export default function MessagingPanel({
             <p className="message-panel__subtitle">{composedSubtitle}</p>
           ) : null}
         </div>
-        <div className="message-panel__status">
+        <div className="message-panel__header-actions">
           <span
-            className={`message-panel__dot ${
+            className={`message-panel__status ${
               realtimeReady ? "online" : "offline"
             }`}
-            aria-hidden="true"
-          />
-          <span>{realtimeReady ? "Live" : "Offline"}</span>
+          >
+            <span className="message-panel__dot" aria-hidden="true" />
+            {realtimeReady ? "Live" : "Offline"}
+          </span>
+          {onClose ? (
+            <button
+              type="button"
+              className="message-panel__close"
+              onClick={() => {
+                onTyping?.(false);
+                onClose();
+              }}
+              aria-label="Close conversation"
+            >
+              <LuX aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -159,30 +216,45 @@ export default function MessagingPanel({
             </p>
           </div>
         ) : (
-          <ul className="message-panel__thread" ref={listRef}>
+          <ul className="message-panel__list" ref={listRef}>
             {messages.map((msg) => {
               const mine = msg.senderRole === actorRole;
-              const alignClass = mine ? "outgoing" : "incoming";
+              const avatarInitials = mine
+                ? initialsFor(viewerLabel)
+                : initialsFor(
+                    otherParticipant?.name || msg.senderName || ""
+                  );
               const label = mine
-                ? viewerLabel
-                : participants[msg.senderRole]?.name ||
-                  roleLabel(msg.senderRole);
+                ? "You"
+                : roleLabel(
+                    msg.senderRole,
+                    otherParticipant?.name || msg.senderName
+                  );
+
               return (
                 <li
                   key={msg.id}
-                  className={`message-panel__item ${alignClass}`}
+                  className={`message-panel__item ${
+                    mine ? "outgoing" : "incoming"
+                  }`}
                 >
+                  {!mine ? (
+                    <div className="message-panel__avatar" aria-hidden="true">
+                      {avatarInitials}
+                    </div>
+                  ) : null}
                   <div className="message-panel__bubble">
-                    <header>
+                    <header className="message-panel__meta">
                       <span className="message-panel__sender">{label}</span>
                       <time className="message-panel__time">
-                        {formatTimestamp(msg.createdAt)}
+                        {formatTimestamp(
+                          msg.createdAt || msg.updatedAt || msg.sentAt
+                        )}
                       </time>
                     </header>
                     {msg.body ? (
                       <p className="message-panel__text">{msg.body}</p>
                     ) : null}
-
                     {Array.isArray(msg.attachments) &&
                     msg.attachments.length > 0 ? (
                       <div className="message-panel__attachments">
@@ -196,6 +268,7 @@ export default function MessagingPanel({
                             <img
                               src={file.url}
                               alt={file.fileName || "Vehicle photo"}
+                              loading="lazy"
                             />
                           </a>
                         ))}
@@ -205,16 +278,35 @@ export default function MessagingPanel({
                 </li>
               );
             })}
+            {othersTyping ? (
+              <li className="message-panel__typing">
+                <span
+                  className="message-panel__typing-avatar"
+                  aria-hidden="true"
+                >
+                  {initialsFor(otherParticipant?.name || "...")}
+                </span>
+                <span
+                  className="message-panel__typing-dots"
+                  aria-live="polite"
+                >
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              </li>
+            ) : null}
           </ul>
         )}
       </div>
 
+      {(error || localError) && (
+        <div className="message-panel__error">
+          {error || localError || "Something went wrong."}
+        </div>
+      )}
+
       <footer className="message-panel__composer">
-        {error || localError ? (
-          <div className="message-panel__error">
-            {error || localError || "Something went wrong."}
-          </div>
-        ) : null}
         <form onSubmit={submit}>
           <label className="sr-only" htmlFor="message-draft">
             Message
@@ -222,9 +314,7 @@ export default function MessagingPanel({
           <textarea
             id="message-draft"
             value={draft}
-            onChange={(event) =>
-              setDraft(event.target.value.slice(0, MAX_MESSAGE_LENGTH))
-            }
+            onChange={handleDraftChange}
             placeholder={
               canMessage
                 ? "Type a message for your vendor…"

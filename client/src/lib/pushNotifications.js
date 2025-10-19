@@ -137,6 +137,34 @@ export async function ensureAdminPushSubscription(options = {}) {
   };
 }
 
+export async function ensureCustomerPushSubscription(options = {}) {
+  if (!SUPPORTS_SERVICE_WORKER || !SUPPORTS_PUSH || typeof Notification === "undefined") {
+    return { supported: false, reason: "unsupported" };
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    return { supported: true, permission };
+  }
+
+  let subscription = await getExistingSubscription();
+  if (!subscription) {
+    subscription = await createSubscription();
+  }
+
+  await postSubscription(api, "/api/customer/push/subscribe", subscription, {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    source: options.source || "customer-app",
+  });
+
+  return {
+    supported: true,
+    permission: "granted",
+    subscription,
+  };
+}
+
 export async function syncSubscriptionFromWorker(subscription) {
   if (!subscription) return;
   const meta = {
@@ -152,8 +180,15 @@ export async function syncSubscriptionFromWorker(subscription) {
   }
   try {
     await postSubscription(api, "/api/admin/push/subscribe", subscription, meta);
+    return;
+  } catch (error) {
+    // try customer fallback
+  }
+  try {
+    await postSubscription(api, "/api/customer/push/subscribe", subscription, meta);
   } catch (error) {
     console.warn("Failed to sync renewed push subscription:", error);
   }
 }
+
 

@@ -9,6 +9,17 @@ import { recordAuditEvent } from "../utils/auditLog";
 import "./AdminJobs.css";
 
 const STATUSES = ["Unassigned", "Assigned", "OnTheWay", "Arrived", "Completed"];
+const DISPLAY_LINK_BASE = "https://serviceops.pro";
+
+const formatShareLink = (link) => {
+  if (!link) return "";
+  try {
+    const parsed = new URL(link);
+    return `${DISPLAY_LINK_BASE}${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch (error) {
+    return link;
+  }
+};
 
 export default function AdminJobs() {
   const navigate = useNavigate();
@@ -17,6 +28,7 @@ export default function AdminJobs() {
   const [toast, setToast] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [vendorFilter, setVendorFilter] = useState("all");
   const [loading, setLoading] = useState(false);
   const [last, setLast] = useState(null);
   const [soloMode, setSoloMode] = useState(false);
@@ -26,6 +38,7 @@ export default function AdminJobs() {
   const jobSnapshotRef = useRef(new Map());
   const jobsInitializedRef = useRef(false);
   const { publish } = useNotifications();
+  const [vendors, setVendors] = useState([]);
 
   const openCreateModal = () => setCreateOpen(true);
   const closeCreateModal = () => setCreateOpen(false);
@@ -48,6 +61,44 @@ export default function AdminJobs() {
     setTimeout(() => setBanner(""), 3500);
   };
 
+  const loadVendors = useCallback(async () => {
+    try {
+      const { data } = await api.get("/api/vendors");
+      setVendors(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.warn("Failed to load vendor directory", e);
+    }
+  }, []);
+
+  const vendorOptions = useMemo(() => {
+    if (!Array.isArray(vendors)) return [];
+    const unique = new Map();
+    vendors.forEach((vendor) => {
+      if (!vendor?._id || unique.has(vendor._id)) return;
+      const label = vendor.name?.trim() || "Unnamed vendor";
+      const location = [vendor.city, vendor.state]
+        .map((part) => (part || "").trim())
+        .filter(Boolean)
+        .join(", ");
+      const descriptor = location || vendor.phone?.trim();
+      unique.set(vendor._id, {
+        value: vendor._id,
+        label: descriptor ? `${label} - ${descriptor}` : label,
+      });
+    });
+    return Array.from(unique.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+  }, [vendors]);
+
+  useEffect(() => {
+    if (vendorFilter === "all" || vendorFilter === "unassigned") return;
+    const stillExists = vendorOptions.some(
+      (option) => option.value === vendorFilter
+    );
+    if (!stillExists) setVendorFilter("all");
+  }, [vendorFilter, vendorOptions]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -63,6 +114,7 @@ export default function AdminJobs() {
 
   useEffect(() => {
     load();
+    loadVendors();
     const id = setInterval(load, 7000);
     return () => clearInterval(id);
   }, [load]);
@@ -227,6 +279,14 @@ export default function AdminJobs() {
     return (jobs || []).filter((j) => {
       const stOk = statusFilter === "all" || j.status === statusFilter;
       if (!stOk) return false;
+      if (vendorFilter === "unassigned" && j?.vendorId) return false;
+      if (
+        vendorFilter !== "all" &&
+        vendorFilter !== "unassigned" &&
+        j?.vendorId !== vendorFilter
+      ) {
+        return false;
+      }
       if (!q) return true;
       const hay = [
         j.serviceType,
@@ -242,7 +302,7 @@ export default function AdminJobs() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [jobs, query, statusFilter]);
+  }, [jobs, query, statusFilter, vendorFilter]);
 
   const exportCsv = () => {
     const base = api.defaults?.baseURL || "";
@@ -257,10 +317,7 @@ export default function AdminJobs() {
   };
 
   const copySelfServeLink = async () => {
-    const origin =
-      (typeof window !== "undefined" && window.location?.origin) ||
-      "https://serviceops.app";
-    const link = `${origin.replace(/\/$/, "")}/customer/login`;
+    const link = `${DISPLAY_LINK_BASE.replace(/\/$/, "")}/customer/login`;
     await copy(link, "Customer portal link");
   };
 
@@ -367,6 +424,23 @@ export default function AdminJobs() {
                   </select>
                 </div>
 
+                <div className="admin-jobs-select-container">
+                  <select
+                    className="admin-jobs-status-select admin-jobs-vendor-select"
+                    value={vendorFilter}
+                    onChange={(e) => setVendorFilter(e.target.value)}
+                    aria-label="Filter by vendor"
+                  >
+                    <option value="all">All vendors</option>
+                    <option value="unassigned">Unassigned</option>
+                    {vendorOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <label className="admin-jobs-toggle">
                   <input
                     type="checkbox"
@@ -454,7 +528,7 @@ export default function AdminJobs() {
           </div>
           <div className="admin-jobs-board-body">
             <div className="admin-jobs-scroll-x">
-              <JobTable
+              <JobTable vendors={vendors}
                 jobs={filteredJobs}
                 onUpdateJob={onUpdateJob}
                 soloMode={soloMode}
@@ -520,12 +594,12 @@ export default function AdminJobs() {
                       <input
                         type="text"
                         readOnly
-                        value={links.statusUrl}
+                        value={formatShareLink(links.statusUrl)}
                         onFocus={(e) => e.target.select()}
                       />
                       <button
                         className="admin-jobs-btn admin-jobs-btn-tiny admin-jobs-copy-btn"
-                        onClick={() => copy(links.statusUrl, "Status link")}
+                        onClick={() => copy(formatShareLink(links.statusUrl), "Status link")}
                       >
                         Copy
                       </button>
@@ -539,12 +613,12 @@ export default function AdminJobs() {
                       <input
                         type="text"
                         readOnly
-                        value={links.vendorLink}
+                        value={formatShareLink(links.vendorLink)}
                         onFocus={(e) => e.target.select()}
                       />
                       <button
                         className="admin-jobs-btn admin-jobs-btn-tiny admin-jobs-copy-btn"
-                        onClick={() => copy(links.vendorLink, "Vendor link")}
+                        onClick={() => copy(formatShareLink(links.vendorLink), "Vendor link")}
                       >
                         Copy
                       </button>
@@ -558,13 +632,13 @@ export default function AdminJobs() {
                       <input
                         type="text"
                         readOnly
-                        value={links.customerLink}
+                        value={formatShareLink(links.customerLink)}
                         onFocus={(e) => e.target.select()}
                       />
                       <button
                         className="admin-jobs-btn admin-jobs-btn-tiny admin-jobs-copy-btn"
                         onClick={() =>
-                          copy(links.customerLink, "Customer link")
+                          copy(formatShareLink(links.customerLink), "Customer link")
                         }
                       >
                         Copy
@@ -588,3 +662,5 @@ export default function AdminJobs() {
     </div>
   );
 }
+
+

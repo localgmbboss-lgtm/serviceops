@@ -182,6 +182,10 @@
   background-size: 1rem;
 }
 
+.admin-jobs-vendor-select {
+  min-width: 240px;
+}
+
 /* Toggle switch */
 .admin-jobs-toggle {
   display: flex;
@@ -708,7 +712,8 @@
   }
 
   .admin-jobs-search,
-  .admin-jobs-status-select {
+  .admin-jobs-status-select,
+  .admin-jobs-vendor-select {
     width: 100%;
     min-width: unset;
   }

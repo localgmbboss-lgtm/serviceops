@@ -40,6 +40,8 @@ export default function JobTable({
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "ascending" });
   const [expandedRow, setExpandedRow] = useState(null);
   const [noteTranslations, setNoteTranslations] = useState({});
+  const [followups, setFollowups] = useState({});
+  const [followupOverlay, setFollowupOverlay] = useState(null);
   const popRef = useRef(null);
 
   useEffect(() => {
@@ -175,6 +177,133 @@ export default function JobTable({
     }
   };
 
+  const updateFollowupState = (jobId, audience, patch) => {
+    setFollowups((prev) => {
+      const current = prev[jobId] || {};
+      const audienceState = current[audience] || {};
+      return {
+        ...prev,
+        [jobId]: {
+          ...current,
+          [audience]: { ...audienceState, ...patch },
+        },
+      };
+    });
+  };
+
+  const copyFollowupText = async (text, label) => {
+    const value = (text || "").trim();
+    if (!value) return;
+    const ok = await copyText(value);
+    if (!ok) alert(`Could not copy ${label}.`);
+  };
+
+  const handleFollowupInputChange = (jobId, audience, field, value) => {
+    const existingInputs = followups[jobId]?.[audience]?.inputs || {};
+    updateFollowupState(jobId, audience, {
+      inputs: {
+        ...existingInputs,
+        [field]: value,
+      },
+    });
+  };
+
+  const requestFollowup = async (job, audience) => {
+    if (!job?._id) return;
+    const jobId = job._id;
+    updateFollowupState(jobId, audience, {
+      loading: true,
+      error: "",
+      draft: null,
+      inputs: { message: "" },
+      context: null,
+      raw: null,
+      sending: false,
+    });
+    try {
+      const payload = {
+        jobId,
+        audience,
+        vendorId: audience === "vendor" ? job.vendorId : undefined,
+      };
+      const { data } = await api.post("/api/ai/followups", payload);
+      const draft = data?.draft || null;
+      updateFollowupState(jobId, audience, {
+        loading: false,
+        error: "",
+        draft,
+        inputs: { message: draft?.message || "" },
+        context: data?.context || null,
+        raw: data?.raw || null,
+        sending: false,
+      });
+    } catch (error) {
+      updateFollowupState(jobId, audience, {
+        loading: false,
+        draft: null,
+        inputs: { message: "" },
+        context: null,
+        raw: null,
+        sending: false,
+        error:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Could not generate follow-up. Try again.",
+      });
+    }
+  };
+
+  const openFollowupOverlay = (job, audience) => {
+    if (!job?._id) return;
+    setFollowupOverlay({ jobId: job._id, audience });
+    requestFollowup(job, audience);
+  };
+
+  const closeFollowupOverlay = () => {
+    setFollowupOverlay(null);
+  };
+
+  const sendFollowup = async (job, audience) => {
+    if (!job?._id) return;
+    const jobId = job._id;
+    const state = followups[jobId]?.[audience] || {};
+    const message = (state.inputs?.message || "").trim();
+    if (!message) {
+      alert("Message cannot be empty.");
+      return;
+    }
+
+    updateFollowupState(jobId, audience, {
+      sending: true,
+      error: "",
+    });
+
+    try {
+      const payload = {
+        jobId,
+        audience,
+        channel: "in_app",
+        body: message,
+      };
+      const { data } = await api.post("/api/ai/followups/send", payload);
+      updateFollowupState(jobId, audience, {
+        sending: false,
+        lastSentAt: data?.message?.createdAt || new Date().toISOString(),
+        lastSentChannel: "in_app",
+        sentMessage: data?.message || null,
+      });
+      closeFollowupOverlay();
+    } catch (error) {
+      updateFollowupState(jobId, audience, {
+        sending: false,
+        error:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Could not send follow-up. Try again.",
+      });
+    }
+  };
+
   const assignVendor = async (job, vendorId) => {
     if (!vendorId) return;
     await onUpdateJob(job._id, { vendorId, status: "Assigned" });
@@ -254,6 +383,13 @@ export default function JobTable({
               const bidPriceClass = `jobtable-price jobtable-price--bid${
                 hasWinningPrice ? " is-filled" : ""
               }`;
+              const hasVendorContact = Boolean(
+                job.vendorId || job.vendorName || job.vendorPhone
+              );
+              const hasCustomerContact = Boolean(job.customerId || job.customerPhone);
+              const jobFollowups = followups[job._id] || {};
+              const vendorFollowup = jobFollowups.vendor || {};
+              const customerFollowup = jobFollowups.customer || {};
 
               return (
                 <>
@@ -540,6 +676,63 @@ export default function JobTable({
                             </div>
                           )}
 
+                          <div className="jobtable-detail-section jobtable-followup">
+                            <h4>AI Follow-up</h4>
+                            <p className="jobtable-followup-hint">
+                              Draft and send a quick update. Messages post to the job chat so the recipient can reply immediately.
+                            </p>
+                            <div className="jobtable-followup-actions">
+                              <button
+                                type="button"
+                                className="jobtable-btn jobtable-btn-primary"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openFollowupOverlay(job, "vendor");
+                                }}
+                                disabled={!hasVendorContact || vendorFollowup.loading}
+                              >
+                                {vendorFollowup.loading
+                                  ? "Preparing vendor draft..."
+                                  : "Vendor follow-up"}
+                              </button>
+                              <button
+                                type="button"
+                                className="jobtable-btn jobtable-btn-ghost"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openFollowupOverlay(job, "customer");
+                                }}
+                                disabled={!hasCustomerContact || customerFollowup.loading}
+                              >
+                                {customerFollowup.loading
+                                  ? "Preparing customer draft..."
+                                  : "Customer follow-up"}
+                              </button>
+                            </div>
+                            {!hasVendorContact && (
+                              <p className="jobtable-followup-hint jobtable-followup-warning">
+                                Assign a vendor to enable vendor outreach.
+                              </p>
+                            )}
+                            {!hasCustomerContact && (
+                              <p className="jobtable-followup-hint jobtable-followup-warning">
+                                Add customer contact details to enable customer outreach.
+                              </p>
+                            )}
+                            {vendorFollowup.lastSentAt && (
+                              <p className="jobtable-followup-meta">
+                                Last vendor touchpoint{" "}
+                                {new Date(vendorFollowup.lastSentAt).toLocaleString()} via in-app chat
+                              </p>
+                            )}
+                            {customerFollowup.lastSentAt && (
+                              <p className="jobtable-followup-meta">
+                                Last customer touchpoint{" "}
+                                {new Date(customerFollowup.lastSentAt).toLocaleString()} via in-app chat
+                              </p>
+                            )}
+                          </div>
+
                           <div className="jobtable-detail-actions">
                           <button
                             className="jobtable-btn jobtable-btn-ghost"
@@ -588,9 +781,156 @@ export default function JobTable({
           </div>
         </div>
       )}
+
+      {followupOverlay && (() => {
+        const { jobId, audience } = followupOverlay;
+        const job = jobs.find((item) => item?._id === jobId);
+        if (!job) return null;
+
+        const state = followups[jobId]?.[audience] || {};
+        const inputs = state.inputs || {};
+        const messageValue = inputs.message || "";
+        const sending = Boolean(state.sending);
+        const disabled = state.loading || sending || !messageValue.trim();
+        const audienceLabel = audience === "vendor" ? "Vendor" : "Customer";
+        const dialogId = `followup-${jobId}-${audience}`;
+        const contextMessages = Array.isArray(state.context?.lastMessages)
+          ? state.context.lastMessages
+          : [];
+
+        return (
+          <div
+            className="jobtable-followup-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogId}
+          >
+            <div className="jobtable-followup-backdrop" onClick={closeFollowupOverlay} />
+            <div
+              className="jobtable-followup-dialog"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="jobtable-followup-dialog-header">
+                <div>
+                  <p className="jobtable-followup-overline">{audienceLabel} follow-up</p>
+                  <h3 id={dialogId}>
+                    {job.serviceType || "Job"} - {job.pickupAddress || "No pickup address"}
+                  </h3>
+                  <p className="jobtable-followup-subtitle">Status: {job.status || "Unassigned"}</p>
+                </div>
+                <button type="button" className="jobtable-followup-dialog-close" onClick={closeFollowupOverlay} aria-label="Close follow-up">X</button>
+              </header>
+              <div className="jobtable-followup-dialog-body">
+                {state.loading ? (
+                  <p>Generating draft...</p>
+                ) : state.error ? (
+                  <div className="jobtable-followup-error-pane">
+                    <p>{state.error}</p>
+                    <button
+                      type="button"
+                      className="jobtable-btn jobtable-btn-primary"
+                      onClick={() => requestFollowup(job, audience)}
+                      disabled={state.loading}
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <label className="jobtable-followup-field">
+                      <span>Message</span>
+                      <textarea
+                        className="jobtable-followup-textarea"
+                        rows={6}
+                        value={messageValue}
+                        onChange={(event) =>
+                          handleFollowupInputChange(
+                            job._id,
+                            audience,
+                            "message",
+                            event.target.value
+                          )
+                        }
+                        disabled={sending}
+                      />
+                    </label>
+                    <p className="jobtable-followup-signature">
+                      Signature added automatically: Best regards - Customer Service Team, ServiceOps, 1 (888) 362-3743
+                    </p>
+                    {Array.isArray(state.draft?.internalNotes) &&
+                      state.draft.internalNotes.length > 0 && (
+                        <div className="jobtable-followup-notes-block">
+                          <span className="jobtable-followup-label">Internal notes</span>
+                          <ul className="jobtable-followup-notes">
+                            {state.draft.internalNotes.map((note, index) => (
+                              <li key={`followup-note-${job._id}-${audience}-${index}`}>{note}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    {contextMessages.length > 0 && (
+                      <div className="jobtable-followup-context">
+                        <h5>Recent chat</h5>
+                        <ul>
+                          {contextMessages.map((msg, index) => (
+                            <li key={`followup-context-${job._id}-${audience}-${index}`}>
+                              <span className="jobtable-followup-context-meta">
+                                {(msg.senderName || msg.senderRole || "Participant")} •{" "}
+                                {msg.at ? new Date(msg.at).toLocaleString() : "Just now"}
+                              </span>
+                              <p>{msg.body || "…"}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <footer className="jobtable-followup-dialog-footer">
+                <button
+                  type="button"
+                  className="jobtable-btn jobtable-btn-ghost"
+                  onClick={() => requestFollowup(job, audience)}
+                  disabled={state.loading || sending}
+                >
+                  Regenerate draft
+                </button>
+                <div className="jobtable-followup-footer-actions">
+                  <button
+                    type="button"
+                    className="jobtable-btn jobtable-btn-link"
+                    onClick={() =>
+                      copyFollowupText(
+                        messageValue || state.draft?.message || "",
+                        "follow-up message"
+                      )
+                    }
+                    disabled={state.loading}
+                  >
+                    Copy text
+                  </button>
+                  <button
+                    type="button"
+                    className="jobtable-btn jobtable-btn-success"
+                    disabled={disabled}
+                    onClick={() => sendFollowup(job, audience)}
+                  >
+                    {sending ? "Sending…" : "Send follow-up"}
+                  </button>
+                </div>
+              </footer>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
+
+
+
+
 
 
 

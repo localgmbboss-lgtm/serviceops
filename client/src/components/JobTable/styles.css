@@ -686,3 +686,288 @@
     color: #c03a2b;
     font-size: 0.85rem;
 }
+
+.jobtable-followup {
+    display: grid;
+    gap: 0.75rem;
+    background: rgba(37, 99, 235, 0.06);
+    border: 1px dashed rgba(37, 99, 235, 0.35);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.jobtable-followup-hint {
+    margin: 0;
+    font-size: 0.82rem;
+    color: rgba(15, 23, 42, 0.75);
+}
+
+.jobtable-followup-warning {
+    color: rgba(185, 94, 0, 0.9);
+}
+
+.jobtable-followup-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.jobtable-followup-error {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--jt-danger);
+}
+
+.jobtable-followup-meta {
+    margin: 0;
+    font-size: 0.78rem;
+    color: rgba(30, 41, 59, 0.65);
+    font-style: italic;
+}
+
+.jobtable-followup-draft {
+    display: grid;
+    gap: 0.6rem;
+    padding: 0.75rem;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.jobtable-followup-header {
+    font-size: 0.85rem;
+    color: rgba(15, 23, 42, 0.8);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.jobtable-followup-row {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.jobtable-followup-label {
+    font-size: 0.78rem;
+    color: rgba(51, 65, 85, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.jobtable-followup-tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.jobtable-followup-tab {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    background: rgba(37, 99, 235, 0.12);
+    color: rgba(30, 64, 175, 0.85);
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.jobtable-followup-tab.active {
+    background: var(--jt-primary);
+    color: var(--primary-ink);
+    border-color: var(--jt-primary);
+}
+
+.jobtable-followup-input,
+.jobtable-followup-textarea {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    padding: 8px 10px;
+    font: inherit;
+    color: rgba(15, 23, 42, 0.85);
+    background: #ffffff;
+}
+
+.jobtable-followup-textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.jobtable-followup-content {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.jobtable-followup-content p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: rgba(15, 23, 42, 0.85);
+    white-space: pre-wrap;
+}
+
+.jobtable-followup-notes {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: rgba(15, 23, 42, 0.8);
+}
+
+.jobtable-followup-send {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.jobtable-followup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.jobtable-followup-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.jobtable-followup-dialog {
+    position: relative;
+    max-width: 520px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: hidden;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+    display: flex;
+    flex-direction: column;
+}
+
+.jobtable-followup-dialog-header {
+    padding: 1.25rem 1.5rem 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.jobtable-followup-overline {
+    margin: 0;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(15, 23, 42, 0.6);
+}
+
+.jobtable-followup-dialog-header h3 {
+    margin: 0.35rem 0 0;
+    font-size: 1.2rem;
+    color: rgba(15, 23, 42, 0.95);
+}
+
+.jobtable-followup-subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: rgba(71, 85, 105, 0.8);
+}
+
+.jobtable-followup-dialog-close {
+    border: none;
+    background: rgba(226, 232, 240, 0.6);
+    color: rgba(15, 23, 42, 0.8);
+    border-radius: 999px;
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.jobtable-followup-dialog-body {
+    padding: 0 1.5rem 1.5rem;
+    overflow-y: auto;
+    display: grid;
+    gap: 1rem;
+}
+
+.jobtable-followup-field {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.jobtable-followup-error-pane {
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    display: grid;
+    gap: 0.75rem;
+}
+
+.jobtable-followup-signature {
+    margin: 0;
+    font-size: 0.78rem;
+    color: rgba(71, 85, 105, 0.9);
+}
+
+.jobtable-followup-context {
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
+    padding-top: 1rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.jobtable-followup-context h5 {
+    margin: 0;
+    font-size: 0.85rem;
+    color: rgba(15, 23, 42, 0.75);
+}
+
+.jobtable-followup-context ul {
+    margin: 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.jobtable-followup-context-meta {
+    display: block;
+    font-size: 0.75rem;
+    color: rgba(100, 116, 139, 0.9);
+}
+
+.jobtable-followup-dialog-footer {
+    padding: 1rem 1.5rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.jobtable-followup-footer-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+@media (max-width: 640px) {
+    .jobtable-followup-dialog {
+        max-height: 100vh;
+        height: 100vh;
+        border-radius: 0;
+    }
+}
+

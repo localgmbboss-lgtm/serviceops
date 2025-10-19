@@ -12,8 +12,9 @@ import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
-import MessagingPanel from "../components/MessagingPanel";
+import ChatOverlay from "../components/ChatOverlay";
 import { useJobMessaging } from "../hooks/useJobMessaging";
+import { ensureCustomerPushSubscription } from "../lib/pushNotifications";
 import { useNotifications } from "../contexts/NotificationsContext";
 import {
   LuCar,
@@ -69,6 +70,13 @@ export default function CustomerDashboard() {
     distanceMeters: null,
   });
   const historyRef = useRef(null);
+  const pushAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (pushAttemptedRef.current) return;
+    pushAttemptedRef.current = true;
+    ensureCustomerPushSubscription({ source: "customer-dashboard" }).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -103,6 +111,9 @@ export default function CustomerDashboard() {
     error: chatError,
     canMessage: chatEnabled,
     realtimeReady: chatRealtimeReady,
+    typingIndicators: chatTypingIndicators,
+    emitTyping: emitChatTyping,
+    unreadCount: chatUnreadCount,
   } = useJobMessaging({ jobId: job?._id, role: "customer" });
   const { publish } = useNotifications();
   const previousStatusRef = useRef(null);
@@ -824,7 +835,7 @@ export default function CustomerDashboard() {
         </section>
 
         {job && (
-          <MessagingPanel
+          <ChatOverlay
             title="Message your vendor"
             subtitle={chatSubtitle}
             messages={chatMessages}
@@ -836,6 +847,9 @@ export default function CustomerDashboard() {
             loading={chatLoading}
             error={chatError}
             realtimeReady={chatRealtimeReady}
+            typingIndicators={chatTypingIndicators}
+            onTyping={emitChatTyping}
+            unreadCount={chatUnreadCount}
           />
         )}
 
@@ -874,6 +888,8 @@ export default function CustomerDashboard() {
     </div>
   );
 }
+
+
 
 
 

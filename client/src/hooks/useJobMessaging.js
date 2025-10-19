@@ -29,9 +29,15 @@ export function useJobMessaging({ jobId, role }) {
   const [error, setError] = useState("");
   const [canMessage, setCanMessage] = useState(false);
   const [realtimeReady, setRealtimeReady] = useState(false);
+  const [typingIndicators, setTypingIndicators] = useState({
+    customer: false,
+    vendor: false,
+  });
 
   const jobIdRef = useRef(jobId);
   const mountedRef = useRef(true);
+  const typingTimersRef = useRef({ customer: null, vendor: null });
+  const typingEmitTimeoutRef = useRef(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -51,6 +57,7 @@ export function useJobMessaging({ jobId, role }) {
     setCanMessage(false);
     setRealtimeReady(false);
     setError("");
+    setTypingIndicators({ customer: false, vendor: false });
   }, []);
 
   const loadMessages = useCallback(async () => {
@@ -105,6 +112,16 @@ export function useJobMessaging({ jobId, role }) {
         }
         return [...prev, payload];
       });
+      const typingKey = payload.senderRole === "customer" ? "customer" : "vendor";
+      setTypingIndicators((prev) => {
+        if (!prev[typingKey]) return prev;
+        return { ...prev, [typingKey]: false };
+      });
+      const timer = typingTimersRef.current[typingKey];
+      if (timer) {
+        clearTimeout(timer);
+        typingTimersRef.current[typingKey] = null;
+      }
     };
 
     const handleReadReceipt = (payload) => {
@@ -132,9 +149,36 @@ export function useJobMessaging({ jobId, role }) {
       setRealtimeReady(false);
     };
 
+    const handleTyping = (payload = {}) => {
+      if (!payload || payload.jobId !== String(jobIdRef.current)) return;
+      const typingRole = payload.role === "vendor" ? "vendor" : payload.role === "customer" ? "customer" : null;
+      if (!typingRole || typingRole === actor.role) return;
+      const isTyping = payload.typing !== false;
+      setTypingIndicators((prev) => {
+        if (prev[typingRole] === isTyping) return prev;
+        return { ...prev, [typingRole]: isTyping };
+      });
+      const existing = typingTimersRef.current[typingRole];
+      if (existing) {
+        clearTimeout(existing);
+      }
+      if (isTyping) {
+        typingTimersRef.current[typingRole] = setTimeout(() => {
+          setTypingIndicators((prev) => {
+            if (!prev[typingRole]) return prev;
+            return { ...prev, [typingRole]: false };
+          });
+          typingTimersRef.current[typingRole] = null;
+        }, 3500);
+      } else {
+        typingTimersRef.current[typingRole] = null;
+      }
+    };
+
     socket.on("messages:new", handleNewMessage);
     socket.on("messages:read", handleReadReceipt);
     socket.on("disconnect", handleDisconnect);
+    socket.on("messages:typing", handleTyping);
 
     if (!socket.connected) {
       socket.connect();
@@ -157,8 +201,9 @@ export function useJobMessaging({ jobId, role }) {
       socket.off("messages:new", handleNewMessage);
       socket.off("messages:read", handleReadReceipt);
       socket.off("disconnect", handleDisconnect);
+      socket.off("messages:typing", handleTyping);
     };
-  }, [jobId, token]);
+  }, [jobId, token, actor.role]);
 
   const sendMessage = useCallback(
     async ({ body, files }) => {
@@ -239,6 +284,54 @@ export function useJobMessaging({ jobId, role }) {
     return messages.filter((msg) => msg.senderRole !== actor.role).length;
   }, [actor.role, messages]);
 
+  const unreadCount = useMemo(() => {
+    const prop = ROLE_PROPERTY[actor?.role] || null;
+    if (!prop) return incomingCount;
+    return messages.filter(
+      (msg) => msg.senderRole !== actor.role && !msg[prop]
+    ).length;
+  }, [actor?.role, incomingCount, messages]);
+
+  const emitTyping = useCallback(
+    (isTyping = true) => {
+      if (!jobId || !token) return;
+      const socket = getSocket();
+      socket.emit("messages:typing", {
+        token,
+        jobId,
+        typing: Boolean(isTyping),
+      });
+      if (isTyping) {
+        if (typingEmitTimeoutRef.current) {
+          clearTimeout(typingEmitTimeoutRef.current);
+        }
+        typingEmitTimeoutRef.current = setTimeout(() => {
+          socket.emit("messages:typing", { token, jobId, typing: false });
+          typingEmitTimeoutRef.current = null;
+        }, 2500);
+      } else if (typingEmitTimeoutRef.current) {
+        clearTimeout(typingEmitTimeoutRef.current);
+        typingEmitTimeoutRef.current = null;
+      }
+    },
+    [jobId, token]
+  );
+
+  useEffect(
+    () => () => {
+      Object.values(typingTimersRef.current).forEach((timer) => {
+        if (timer) clearTimeout(timer);
+      });
+      typingTimersRef.current = { customer: null, vendor: null };
+      if (typingEmitTimeoutRef.current) {
+        clearTimeout(typingEmitTimeoutRef.current);
+        typingEmitTimeoutRef.current = null;
+      }
+    },
+    []
+  );
+
+
   return {
     messages,
     participants,
@@ -253,5 +346,10 @@ export function useJobMessaging({ jobId, role }) {
     markConversationRead,
     lastMessage,
     incomingCount,
+    typingIndicators,
+    emitTyping,
+    unreadCount,
   };
 }
+
+
