@@ -5,7 +5,7 @@ import Customer from "../models/Customer.js";
 import Job from "../models/Jobs.js";
 import AdminNotification from "../models/AdminNotification.js";
 import { getClientBaseUrl } from "../lib/clientUrl.js";
-import { sendAdminPushNotifications } from "../lib/push.js";
+import { sendAdminPushNotifications, sendCustomerPushNotifications } from "../lib/push.js";
 
 const router = Router();
 
@@ -146,6 +146,31 @@ router.post("/jobs", async (req, res, next) => {
       console.error("Failed to notify admins about new request:", notifyError);
     }
 
+    try {
+      await sendCustomerPushNotifications([
+        {
+          customerId: cust._id,
+          jobId: job._id,
+          title: "Request received",
+          body: `${serviceType} request logged. We'll notify you when a provider responds.`,
+          severity: "info",
+          meta: {
+            role: "customer",
+            jobId: job._id,
+            kind: "status",
+            route: `/status/${job._id}`,
+            absoluteUrl: statusUrl,
+            dedupeKey: `customer:job:${job._id}:created`,
+          },
+        },
+      ]);
+    } catch (notifyCustomerError) {
+      console.error(
+        "Failed to notify customer about new request",
+        notifyCustomerError
+      );
+    }
+
     // 8) Respond with everything the client needs (fixes "undefined token" issues)
     return res.status(201).json({
       ok: true,
@@ -164,3 +189,4 @@ router.post("/jobs", async (req, res, next) => {
 });
 
 export default router;
+

@@ -340,3 +340,4 @@ export const withVendorSnapshot = async (callback) => {
   const snapshot = await fetchVendorSnapshot();
   return callback(snapshot);
 };
+

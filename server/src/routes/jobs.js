@@ -13,6 +13,7 @@ import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
 import {
   sendAdminPushNotifications,
   sendVendorPushNotifications,
+  sendCustomerPushNotifications,
 } from "../lib/push.js";
 const router = Router();
 
@@ -25,6 +26,97 @@ export const STATUSES = [
   "Arrived",
   "Completed",
 ];
+
+const STATUS_TITLES = {
+  Unassigned: "Request received",
+  Assigned: "Driver assigned",
+  OnTheWay: "Driver en route",
+  Arrived: "Driver arrived",
+  Completed: "Service completed",
+};
+
+const STATUS_MESSAGES = {
+  Unassigned: "We received your request and will notify you once a provider accepts.",
+  Assigned: "A provider has been assigned. Track their progress from your dashboard.",
+  OnTheWay: "Your provider is en route. Hang tight.",
+  Arrived: "Your provider has arrived at the pickup location.",
+  Completed: "Service completed. Thanks for choosing ServiceOps.",
+};
+
+const jobStatusRoute = (job) =>
+  job?.customerToken ? `/status/${job._id}` : `/status/${job?._id}`;
+
+const buildAbsoluteUrl = (baseUrl, route) => {
+  if (!route) return null;
+  const base = (baseUrl || defaultClientBase || "").replace(/\/$/, "");
+  return `${base}${route.startsWith("/") ? "" : "/"}${route}`;
+};
+
+const stringifyId = (value) =>
+  value ? String(value instanceof mongoose.Types.ObjectId ? value.toString() : value) : null;
+
+async function notifyCustomerJobChanges(previousJob, nextJob, baseUrl) {
+  if (!nextJob || !nextJob.customerId) return;
+
+  const prevStatus = previousJob?.status || null;
+  const nextStatus = nextJob.status || null;
+  const prevVendorId = stringifyId(previousJob?.vendorId);
+  const nextVendorId = stringifyId(nextJob.vendorId);
+
+  const notifications = [];
+  const route = jobStatusRoute(nextJob);
+  const absoluteUrl = buildAbsoluteUrl(baseUrl, route);
+
+  if (nextStatus && prevStatus !== nextStatus) {
+    const title = STATUS_TITLES[nextStatus] || `Job ${nextStatus}`;
+    let body = STATUS_MESSAGES[nextStatus] || `Your job status is now ${nextStatus}.`;
+
+    if (nextStatus === "Assigned" && nextJob.vendorName) {
+      body = `Your provider ${nextJob.vendorName} is confirmed and preparing to roll.`;
+    } else if (nextStatus === "OnTheWay" && nextJob.vendorName) {
+      body = `${nextJob.vendorName} is en route to you. Track their progress in the app.`;
+    }
+
+    notifications.push({
+      customerId: nextJob.customerId,
+      jobId: nextJob._id,
+      title,
+      body,
+      severity: nextStatus === "Completed" ? "success" : "info",
+      meta: {
+        role: "customer",
+        jobId: nextJob._id,
+        status: nextStatus,
+        kind: "status",
+        route,
+        absoluteUrl,
+        dedupeKey: `customer:job:${nextJob._id}:status:${nextStatus}`,
+      },
+    });
+  }
+
+  if (prevVendorId !== nextVendorId && nextVendorId && nextJob.vendorName) {
+    notifications.push({
+      customerId: nextJob.customerId,
+      jobId: nextJob._id,
+      title: "Provider assigned",
+      body: `${nextJob.vendorName} has been assigned to your request.`,
+      severity: "info",
+      meta: {
+        role: "customer",
+        jobId: nextJob._id,
+        kind: "assignment",
+        route,
+        absoluteUrl,
+        dedupeKey: `customer:job:${nextJob._id}:vendor:${nextVendorId}`,
+      },
+    });
+  }
+
+  if (notifications.length) {
+    await sendCustomerPushNotifications(notifications);
+  }
+}
 
 const ALLOWED_NEXT = {
   Unassigned: ["Assigned"],
@@ -512,6 +604,7 @@ router.patch("/:id", async (req, res, next) => {
     }
 
     const job = await Job.findById(id);
+    const previousJob = job ? (typeof job.toObject === "function" ? job.toObject() : job) : null;
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     const set = {};
@@ -546,6 +639,7 @@ router.patch("/:id", async (req, res, next) => {
         set.vendorPhone = null;
         set.vendorAcceptedToken = null;
         set.biddingOpen = true;
+        set.unbidAlertSentAt = null;
       } else {
         if (!mongoose.isValidObjectId(vendorId)) {
           return res.status(400).json({ message: "Invalid vendorId" });
@@ -619,6 +713,7 @@ router.patch("/:id", async (req, res, next) => {
           set.vendorPhone = null;
           set.vendorAcceptedToken = null;
           set.biddingOpen = true;
+          set.unbidAlertSentAt = null;
         }
       }
     }
@@ -633,6 +728,9 @@ router.patch("/:id", async (req, res, next) => {
 
     await Job.updateOne({ _id: id }, update);
     const refreshed = await Job.findById(id).lean();
+    if (previousJob && refreshed) {
+      await notifyCustomerJobChanges(previousJob, refreshed, resolveClientBaseUrl(req));
+    }
     res.json(refreshed);
   } catch (e) {
     next(e);
@@ -645,6 +743,7 @@ router.post("/:id/scheduling", async (req, res, next) => {
     assertId(id);
 
     const job = await Job.findById(id);
+    const previousJob = job ? (typeof job.toObject === "function" ? job.toObject() : job) : null;
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     const payload = req.body || {};
@@ -701,6 +800,7 @@ router.post("/:id/complete", async (req, res, next) => {
     }
 
     const job = await Job.findById(id);
+    const previousJob = job ? (typeof job.toObject === "function" ? job.toObject() : job) : null;
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     const { summary, job: updatedJob, charge } = await completeJobWithPayment(job, {
@@ -746,11 +846,13 @@ router.post("/:id/open-bidding", async (req, res, next) => {
     const { id } = req.params;
     assertId(id);
     const job = await Job.findById(id);
+    const previousJob = job ? (typeof job.toObject === "function" ? job.toObject() : job) : null;
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     job.vendorToken = job.vendorToken || makeToken();
     job.customerToken = job.customerToken || makeToken();
     job.biddingOpen = true;
+    job.unbidAlertSentAt = null;
 
     await job.save();
 
@@ -904,5 +1006,9 @@ Respond in the ServiceOps vendor portal if available.`;
 });
 
 export default router;
+
+
+
+
 
 

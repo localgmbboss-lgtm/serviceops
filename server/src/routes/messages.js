@@ -9,6 +9,8 @@ import Customer from "../models/Customer.js";
 import Vendor from "../models/Vendor.js";
 import { requireConversationAccess } from "../middleware/conversationAccess.js";
 import { getIo } from "../realtime/index.js";
+import { sendCustomerPushNotifications, sendVendorPushNotifications } from "../lib/push.js";
+import { resolveClientBaseUrl } from "../lib/clientUrl.js";
 
 const router = Router();
 
@@ -38,6 +40,12 @@ const extensionForMime = (mimetype = "") => {
   if (subtype.includes("gif")) return ".gif";
   if (subtype.includes("webp")) return ".webp";
   return `.${subtype.replace(/[^a-z0-9]/g, "")}`;
+};
+
+const buildAbsoluteUrl = (baseUrl, route) => {
+  if (!route) return null;
+  const base = (baseUrl || "").replace(/\/$/, "");
+  return `${base}${route.startsWith("/") ? "" : "/"}${route}`;
 };
 
 const storage = multer.diskStorage({
@@ -259,6 +267,53 @@ router.post(
       });
 
       const sanitized = sanitizeMessage(messageDoc);
+
+      const baseUrl = resolveClientBaseUrl(req);
+      const messagePreview = sanitized.body
+        ? sanitized.body.slice(0, 140)
+        : sanitized.attachments?.length
+        ? "Sent an attachment"
+        : "New message";
+
+      if (isVendor && conversationContext.customerId) {
+        const customerRoute = `/status/${job._id}`;
+        await sendCustomerPushNotifications([
+          {
+            customerId: conversationContext.customerId,
+            jobId: job._id,
+            title: senderName ? `${senderName} sent a message` : "New message",
+            body: messagePreview,
+            severity: "info",
+            meta: {
+              role: "customer",
+              jobId: job._id,
+              kind: "message",
+              route: customerRoute,
+              absoluteUrl: buildAbsoluteUrl(baseUrl, customerRoute),
+              dedupeKey: `customer:job:${job._id}:message:${sanitized.id}`,
+            },
+          },
+        ]);
+      }
+
+      if (isCustomer && conversationContext.vendorId) {
+        await sendVendorPushNotifications([
+          {
+            vendorId: conversationContext.vendorId,
+            jobId: job._id,
+            title: "Customer sent a message",
+            body: messagePreview,
+            severity: "info",
+            meta: {
+              role: "vendor",
+              jobId: job._id,
+              kind: "message",
+              route: "/vendor/app",
+              dedupeKey: `vendor:job:${job._id}:message:${sanitized.id}`,
+            },
+          },
+        ]);
+      }
 
       const io = getIo();
       if (io) {

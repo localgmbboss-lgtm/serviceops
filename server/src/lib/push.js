@@ -45,6 +45,7 @@ async function upsertSubscription({
   role,
   vendorId = null,
   userId = null,
+  customerId = null,
   subscription,
   meta = {},
 }) {
@@ -77,9 +78,15 @@ async function upsertSubscription({
   if (role === "vendor") {
     update.vendorId = vendorId;
     update.userId = null;
+    update.customerId = null;
   } else if (role === "admin") {
     update.userId = userId;
     update.vendorId = null;
+    update.customerId = null;
+  } else if (role === "customer") {
+    update.customerId = customerId;
+    update.vendorId = null;
+    update.userId = null;
   }
 
   const doc = await PushSubscription.findOneAndUpdate(
@@ -103,6 +110,15 @@ export async function registerAdminSubscription(userId, payload = {}) {
   return upsertSubscription({
     role: "admin",
     userId,
+    subscription: payload.subscription,
+    meta: payload.meta || payload,
+  });
+}
+
+export async function registerCustomerSubscription(customerId, payload = {}) {
+  return upsertSubscription({
+    role: "customer",
+    customerId,
     subscription: payload.subscription,
     meta: payload.meta || payload,
   });
@@ -231,4 +247,35 @@ export async function sendAdminPushNotifications(notifications = []) {
   );
 
   await dispatchNotifications(subs, payload);
+}
+
+export async function sendCustomerPushNotifications(notifications = []) {
+  if (!configured || !notifications.length) return;
+
+  const grouped = new Map();
+  notifications.forEach((notification) => {
+    const customerKey = String(notification.customerId || "");
+    if (!grouped.has(customerKey)) grouped.set(customerKey, []);
+    grouped.get(customerKey).push(notification);
+  });
+
+  for (const [customerId, customerNotifications] of grouped.entries()) {
+    if (!customerId || customerId === "null") continue;
+    const subs = await PushSubscription.find({
+      customerId,
+      role: "customer",
+      status: "active",
+    }).lean();
+
+    if (!subs.length) continue;
+
+    const payload = JSON.stringify(
+      toPayload(customerNotifications[customerNotifications.length - 1], {
+        type: "customer_notification",
+        defaultRoute: "/customer/home",
+      })
+    );
+
+    await dispatchNotifications(subs, payload);
+  }
 }
