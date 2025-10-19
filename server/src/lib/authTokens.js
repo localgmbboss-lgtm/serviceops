@@ -2,11 +2,51 @@
 import jwt from "jsonwebtoken";
 
 const DEFAULT_SECRET = "dev_secret";
+const DEFAULT_ADMIN_SECRET = "dev_admin_secret";
+const DEFAULT_VENDOR_SECRET = "dev_secret_change_me";
 
 const getSharedSecret = () =>
   process.env.JWT_SECRET && process.env.JWT_SECRET.length
     ? process.env.JWT_SECRET
     : DEFAULT_SECRET;
+
+const collectVerificationSecrets = () => {
+  const secrets = [];
+  const addSecret = (value) => {
+    if (typeof value === "string" && value.length && !secrets.includes(value)) {
+      secrets.push(value);
+    }
+  };
+
+  addSecret(getSharedSecret());
+  addSecret(process.env.JWT_ADMIN_SECRET);
+  if (!process.env.JWT_ADMIN_SECRET) {
+    addSecret(DEFAULT_ADMIN_SECRET);
+  }
+  addSecret(process.env.JWT_VENDOR_SECRET);
+  addSecret(DEFAULT_VENDOR_SECRET);
+
+  return secrets;
+};
+
+const verifyTokenWithCandidates = (token) => {
+  let lastError;
+  for (const secret of collectVerificationSecrets()) {
+    try {
+      return jwt.verify(token, secret);
+    } catch (error) {
+      lastError = error;
+      if (
+        error.name === "JsonWebTokenError" &&
+        error.message === "invalid signature"
+      ) {
+        continue;
+      }
+      break;
+    }
+  }
+  throw lastError;
+};
 
 const normalizeId = (value) => {
   if (!value) return null;
@@ -30,7 +70,7 @@ export function decodeAppToken(token) {
   }
 
   try {
-    const payload = jwt.verify(token, getSharedSecret());
+    const payload = verifyTokenWithCandidates(token);
     if (payload?.role === "customer" && payload?.sub) {
       return { role: "customer", id: normalizeId(payload.sub), raw: payload };
     }

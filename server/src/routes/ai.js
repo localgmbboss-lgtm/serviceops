@@ -572,7 +572,7 @@ router.post("/followups/send", async (req, res, next) => {
 
     const finalBody =
       normalizedChannel === "email" && trimmedSubject
-        ? `Subject: ${trimmedSubject}\n\n${trimmedBody}`
+        ? "Subject: " + trimmedSubject + "\n\n" + trimmedBody
         : trimmedBody;
 
     const senderName = "Dispatch";
