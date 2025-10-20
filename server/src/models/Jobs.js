@@ -62,6 +62,23 @@ const schedulingSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const jobMediaSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true },
+    url: { type: String, required: true },
+    fileName: { type: String },
+    mimeType: { type: String },
+    size: { type: Number },
+    kind: {
+      type: String,
+      enum: ["image", "video", "file"],
+      default: "image",
+    },
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const JobSchema = new mongoose.Schema(
   {
     // Core relations
@@ -133,6 +150,10 @@ const JobSchema = new mongoose.Schema(
     dropoffAddress: { type: String, trim: true },
     serviceType: { type: String, trim: true },
     notes: { type: String, trim: true },
+    media: {
+      type: [jobMediaSchema],
+      default: [],
+    },
 
     // Vehicle information (from guest form)
     vehicleMake: { type: String, trim: true },

@@ -1436,8 +1436,8 @@ export default function VendorApp() {
         <p className="va-support__title">Need assistance?</p>
         <p className="va-support__copy">
           Call our dispatch team at{" "}
-          <a className="va-support__phone" href="tel:+18883623743">
-            1 (888) 362-3743
+          <a className="va-support__phone" href="tel:+17208157770">
+            1 (720) 815-7770
           </a>
         </p>
       </footer>

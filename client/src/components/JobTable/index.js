@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { copyText } from "../../utils/clipboard";
 import { APP_BASE_URL } from "../../config/env";
+import JobChatModal from "../JobChatModal";
 import "./styles.css";
 
 const currencyFormatterCache = new Map();
@@ -42,6 +43,7 @@ export default function JobTable({
   const [noteTranslations, setNoteTranslations] = useState({});
   const [followups, setFollowups] = useState({});
   const [followupOverlay, setFollowupOverlay] = useState(null);
+  const [chatOverlayJobId, setChatOverlayJobId] = useState(null);
   const popRef = useRef(null);
 
   useEffect(() => {
@@ -261,6 +263,15 @@ export default function JobTable({
 
   const closeFollowupOverlay = () => {
     setFollowupOverlay(null);
+  };
+
+  const openChatOverlay = (job) => {
+    if (!job?._id) return;
+    setChatOverlayJobId(job._id);
+  };
+
+  const closeChatOverlay = () => {
+    setChatOverlayJobId(null);
   };
 
   const sendFollowup = async (job, audience) => {
@@ -731,9 +742,28 @@ export default function JobTable({
                                 {new Date(customerFollowup.lastSentAt).toLocaleString()} via in-app chat
                               </p>
                             )}
-                          </div>
+                        </div>
 
-                          <div className="jobtable-detail-actions">
+                        <div className="jobtable-detail-section">
+                          <h4>Job Chat</h4>
+                          <p className="jobtable-followup-hint">
+                            Open the in-app conversation to coordinate with vendors and customers in real time.
+                          </p>
+                          <div className="jobtable-followup-actions">
+                            <button
+                              type="button"
+                              className="jobtable-btn jobtable-btn-primary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openChatOverlay(job);
+                              }}
+                            >
+                              Open chat
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="jobtable-detail-actions">
                           <button
                             className="jobtable-btn jobtable-btn-ghost"
                             onClick={(event) => {
@@ -855,7 +885,7 @@ export default function JobTable({
                       />
                     </label>
                     <p className="jobtable-followup-signature">
-                      Signature added automatically: Best regards - Customer Service Team, ServiceOps, 1 (888) 362-3743
+                      Signature added automatically: Best regards - Customer Service Team, ServiceOps, 1 (720) 815-7770
                     </p>
                     {Array.isArray(state.draft?.internalNotes) &&
                       state.draft.internalNotes.length > 0 && (
@@ -923,6 +953,12 @@ export default function JobTable({
             </div>
           </div>
         );
+      })()}
+
+      {chatOverlayJobId && (() => {
+        const job = (jobs || []).find((item) => item?._id === chatOverlayJobId);
+        if (!job) return null;
+        return <JobChatModal job={job} onClose={closeChatOverlay} />;
       })()}
     </div>
   );

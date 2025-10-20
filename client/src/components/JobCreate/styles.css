@@ -238,6 +238,70 @@
   border-radius: 8px;
 }
 
+.jobcreate-media {
+  margin: 24px 0;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px dashed rgba(15, 23, 42, 0.16);
+  background: rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.jobcreate-media-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--color-text-strong, #0f172a);
+}
+
+.jobcreate-media-label input[type="file"] {
+  font-size: 0.9rem;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+
+.jobcreate-media-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jobcreate-media-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+}
+
+.jobcreate-media-name {
+  display: block;
+  font-weight: 600;
+  color: var(--color-text-strong, #0f172a);
+}
+
+.jobcreate-media-meta {
+  display: block;
+  font-size: 0.75rem;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.jobcreate-media-list .btn.ghost {
+  white-space: nowrap;
+}
+
 .jobcreate-ai {
   gap: 12px;
   border-style: dashed;

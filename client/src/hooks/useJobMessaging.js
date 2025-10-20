@@ -7,6 +7,7 @@ import { useAuth } from "../contexts/AuthContext";
 const ROLE_PROPERTY = {
   customer: "readByCustomer",
   vendor: "readByVendor",
+  admin: null,
 };
 
 const MAX_ATTACHMENTS = 6;
@@ -22,7 +23,11 @@ export function useJobMessaging({ jobId, role }) {
   const httpClient = role === "vendor" ? vendorApi : api;
 
   const [messages, setMessages] = useState([]);
-  const [participants, setParticipants] = useState({ customer: null, vendor: null });
+  const [participants, setParticipants] = useState({
+    customer: null,
+    vendor: null,
+    admin: null,
+  });
   const [actor, setActor] = useState({ role, id: null });
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -32,11 +37,12 @@ export function useJobMessaging({ jobId, role }) {
   const [typingIndicators, setTypingIndicators] = useState({
     customer: false,
     vendor: false,
+    admin: false,
   });
 
   const jobIdRef = useRef(jobId);
   const mountedRef = useRef(true);
-  const typingTimersRef = useRef({ customer: null, vendor: null });
+  const typingTimersRef = useRef({ customer: null, vendor: null, admin: null });
   const typingEmitTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -53,11 +59,11 @@ export function useJobMessaging({ jobId, role }) {
   const resetState = useCallback(() => {
     if (!mountedRef.current) return;
     setMessages([]);
-    setParticipants({ customer: null, vendor: null });
+    setParticipants({ customer: null, vendor: null, admin: null });
     setCanMessage(false);
     setRealtimeReady(false);
     setError("");
-    setTypingIndicators({ customer: false, vendor: false });
+    setTypingIndicators({ customer: false, vendor: false, admin: false });
   }, []);
 
   const loadMessages = useCallback(async () => {
@@ -70,7 +76,9 @@ export function useJobMessaging({ jobId, role }) {
       const { data } = await httpClient.get(`/api/messages/job/${jobId}`);
       if (!mountedRef.current || jobIdRef.current !== jobId) return;
       setMessages(Array.isArray(data?.messages) ? data.messages : []);
-      setParticipants(data?.participants || { customer: null, vendor: null });
+      setParticipants(
+        data?.participants || { customer: null, vendor: null, admin: null }
+      );
       if (data?.actor?.role) {
         setActor({
           role: data.actor.role,
@@ -112,15 +120,24 @@ export function useJobMessaging({ jobId, role }) {
         }
         return [...prev, payload];
       });
-      const typingKey = payload.senderRole === "customer" ? "customer" : "vendor";
-      setTypingIndicators((prev) => {
-        if (!prev[typingKey]) return prev;
-        return { ...prev, [typingKey]: false };
-      });
-      const timer = typingTimersRef.current[typingKey];
-      if (timer) {
-        clearTimeout(timer);
-        typingTimersRef.current[typingKey] = null;
+      const typingKey =
+        payload.senderRole === "customer"
+          ? "customer"
+          : payload.senderRole === "vendor"
+          ? "vendor"
+          : payload.senderRole === "admin"
+          ? "admin"
+          : null;
+      if (typingKey) {
+        setTypingIndicators((prev) => {
+          if (!prev[typingKey]) return prev;
+          return { ...prev, [typingKey]: false };
+        });
+        const timer = typingTimersRef.current[typingKey];
+        if (timer) {
+          clearTimeout(timer);
+          typingTimersRef.current[typingKey] = null;
+        }
       }
     };
 
@@ -151,7 +168,14 @@ export function useJobMessaging({ jobId, role }) {
 
     const handleTyping = (payload = {}) => {
       if (!payload || payload.jobId !== String(jobIdRef.current)) return;
-      const typingRole = payload.role === "vendor" ? "vendor" : payload.role === "customer" ? "customer" : null;
+      const typingRole =
+        payload.role === "vendor"
+          ? "vendor"
+          : payload.role === "customer"
+          ? "customer"
+          : payload.role === "admin"
+          ? "admin"
+          : null;
       if (!typingRole || typingRole === actor.role) return;
       const isTyping = payload.typing !== false;
       setTypingIndicators((prev) => {
@@ -322,7 +346,7 @@ export function useJobMessaging({ jobId, role }) {
       Object.values(typingTimersRef.current).forEach((timer) => {
         if (timer) clearTimeout(timer);
       });
-      typingTimersRef.current = { customer: null, vendor: null };
+      typingTimersRef.current = { customer: null, vendor: null, admin: null };
       if (typingEmitTimeoutRef.current) {
         clearTimeout(typingEmitTimeoutRef.current);
         typingEmitTimeoutRef.current = null;

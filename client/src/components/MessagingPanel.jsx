@@ -18,11 +18,12 @@ const formatTimestamp = (iso) => {
   }
 };
 
-const roleLabel = (role, viewerLabel) => {
-  if (viewerLabel && role !== "system") return viewerLabel;
-  if (role === "customer") return "You";
-  if (role === "vendor") return "Vendor";
-  return "System";
+const roleLabel = (role, preferred) => {
+  if (role === "customer") return preferred || "Customer";
+  if (role === "vendor") return preferred || "Vendor";
+  if (role === "admin") return preferred || "Dispatch";
+  if (role === "system") return preferred || "Dispatch";
+  return preferred || "Participant";
 };
 
 const initialsFor = (name = "") => {
@@ -66,16 +67,27 @@ export default function MessagingPanel({
     if (actorRole === "vendor") {
       return participants.vendor?.name || "You";
     }
+    if (actorRole === "admin") {
+      return participants.admin?.name || "You";
+    }
     return "You";
-  }, [actorRole, participants.customer?.name, participants.vendor?.name]);
+  }, [
+    actorRole,
+    participants.admin?.name,
+    participants.customer?.name,
+    participants.vendor?.name,
+  ]);
 
-const otherParticipant = useMemo(
-  () =>
-    actorRole === "customer"
-      ? participants.vendor
-      : participants.customer,
-  [actorRole, participants.customer, participants.vendor]
-);
+  const otherParticipant = useMemo(() => {
+    if (actorRole === "customer") return participants.vendor;
+    if (actorRole === "vendor") return participants.customer;
+    if (actorRole === "admin") return participants.vendor || participants.customer;
+    return null;
+  }, [
+    actorRole,
+    participants.customer,
+    participants.vendor,
+  ]);
 
   const composerPlaceholder = useMemo(() => {
     if (!canMessage) return "Messaging is unavailable for this job.";
@@ -85,8 +97,16 @@ const otherParticipant = useMemo(
     if (actorRole === "vendor" && !participants?.customer) {
       return "Type a message for dispatch...";
     }
+    if (actorRole === "admin") {
+      return "Share an update with your customer or vendor...";
+    }
     return "Type a message...";
-  }, [actorRole, canMessage, participants?.customer, participants?.vendor]);
+  }, [
+    actorRole,
+    canMessage,
+    participants?.customer,
+    participants?.vendor,
+  ]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -160,22 +180,49 @@ const otherParticipant = useMemo(
 
   const composedSubtitle = useMemo(() => {
     if (subtitle) return subtitle;
-    const vendorName = participants.vendor?.name;
-    if (vendorName) {
-      return `Chat with ${vendorName}`;
+
+    if (actorRole === "customer") {
+      const vendorName = participants.vendor?.name;
+      if (vendorName) return `Chat with ${vendorName}`;
+      if (!canMessage) return "We'll unlock chat once your vendor is assigned.";
+      return "";
     }
+
+    if (actorRole === "vendor") {
+      const customerName = participants.customer?.name;
+      if (customerName) return `Chat with ${customerName}`;
+      return "";
+    }
+
+    if (actorRole === "admin") {
+      if (participants.vendor?.name) return `Chat with ${participants.vendor.name}`;
+      if (participants.customer?.name) return `Chat with ${participants.customer.name}`;
+      return "Message participants directly from dispatch.";
+    }
+
     if (!canMessage) {
-      return "We’ll unlock chat once your vendor is assigned.";
+      return "We'll unlock chat once your vendor is assigned.";
     }
     return "";
-  }, [canMessage, participants.vendor?.name, subtitle]);
+  }, [
+    actorRole,
+    canMessage,
+    participants.customer?.name,
+    participants.vendor?.name,
+    subtitle,
+  ]);
 
   const othersTyping = useMemo(() => {
-    const indicator =
-      actorRole === "customer"
-        ? typingIndicators?.vendor
-        : typingIndicators?.customer;
-    return Boolean(indicator);
+    if (actorRole === "customer") {
+      return Boolean(typingIndicators?.vendor || typingIndicators?.admin);
+    }
+    if (actorRole === "vendor") {
+      return Boolean(typingIndicators?.customer || typingIndicators?.admin);
+    }
+    if (actorRole === "admin") {
+      return Boolean(typingIndicators?.vendor || typingIndicators?.customer);
+    }
+    return Object.values(typingIndicators || {}).some(Boolean);
   }, [actorRole, typingIndicators]);
 
   return (
@@ -229,18 +276,27 @@ const otherParticipant = useMemo(
         ) : (
           <ul className="message-panel__list" ref={listRef}>
             {messages.map((msg) => {
-              const mine = msg.senderRole === actorRole;
+              const mine =
+                msg.senderRole === actorRole ||
+                (actorRole === "admin" && msg.senderRole === "system");
+
+              const nameHint =
+                msg.senderName ||
+                (msg.senderRole === "customer"
+                  ? participants.customer?.name
+                  : msg.senderRole === "vendor"
+                  ? participants.vendor?.name
+                  : msg.senderRole === "admin"
+                  ? participants.admin?.name
+                  : null) ||
+                otherParticipant?.name ||
+                "";
+
               const avatarInitials = mine
                 ? initialsFor(viewerLabel)
-                : initialsFor(
-                    otherParticipant?.name || msg.senderName || ""
-                  );
-              const label = mine
-                ? "You"
-                : roleLabel(
-                    msg.senderRole,
-                    otherParticipant?.name || msg.senderName
-                  );
+                : initialsFor(nameHint);
+
+              const label = mine ? "You" : roleLabel(msg.senderRole, nameHint);
 
               return (
                 <li
@@ -339,7 +395,7 @@ const otherParticipant = useMemo(
                     onClick={() => removeFileAt(index)}
                     aria-label="Remove attachment"
                   >
-                    ×
+                    x
                   </button>
                   <img src={preview.url} alt="Selected attachment" />
                 </div>
@@ -375,3 +431,6 @@ const otherParticipant = useMemo(
     </section>
   );
 }
+
+
+

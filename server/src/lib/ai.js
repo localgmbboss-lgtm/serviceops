@@ -444,7 +444,7 @@ Guidelines:
 Best regards,
 Customer Service Team
 ServiceOps
-1 (888) 362-3743
+1 (720) 815-7770
 `;
 
   const response = await client.chat.completions.create({

@@ -78,12 +78,13 @@ const canAccessJobConversation = async (actor, jobId) => {
 
   const isCustomer = actor.role === "customer" && actor.id === customerId;
   const isVendor = actor.role === "vendor" && actor.id === vendorId;
+  const isAdmin = actor.role === "admin";
 
-  if (!isCustomer && !isVendor) {
+  if (!isCustomer && !isVendor && !isAdmin) {
     return { ok: false, reason: "Access denied" };
   }
 
-  return { ok: true, job, isCustomer, isVendor };
+  return { ok: true, job, isCustomer, isVendor, isAdmin };
 };
 
 const isAllowedOrigin = (origin) => {

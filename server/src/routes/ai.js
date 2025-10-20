@@ -579,7 +579,7 @@ router.post("/followups/send", async (req, res, next) => {
 
     const messageDoc = await Message.create({
       jobId: job._id,
-      senderRole: "system",
+      senderRole: "admin",
       senderId: actor.id ? String(actor.id) : null,
       senderName,
       body: finalBody,
@@ -833,6 +833,8 @@ router.get("/reports/digest", async (req, res, next) => {
       messages: digestMessages,
       notes,
     });
+
+    
 
     res.json({
       ok: true,

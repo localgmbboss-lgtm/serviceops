@@ -2,6 +2,11 @@
 import { Router } from "express";
 import crypto from "crypto";
 import mongoose from "mongoose";
+import path from "path";
+import fs from "fs";
+import fsPromises from "fs/promises";
+import multer from "multer";
+import { fileURLToPath } from "url";
 import { completeJobWithPayment } from "../lib/jobCompletion.js";
 import Job from "../models/Jobs.js";
 import Vendor from "../models/Vendor.js"; // Changed from Driver to Vendor
@@ -16,6 +21,80 @@ import {
   sendCustomerPushNotifications,
 } from "../lib/push.js";
 const router = Router();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const jobUploadRoot = path.join(__dirname, "..", "uploads", "jobs");
+fs.mkdirSync(jobUploadRoot, { recursive: true });
+
+const JOB_MEDIA_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+]);
+
+const extensionForMime = (mimetype = "") => {
+  const [, subtypeRaw] = String(mimetype).toLowerCase().split("/");
+  if (!subtypeRaw) return "";
+  const subtype = subtypeRaw.split("+")[0];
+  if (subtype === "jpeg") return ".jpg";
+  if (subtype.includes("heic") || subtype.includes("heif")) return ".heic";
+  if (subtype.includes("png")) return ".png";
+  if (subtype.includes("gif")) return ".gif";
+  if (subtype.includes("webp")) return ".webp";
+  if (subtype.includes("mp4")) return ".mp4";
+  if (subtype.includes("quicktime")) return ".mov";
+  if (subtype.includes("webm")) return ".webm";
+  return `.${subtype.replace(/[^a-z0-9]/g, "")}`;
+};
+
+const jobMediaStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, jobUploadRoot),
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext =
+      path.extname(file.originalname)?.toLowerCase() || extensionForMime(file.mimetype);
+    cb(null, `${unique}${ext}`);
+  },
+});
+
+const jobUpload = multer({
+  storage: jobMediaStorage,
+  limits: { fileSize: 25 * 1024 * 1024, files: 6 },
+  fileFilter: (_req, file, cb) => {
+    if (JOB_MEDIA_TYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image and video uploads are allowed"));
+    }
+  },
+});
+
+const toJobMediaRecord = (file) => {
+  const key = file.filename;
+  const relativeUrl = path.posix.join("uploads", "jobs", key);
+  const kind = file.mimetype?.startsWith("video/")
+    ? "video"
+    : file.mimetype?.startsWith("image/")
+    ? "image"
+    : "file";
+  return {
+    key,
+    url: `/${relativeUrl}`,
+    fileName: file.originalname || null,
+    mimeType: file.mimetype || null,
+    size: file.size ?? null,
+    kind,
+    uploadedAt: new Date(),
+  };
+};
 
 const defaultClientBase = getClientBaseUrl();
 
@@ -510,13 +589,31 @@ router.get("/:id", async (req, res, next) => {
 });
 
 // ---------- CREATE ----------
-router.post("/", async (req, res, next) => {
+router.post("/", jobUpload.array("media", 6), async (req, res, next) => {
+  const storedFiles = [];
+  const files = Array.isArray(req.files) ? req.files : [];
+  for (const file of files) {
+    storedFiles.push(path.join(jobUploadRoot, file.filename));
+  }
+
+  const cleanupUploaded = async () => {
+    if (!storedFiles.length) return;
+    await Promise.all(
+      storedFiles.map((filepath) => fsPromises.unlink(filepath).catch(() => {}))
+    );
+    storedFiles.length = 0;
+  };
+
   try {
     const body = req.body || {};
-    if (!body.customerId)
+    if (!body.customerId) {
+      await cleanupUploaded();
       return res.status(400).json({ message: "customerId required" });
-    if (!body.pickupAddress)
+    }
+    if (!body.pickupAddress) {
+      await cleanupUploaded();
       return res.status(400).json({ message: "pickupAddress required" });
+    }
 
     const vendorId = body.vendorId ? String(body.vendorId).trim() : null;
     let vendorDoc = null;
@@ -524,6 +621,7 @@ router.post("/", async (req, res, next) => {
       assertId(vendorId);
       vendorDoc = await Vendor.findById(vendorId).lean();
       if (!vendorDoc) {
+        await cleanupUploaded();
         return res.status(404).json({ message: "Vendor not found" });
       }
     }
@@ -560,7 +658,12 @@ router.post("/", async (req, res, next) => {
         Number(body.finalPrice) > 0 ? Number(body.finalPrice) : quotedPrice;
     }
 
+    if (files.length) {
+      jobPayload.media = files.map((file) => toJobMediaRecord(file));
+    }
+
     const job = await Job.create(jobPayload);
+    storedFiles.length = 0;
 
     try {
       const customer = await Customer.findById(job.customerId).lean();
@@ -589,6 +692,7 @@ router.post("/", async (req, res, next) => {
 
     res.status(201).json(job);
   } catch (e) {
+    await cleanupUploaded();
     next(e);
   }
 });

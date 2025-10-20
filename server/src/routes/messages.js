@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import Message from "../models/Message.js";
 import Customer from "../models/Customer.js";
 import Vendor from "../models/Vendor.js";
+import User from "../models/User.js";
 import { requireConversationAccess } from "../middleware/conversationAccess.js";
 import { getIo } from "../realtime/index.js";
 import { sendCustomerPushNotifications, sendVendorPushNotifications } from "../lib/push.js";
@@ -102,11 +103,12 @@ const sanitizeMessage = (doc) => {
 };
 
 const getParticipantSnapshot = async (context) => {
-  const { job, isCustomer, isVendor, customerId, vendorId } = context;
+  const { job, isCustomer, isVendor, isAdmin, customerId, vendorId, actor } = context;
 
-  const [customerDoc, vendorDoc] = await Promise.all([
+  const [customerDoc, vendorDoc, adminDoc] = await Promise.all([
     customerId ? Customer.findById(customerId).select("name phone").lean() : null,
     vendorId ? Vendor.findById(vendorId).select("name phone company").lean() : null,
+    isAdmin && actor?.id ? User.findById(actor.id).select("email").lean() : null,
   ]);
 
   return {
@@ -141,6 +143,14 @@ const getParticipantSnapshot = async (context) => {
           isSelf: isVendor,
         }
       : null,
+    admin:
+      isAdmin && actor?.id
+        ? {
+            id: String(actor.id),
+            name: adminDoc?.email || "Dispatch",
+            isSelf: true,
+          }
+        : null,
   };
 };
 
@@ -174,7 +184,8 @@ router.get(
         messages: messages.map(sanitizeMessage),
         canMessage:
           Boolean(conversationContext.isCustomer) ||
-          Boolean(conversationContext.isVendor),
+          Boolean(conversationContext.isVendor) ||
+          Boolean(conversationContext.isAdmin),
         actor: {
           role: actor.role,
           id: actor.id,
@@ -200,10 +211,17 @@ router.post(
     const storedFiles = [];
     try {
       const { conversationContext } = req;
-      const { job, actor, isCustomer, isVendor, vendorId } =
-        conversationContext;
+      const {
+        job,
+        actor,
+        isCustomer,
+        isVendor,
+        isAdmin,
+        vendorId,
+        customerId,
+      } = conversationContext;
 
-      if (!vendorId) {
+      if (!vendorId && actor.role === "vendor") {
         return res.status(409).json({
           message: "Messaging is available once a vendor is assigned.",
         });
@@ -253,11 +271,15 @@ router.post(
           job.customerName ||
           job.customerEmail ||
           "Customer";
+      } else if (isAdmin) {
+        const admin =
+          (await User.findById(actor.id).select("email").lean()) || null;
+        senderName = admin?.email || "Dispatch";
       }
 
       const messageDoc = await Message.create({
         jobId: job._id,
-        senderRole: actor.role,
+        senderRole: isAdmin ? "admin" : actor.role,
         senderId: actor.id,
         senderName,
         body,
@@ -275,11 +297,11 @@ router.post(
         ? "Sent an attachment"
         : "New message";
 
-      if (isVendor && conversationContext.customerId) {
+      if (isVendor && customerId) {
         const customerRoute = `/status/${job._id}`;
         await sendCustomerPushNotifications([
           {
-            customerId: conversationContext.customerId,
+            customerId,
             jobId: job._id,
             title: senderName ? `${senderName} sent a message` : "New message",
             body: messagePreview,
@@ -296,10 +318,10 @@ router.post(
         ]);
       }
 
-      if (isCustomer && conversationContext.vendorId) {
+      if (isCustomer && vendorId) {
         await sendVendorPushNotifications([
           {
-            vendorId: conversationContext.vendorId,
+            vendorId,
             jobId: job._id,
             title: "Customer sent a message",
             body: messagePreview,
@@ -310,6 +332,46 @@ router.post(
               kind: "message",
               route: "/vendor/app",
               dedupeKey: `vendor:job:${job._id}:message:${sanitized.id}`,
+            },
+          },
+        ]);
+      }
+
+      if (isAdmin && vendorId) {
+        await sendVendorPushNotifications([
+          {
+            vendorId,
+            jobId: job._id,
+            title: senderName ? `${senderName} sent a message` : "Dispatch update",
+            body: messagePreview,
+            severity: "info",
+            meta: {
+              role: "vendor",
+              jobId: job._id,
+              kind: "message",
+              route: "/vendor/app",
+              dedupeKey: `vendor:job:${job._id}:message:${sanitized.id}`,
+            },
+          },
+        ]);
+      }
+
+      if (isAdmin && customerId) {
+        const customerRoute = `/status/${job._id}`;
+        await sendCustomerPushNotifications([
+          {
+            customerId,
+            jobId: job._id,
+            title: senderName ? `${senderName} sent a message` : "Dispatch update",
+            body: messagePreview,
+            severity: "info",
+            meta: {
+              role: "customer",
+              jobId: job._id,
+              kind: "message",
+              route: customerRoute,
+              absoluteUrl: buildAbsoluteUrl(baseUrl, customerRoute),
+              dedupeKey: `customer:job:${job._id}:message:${sanitized.id}`,
             },
           },
         ]);
@@ -340,24 +402,41 @@ router.post(
   async (req, res, next) => {
     try {
       const { conversationContext } = req;
-      const { job, isCustomer, isVendor } = conversationContext;
+      const { job, isCustomer, isVendor, isAdmin } = conversationContext;
 
-      if (!isCustomer && !isVendor) {
+      if (!isCustomer && !isVendor && !isAdmin) {
         return res.status(403).json({ message: "Not allowed" });
+      }
+
+      if (isAdmin) {
+        return res.json({ ok: true });
       }
 
       const update = {};
       if (isCustomer) update.readByCustomer = true;
       if (isVendor) update.readByVendor = true;
 
-      await Message.updateMany(
-        {
-          jobId: job._id,
-          ...(isCustomer ? { senderRole: "vendor" } : {}),
-          ...(isVendor ? { senderRole: "customer" } : {}),
-        },
-        { $set: update }
-      );
+      const senderRoles = new Set();
+      if (isCustomer) {
+        senderRoles.add("vendor");
+        senderRoles.add("admin");
+        senderRoles.add("system");
+      }
+      if (isVendor) {
+        senderRoles.add("customer");
+        senderRoles.add("admin");
+        senderRoles.add("system");
+      }
+
+      if (senderRoles.size > 0) {
+        await Message.updateMany(
+          {
+            jobId: job._id,
+            senderRole: { $in: Array.from(senderRoles) },
+          },
+          { $set: update }
+        );
+      }
 
       const io = getIo();
       if (io) {

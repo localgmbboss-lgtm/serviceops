@@ -34,8 +34,9 @@ export async function requireConversationAccess(req, res, next) {
 
     const isCustomer = actor.role === "customer" && actor.id === customerId;
     const isVendor = actor.role === "vendor" && actor.id === vendorId;
+    const isAdmin = actor.role === "admin";
 
-    if (!isCustomer && !isVendor) {
+    if (!isCustomer && !isVendor && !isAdmin) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -44,6 +45,7 @@ export async function requireConversationAccess(req, res, next) {
       actor,
       isCustomer,
       isVendor,
+      isAdmin,
       customerId,
       vendorId,
     };

@@ -36,6 +36,10 @@ const INITIAL_FORM = {
   vendorId: "",
 };
 
+const MAX_MEDIA_FILES = 6;
+const MAX_MEDIA_SIZE = 25 * 1024 * 1024; // 25 MB
+const MEDIA_ACCEPT = "image/*,video/*";
+
 export default function JobCreate({ onCreated }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [busy, setBusy] = useState(false);
@@ -53,6 +57,8 @@ export default function JobCreate({ onCreated }) {
   const [vendorAiSuggestions, setVendorAiSuggestions] = useState([]);
   const [vendorAiNotes, setVendorAiNotes] = useState([]);
   const [vendorAiCandidates, setVendorAiCandidates] = useState([]);
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentError, setAttachmentError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +125,63 @@ export default function JobCreate({ onCreated }) {
   const setField = (key) => (event) =>
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
+  const formatFileSize = (bytes) => {
+    if (!Number.isFinite(bytes)) return "";
+    if (bytes >= 1024 * 1024) return `${(bytes / 1048576).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
+  };
+
+  const handleMediaChange = (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    const availableSlots = MAX_MEDIA_FILES - attachments.length;
+    if (availableSlots <= 0) {
+      setAttachmentError(`You can attach up to ${MAX_MEDIA_FILES} files.`);
+      event.target.value = "";
+      return;
+    }
+
+    const allowed = [];
+    const messages = [];
+
+    files.slice(0, availableSlots).forEach((file) => {
+      if (
+        !file.type?.startsWith("image/") &&
+        !file.type?.startsWith("video/")
+      ) {
+        messages.push(`${file.name} must be an image or video file.`);
+        return;
+      }
+      if (file.size > MAX_MEDIA_SIZE) {
+        messages.push(`${file.name} exceeds the 25 MB limit.`);
+        return;
+      }
+      allowed.push(file);
+    });
+
+    if (files.length > availableSlots) {
+      messages.push(
+        `Only ${availableSlots} more ${
+          availableSlots === 1 ? "file fits" : "files fit"
+        }; remove an attachment to add more.`
+      );
+    }
+
+    if (allowed.length) {
+      setAttachments((prev) => [...prev, ...allowed]);
+    }
+
+    setAttachmentError(messages.length ? messages.join(" ") : "");
+    event.target.value = "";
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+    setAttachmentError("");
+  };
+
   const selectedVendor = useMemo(
     () => vendors.find((v) => v._id === form.vendorId) || null,
     [vendors, form.vendorId]
@@ -178,7 +241,11 @@ export default function JobCreate({ onCreated }) {
     });
   };
 
-  const reset = () => setForm({ ...INITIAL_FORM });
+  const reset = () => {
+    setForm({ ...INITIAL_FORM });
+    setAttachments([]);
+    setAttachmentError("");
+  };
 
   const formatAdviceForCopy = (advice) => {
     if (!advice) return "";
@@ -360,7 +427,23 @@ export default function JobCreate({ onCreated }) {
         payload.finalPrice = Number(form.quotedPrice) || 0;
       }
 
-      const { data: job } = await api.post("/api/jobs", payload);
+      let jobResponse;
+      if (attachments.length) {
+        const formData = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+          if (value === undefined || value === null) return;
+          formData.append(
+            key,
+            typeof value === "number" ? String(value) : value
+          );
+        });
+        attachments.forEach((file) => formData.append("media", file));
+        jobResponse = await api.post("/api/jobs", formData);
+      } else {
+        jobResponse = await api.post("/api/jobs", payload);
+      }
+
+      const { data: job } = jobResponse;
 
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
@@ -867,6 +950,46 @@ export default function JobCreate({ onCreated }) {
           </small>
         </label>
       </div>
+
+      <section className="jobcreate-media">
+        <label className="jobcreate-media-label">
+          <span>Upload photos or video</span>
+          <input
+            type="file"
+            accept={MEDIA_ACCEPT}
+            multiple
+            onChange={handleMediaChange}
+          />
+        </label>
+        {attachmentError ? (
+          <p className="jobcreate-hint-error">{attachmentError}</p>
+        ) : (
+          !attachments.length && (
+            <p className="jobcreate-hint">
+              Attach up to {MAX_MEDIA_FILES} files (images or short videos, 25 MB max per file).
+            </p>
+          )
+        )}
+        {attachments.length > 0 && (
+          <ul className="jobcreate-media-list">
+            {attachments.map((file, index) => (
+              <li key={`${file.name}-${index}`}>
+                <div>
+                  <span className="jobcreate-media-name">{file.name}</span>
+                  <span className="jobcreate-media-meta">{formatFileSize(file.size)}</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn tiny ghost"
+                  onClick={() => removeAttachment(index)}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <label>
         <span>Notes</span>
