@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Job from "../models/Jobs.js";
+import Vendor from "../models/Vendor.js";
 import { decodeRequestActor } from "../lib/authTokens.js";
 
 const isValidObjectId = (value) => {
@@ -8,6 +9,16 @@ const isValidObjectId = (value) => {
   } catch {
     return false;
   }
+};
+
+const normalizePhone = (input) => {
+  if (!input) return "";
+  const str = String(input).trim();
+  if (!str) return "";
+  if (str.startsWith("+")) {
+    return `+${str.slice(1).replace(/\D+/g, "")}`;
+  }
+  return str.replace(/\D+/g, "");
 };
 
 export async function requireConversationAccess(req, res, next) {
@@ -30,10 +41,26 @@ export async function requireConversationAccess(req, res, next) {
     }
 
     const customerId = job.customerId ? String(job.customerId) : null;
-    const vendorId = job.vendorId ? String(job.vendorId) : null;
-
+    let vendorId = job.vendorId ? String(job.vendorId) : null;
+    const jobVendorPhone = normalizePhone(job.vendorPhone);
     const isCustomer = actor.role === "customer" && actor.id === customerId;
-    const isVendor = actor.role === "vendor" && actor.id === vendorId;
+    let isVendor = actor.role === "vendor" && actor.id === vendorId;
+    if (actor.role === "vendor" && !isVendor && jobVendorPhone) {
+      try {
+        const vendorDoc = actor.id
+          ? await Vendor.findById(actor.id).select("_id phone").lean()
+          : null;
+        const vendorPhone = normalizePhone(vendorDoc?.phone);
+        if (vendorPhone && vendorPhone === jobVendorPhone) {
+          isVendor = true;
+          if (!vendorId && vendorDoc?._id) {
+            vendorId = String(vendorDoc._id);
+          }
+        }
+      } catch {
+        // ignore lookup errors and fall back to strict id match
+      }
+    }
     const isAdmin = actor.role === "admin";
 
     if (!isCustomer && !isVendor && !isAdmin) {

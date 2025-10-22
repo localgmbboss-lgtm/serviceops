@@ -99,9 +99,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 320px;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 6px;
   flex: 1 1 auto;
 }
 
@@ -168,24 +167,52 @@
 
 .message-panel__attachments {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
 }
 
-.message-panel__attachments a {
+.message-panel__attachment {
   display: block;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.04);
 }
 
-.message-panel__attachments img {
+.message-panel__attachment img,
+.message-panel__attachment video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
+.message-panel__attachment--video {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+}
+
+.message-panel__attachment--video video {
+  max-height: 200px;
+  background: #000;
+}
+
+.message-panel__attachment-link {
+  display: block;
+  text-align: center;
+  font-size: 0.7rem;
+  color: #2563eb;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+
+.message-panel__attachment-link:hover,
+.message-panel__attachment-link:focus-visible {
+  text-decoration: underline;
+}
 .message-panel__empty {
   margin: auto;
   text-align: center;

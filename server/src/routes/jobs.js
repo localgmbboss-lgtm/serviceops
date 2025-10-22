@@ -3,10 +3,7 @@ import { Router } from "express";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import path from "path";
-import fs from "fs";
 import fsPromises from "fs/promises";
-import multer from "multer";
-import { fileURLToPath } from "url";
 import { completeJobWithPayment } from "../lib/jobCompletion.js";
 import Job from "../models/Jobs.js";
 import Vendor from "../models/Vendor.js"; // Changed from Driver to Vendor
@@ -15,86 +12,13 @@ import { notifySMS } from "../lib/notifier.js";
 import VendorNotification from "../models/VendorNotification.js";
 import AdminNotification from "../models/AdminNotification.js";
 import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
+import { jobMediaUpload, toJobMediaRecord, jobMediaUploadRoot, JOB_MEDIA_MAX_FILES } from "../lib/jobMedia.js";
 import {
   sendAdminPushNotifications,
   sendVendorPushNotifications,
   sendCustomerPushNotifications,
 } from "../lib/push.js";
 const router = Router();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const jobUploadRoot = path.join(__dirname, "..", "uploads", "jobs");
-fs.mkdirSync(jobUploadRoot, { recursive: true });
-
-const JOB_MEDIA_TYPES = new Set([
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "image/heic",
-  "image/heif",
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
-]);
-
-const extensionForMime = (mimetype = "") => {
-  const [, subtypeRaw] = String(mimetype).toLowerCase().split("/");
-  if (!subtypeRaw) return "";
-  const subtype = subtypeRaw.split("+")[0];
-  if (subtype === "jpeg") return ".jpg";
-  if (subtype.includes("heic") || subtype.includes("heif")) return ".heic";
-  if (subtype.includes("png")) return ".png";
-  if (subtype.includes("gif")) return ".gif";
-  if (subtype.includes("webp")) return ".webp";
-  if (subtype.includes("mp4")) return ".mp4";
-  if (subtype.includes("quicktime")) return ".mov";
-  if (subtype.includes("webm")) return ".webm";
-  return `.${subtype.replace(/[^a-z0-9]/g, "")}`;
-};
-
-const jobMediaStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, jobUploadRoot),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext =
-      path.extname(file.originalname)?.toLowerCase() || extensionForMime(file.mimetype);
-    cb(null, `${unique}${ext}`);
-  },
-});
-
-const jobUpload = multer({
-  storage: jobMediaStorage,
-  limits: { fileSize: 25 * 1024 * 1024, files: 6 },
-  fileFilter: (_req, file, cb) => {
-    if (JOB_MEDIA_TYPES.has(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image and video uploads are allowed"));
-    }
-  },
-});
-
-const toJobMediaRecord = (file) => {
-  const key = file.filename;
-  const relativeUrl = path.posix.join("uploads", "jobs", key);
-  const kind = file.mimetype?.startsWith("video/")
-    ? "video"
-    : file.mimetype?.startsWith("image/")
-    ? "image"
-    : "file";
-  return {
-    key,
-    url: `/${relativeUrl}`,
-    fileName: file.originalname || null,
-    mimeType: file.mimetype || null,
-    size: file.size ?? null,
-    kind,
-    uploadedAt: new Date(),
-  };
-};
 
 const defaultClientBase = getClientBaseUrl();
 
@@ -112,6 +36,16 @@ const STATUS_TITLES = {
   OnTheWay: "Driver en route",
   Arrived: "Driver arrived",
   Completed: "Service completed",
+};
+
+const normalizePhone = (input = "") => {
+  if (!input) return "";
+  const str = String(input).trim();
+  if (!str) return "";
+  if (str.startsWith("+")) {
+    return `+${str.slice(1).replace(/\D+/g, "")}`;
+  }
+  return str.replace(/\D+/g, "");
 };
 
 const STATUS_MESSAGES = {
@@ -589,11 +523,11 @@ router.get("/:id", async (req, res, next) => {
 });
 
 // ---------- CREATE ----------
-router.post("/", jobUpload.array("media", 6), async (req, res, next) => {
+router.post("/", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (req, res, next) => {
   const storedFiles = [];
   const files = Array.isArray(req.files) ? req.files : [];
   for (const file of files) {
-    storedFiles.push(path.join(jobUploadRoot, file.filename));
+    storedFiles.push(path.join(jobMediaUploadRoot, file.filename));
   }
 
   const cleanupUploaded = async () => {
@@ -649,7 +583,7 @@ router.post("/", jobUpload.array("media", 6), async (req, res, next) => {
     if (vendorDoc) {
       jobPayload.vendorId = vendorDoc._id;
       jobPayload.vendorName = vendorDoc.name || null;
-      jobPayload.vendorPhone = vendorDoc.phone || null;
+      jobPayload.vendorPhone = normalizePhone(vendorDoc.phone) || null;
       jobPayload.status = "Assigned";
       jobPayload.bidMode = "fixed";
       jobPayload.biddingOpen = false;
@@ -754,7 +688,7 @@ router.patch("/:id", async (req, res, next) => {
         }
         set.vendorId = vendor._id;
         set.vendorName = vendor.name || null;
-        set.vendorPhone = vendor.phone || null;
+        set.vendorPhone = normalizePhone(vendor.phone) || null;
         set.biddingOpen = false;
         if (!payload.status) {
           payload.status = "Assigned";
@@ -874,15 +808,342 @@ router.post("/:id/scheduling", async (req, res, next) => {
   }
 });
 
-router.post("/guest", async (req, res) => {
-  return res
-    .status(403)
-    .json({ message: "Guest intake is currently disabled." });
-});
+router.post(
+  "/guest",
+  jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES),
+  async (req, res, next) => {
+    const storedFiles = [];
+    const files = Array.isArray(req.files) ? req.files : [];
+    for (const file of files) {
+      storedFiles.push(path.join(jobMediaUploadRoot, file.filename));
+    }
+
+    const cleanupUploaded = async () => {
+      if (!storedFiles.length) return;
+      await Promise.all(
+        storedFiles.map((filepath) => fsPromises.unlink(filepath).catch(() => {}))
+      );
+      storedFiles.length = 0;
+    };
+
+    try {
+      const rawPayload =
+        typeof req.body?.payload === "string" && req.body.payload.trim()
+          ? req.body.payload.trim()
+          : null;
+      let payload;
+      if (rawPayload) {
+        try {
+          payload = JSON.parse(rawPayload);
+        } catch (error) {
+          await cleanupUploaded();
+          return res.status(400).json({ message: "Invalid payload JSON." });
+        }
+      } else {
+        payload = req.body || {};
+      }
+
+      if (!payload || typeof payload !== "object") {
+        await cleanupUploaded();
+        return res.status(400).json({ message: "Request body required." });
+      }
+
+      const name = typeof payload.name === "string" ? payload.name.trim() : "";
+      const email =
+        typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
+      const phone = typeof payload.phone === "string" ? payload.phone.trim() : "";
+      const serviceType =
+        typeof payload.serviceType === "string" ? payload.serviceType.trim() : "";
+      const description =
+        typeof payload.description === "string" ? payload.description.trim() : "";
+      const pickupAddress =
+        typeof payload.address === "string" ? payload.address.trim() : "";
+      const destination =
+        typeof payload.destination === "string" ? payload.destination.trim() : "";
+
+      if (!name || !serviceType || !pickupAddress) {
+        await cleanupUploaded();
+        return res.status(400).json({
+          message: "name, serviceType, and address are required.",
+        });
+      }
+
+      if (!email && !phone) {
+        await cleanupUploaded();
+        return res.status(400).json({
+          message: "Provide at least an email or phone number.",
+        });
+      }
+
+      const vehicleMake =
+        typeof payload.vehicleMake === "string" ? payload.vehicleMake.trim() : "";
+      const vehicleModel =
+        typeof payload.vehicleModel === "string" ? payload.vehicleModel.trim() : "";
+      const vehicleColor =
+        typeof payload.vehicleColor === "string" ? payload.vehicleColor.trim() : "";
+
+      if (!vehicleMake || !vehicleModel || !vehicleColor) {
+        await cleanupUploaded();
+        return res.status(400).json({
+          message: "vehicleMake, vehicleModel, and vehicleColor are required.",
+        });
+      }
+
+      const coordinates =
+        payload.coordinates && typeof payload.coordinates === "object"
+          ? {
+              lat: Number(payload.coordinates.lat),
+              lng: Number(payload.coordinates.lng),
+            }
+          : null;
+      const destinationCoordinates =
+        payload.destinationCoordinates &&
+        typeof payload.destinationCoordinates === "object"
+          ? {
+              lat: Number(payload.destinationCoordinates.lat),
+              lng: Number(payload.destinationCoordinates.lng),
+            }
+          : null;
+
+      const urgency =
+        payload.urgency === "emergency" || payload.urgency === "urgent"
+          ? "urgent"
+          : "normal";
+
+      const now = new Date();
+
+      const savedProfile = {
+        name,
+        email: email || undefined,
+        phone: phone || undefined,
+        address: pickupAddress,
+        vehicleMake,
+        vehicleModel,
+        vehicleColor,
+        notes: description || undefined,
+        updatedAt: now,
+      };
+
+      let customerDoc = null;
+      if (email) {
+        customerDoc = await Customer.findOne({ email }).lean();
+      }
+      if (!customerDoc && phone) {
+        customerDoc = await Customer.findOne({ phone }).lean();
+      }
+
+      if (!customerDoc) {
+        customerDoc = await Customer.create({
+          name,
+          email: email || undefined,
+          phone: phone || undefined,
+          isGuest: true,
+          guestToken: makeToken(),
+          lastServiceRequest: now,
+          savedProfile,
+          serviceHistory: [
+            {
+              date: now,
+              serviceType,
+              description,
+              address: pickupAddress,
+              vehicleMake,
+              vehicleModel,
+              vehicleColor,
+            },
+          ],
+        });
+      } else {
+        const updateSet = {
+          name,
+          isGuest: customerDoc.isGuest || true,
+          savedProfile,
+          lastServiceRequest: now,
+        };
+        if (email) updateSet.email = email;
+        if (phone) updateSet.phone = phone;
+        if (!customerDoc.guestToken) {
+          updateSet.guestToken = makeToken();
+        }
+
+        await Customer.updateOne(
+          { _id: customerDoc._id },
+          {
+            $set: updateSet,
+            $push: {
+              serviceHistory: {
+                date: now,
+                serviceType,
+                description,
+                address: pickupAddress,
+                vehicleMake,
+                vehicleModel,
+                vehicleColor,
+              },
+            },
+          }
+        );
+        customerDoc = await Customer.findById(customerDoc._id).lean();
+      }
+
+      const jobPayload = {
+        customerId: customerDoc._id,
+        pickupAddress,
+        dropoffAddress: destination || undefined,
+        serviceType,
+        notes: description,
+        guestRequest: true,
+        status: "Unassigned",
+        priority: urgency === "urgent" ? "urgent" : "normal",
+        bidMode: "open",
+        biddingOpen: true,
+        vendorToken: makeToken(),
+        customerToken: makeToken(),
+        quotedPrice: Number(payload.quotedPrice) || 0,
+        finalPrice: 0,
+        vehicleMake,
+        vehicleModel,
+        vehicleColor,
+      };
+
+      if (
+        coordinates &&
+        Number.isFinite(coordinates.lat) &&
+        Number.isFinite(coordinates.lng)
+      ) {
+        jobPayload.pickupLat = coordinates.lat;
+        jobPayload.pickupLng = coordinates.lng;
+      }
+
+      if (
+        destinationCoordinates &&
+        Number.isFinite(destinationCoordinates.lat) &&
+        Number.isFinite(destinationCoordinates.lng)
+      ) {
+        jobPayload.dropoffLat = destinationCoordinates.lat;
+        jobPayload.dropoffLng = destinationCoordinates.lng;
+      }
+
+      if (files.length) {
+        jobPayload.media = files.map((file) => toJobMediaRecord(file));
+      }
+
+      const job = await Job.create(jobPayload);
+      storedFiles.length = 0;
+
+      try {
+        await AdminNotification.create({
+          title: "New guest request",
+          body: `${serviceType || "Service request"} from ${name}`,
+          severity: urgency === "urgent" ? "warning" : "info",
+          jobId: job._id,
+          customerId: job.customerId || null,
+          meta: {
+            role: "admin",
+            route: `/jobs/${job._id}`,
+            jobId: job._id,
+            guestRequest: true,
+            serviceType: job.serviceType || null,
+            pickupAddress: job.pickupAddress || null,
+            priority: job.priority || "normal",
+          },
+        });
+      } catch (notifyError) {
+        console.error("Failed to notify admins about guest job", notifyError);
+      }
+
+      const baseUrl = resolveClientBaseUrl(req);
+      const trimmedBase = baseUrl ? baseUrl.replace(/\/$/, "") : null;
+
+      res.status(201).json({
+        success: true,
+        jobId: job._id,
+        customerToken: job.customerToken,
+        jobToken: job.customerToken,
+        vendorToken: job.vendorToken,
+        statusUrl: trimmedBase ? `${trimmedBase}/status/${job._id}` : null,
+        chooseUrl:
+          job.customerToken && trimmedBase
+            ? `${trimmedBase}/choose/${job.customerToken}`
+            : null,
+      });
+    } catch (error) {
+      await cleanupUploaded();
+      next(error);
+    }
+  }
+);
 
 // ---------- GUEST STATUS (read-only by token) ----------
-router.get("/guest/:token", async (req, res) => {
-  return res.status(404).json({ message: "Guest tracking is unavailable." });
+router.get("/guest/:token", async (req, res, next) => {
+  try {
+    const token = String(req.params.token || "").trim();
+    if (!token) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing job token." });
+    }
+
+    const job = await Job.findOne({ customerToken: token }).lean();
+    if (!job) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Job not found or link expired." });
+    }
+
+    let vendor = null;
+    if (job.vendorId) {
+      vendor = await Vendor.findById(job.vendorId)
+        .select("name phone city state rating averageRating totalJobs lat lng location")
+        .lean();
+    }
+
+    const rating =
+      vendor && typeof vendor.rating === "number"
+        ? vendor.rating
+        : vendor && typeof vendor.averageRating === "number"
+        ? vendor.averageRating
+        : null;
+
+    res.json({
+      success: true,
+      job: {
+        _id: job._id,
+        status: job.status,
+        serviceType: job.serviceType,
+        pickupAddress: job.pickupAddress,
+        dropoffAddress: job.dropoffAddress || null,
+        vehicleMake: job.vehicleMake || null,
+        vehicleModel: job.vehicleModel || null,
+        vehicleColor: job.vehicleColor || null,
+        createdAt: job.created,
+        biddingOpen: !!job.biddingOpen,
+        selectedBidId: job.selectedBidId || null,
+        quotedPrice: Number.isFinite(job.quotedPrice) ? job.quotedPrice : 0,
+        finalPrice: Number.isFinite(job.finalPrice) ? job.finalPrice : 0,
+        media: Array.isArray(job.media) ? job.media : [],
+        customerToken: job.customerToken,
+        vendorToken: job.vendorToken,
+        pickupLat: Number.isFinite(job.pickupLat) ? job.pickupLat : null,
+        pickupLng: Number.isFinite(job.pickupLng) ? job.pickupLng : null,
+        dropoffLat: Number.isFinite(job.dropoffLat) ? job.dropoffLat : null,
+        dropoffLng: Number.isFinite(job.dropoffLng) ? job.dropoffLng : null,
+      },
+      vendor: vendor
+        ? {
+            _id: vendor._id,
+            name: vendor.name || null,
+            phone: vendor.phone || null,
+            city: vendor.city || null,
+            state: vendor.state || null,
+            rating,
+            totalJobs: vendor.totalJobs || null,
+          }
+        : null,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post("/:id/complete", async (req, res, next) => {
@@ -1110,9 +1371,6 @@ Respond in the ServiceOps vendor portal if available.`;
 });
 
 export default router;
-
-
-
 
 
 

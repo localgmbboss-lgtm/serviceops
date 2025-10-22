@@ -117,7 +117,7 @@ export default function AdminJobs() {
     loadVendors();
     const id = setInterval(load, 7000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, loadVendors]);
 
   useEffect(() => {
     if (!publish) return;
@@ -360,7 +360,13 @@ export default function AdminJobs() {
   const handleViewJob = useCallback(
     (job) => {
       if (!job?._id) return;
-      navigate(`/jobs/${job._id}`);
+      const path = `/jobs/${job._id}`;
+      if (typeof window !== "undefined" && window?.open) {
+        const base = window.location?.origin || "";
+        window.open(`${base}${path}`, "_blank", "noopener");
+      } else {
+        navigate(path);
+      }
     },
     [navigate]
   );
@@ -380,25 +386,69 @@ export default function AdminJobs() {
       <section className="admin-jobs-board-section">
         <div className="admin-jobs-card admin-jobs-board-card">
           <div className="admin-jobs-board-header">
-            <div className="admin-jobs-board-heading">
-              <h2>Jobs table</h2>
-              {last && (
-                <span className="admin-jobs-board-updated admin-jobs-muted admin-jobs-small">
-                  Updated {last.toLocaleTimeString()}
-                </span>
-              )}
+            <div className="admin-jobs-board-top">
+              <div className="admin-jobs-board-heading">
+                <h2>Jobs table</h2>
+                {last && (
+                  <span className="admin-jobs-board-updated admin-jobs-muted admin-jobs-small">
+                    Updated {last.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              <div className="admin-jobs-primary-actions">
+                <button
+                  type="button"
+                  className="admin-jobs-btn admin-jobs-btn-ghost admin-jobs-refresh-btn"
+                  onClick={load}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="admin-jobs-refresh-spinner" aria-hidden="true">
+                        ↻
+                      </span>
+                      <span className="admin-jobs-refresh-label">Syncing</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="admin-jobs-refresh-icon" aria-hidden="true">
+                        ↻
+                      </span>
+                      <span className="admin-jobs-refresh-label">Refresh</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="admin-jobs-btn admin-jobs-btn-primary admin-jobs-create-btn"
+                  onClick={openCreateModal}
+                >
+                  Create job
+                </button>
+              </div>
             </div>
-            <div className="admin-jobs-board-controls">
-              <button
-                type="button"
-                className="admin-jobs-btn admin-jobs-btn-primary admin-jobs-create-btn"
-                onClick={openCreateModal}
-              >
-                Create job
-              </button>
-
-              <div className="admin-jobs-filters">
+            <div
+              className="admin-jobs-toolbar"
+              role="group"
+              aria-label="Job filters and actions"
+            >
+              <div className="admin-jobs-toolbar-main">
                 <div className="admin-jobs-search-container">
+                  <span className="admin-jobs-search-icon" aria-hidden="true">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="11" cy="11" r="7" />
+                      <line x1="16.65" y1="16.65" x2="21" y2="21" />
+                    </svg>
+                  </span>
                   <input
                     className="admin-jobs-search"
                     placeholder="Search jobs..."
@@ -407,40 +457,41 @@ export default function AdminJobs() {
                     aria-label="Search jobs"
                   />
                 </div>
-
-                <div className="admin-jobs-select-container">
-                  <select
-                    className="admin-jobs-status-select"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    aria-label="Filter by status"
-                  >
-                    <option value="all">All statuses</option>
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+                <div className="admin-jobs-filter-group">
+                  <div className="admin-jobs-select-container">
+                    <select
+                      className="admin-jobs-status-select"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      aria-label="Filter by status"
+                    >
+                      <option value="all">All statuses</option>
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="admin-jobs-select-container">
+                    <select
+                      className="admin-jobs-status-select admin-jobs-vendor-select"
+                      value={vendorFilter}
+                      onChange={(e) => setVendorFilter(e.target.value)}
+                      aria-label="Filter by vendor"
+                    >
+                      <option value="all">All vendors</option>
+                      <option value="unassigned">Unassigned</option>
+                      {vendorOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-
-                <div className="admin-jobs-select-container">
-                  <select
-                    className="admin-jobs-status-select admin-jobs-vendor-select"
-                    value={vendorFilter}
-                    onChange={(e) => setVendorFilter(e.target.value)}
-                    aria-label="Filter by vendor"
-                  >
-                    <option value="all">All vendors</option>
-                    <option value="unassigned">Unassigned</option>
-                    {vendorOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
+              </div>
+              <div className="admin-jobs-toolbar-actions">
                 <label className="admin-jobs-toggle">
                   <input
                     type="checkbox"
@@ -450,25 +501,6 @@ export default function AdminJobs() {
                   <span className="admin-jobs-toggle-slider"></span>
                   <span className="admin-jobs-toggle-text">Solo mode</span>
                 </label>
-
-                <button
-                  type="button"
-                  className="admin-jobs-btn admin-jobs-btn-ghost admin-jobs-refresh-btn"
-                  onClick={load}
-                  disabled={loading}
-                >
-                  <span
-                    className={`admin-jobs-btn-icon ${
-                      loading ? "admin-jobs-refresh-spinner" : ""
-                    }`}
-                  >
-                    {loading ? "" : ""}
-                  </span>
-                  <span className="admin-jobs-btn-text">
-                    {loading ? "Refreshing..." : "Refresh"}
-                  </span>
-                </button>
-
                 <div className="admin-jobs-dropdown-container">
                   <button
                     type="button"

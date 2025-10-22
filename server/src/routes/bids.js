@@ -20,6 +20,14 @@ const toInt = (v) => Number.parseInt(v, 10);
 const toNum = (v) => Number(v);
 const clamp = (n, lo, hi) =>
   Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : NaN;
+const normalizePhone = (input = "") => {
+  const str = String(input || "").trim();
+  if (!str) return "";
+  if (str.startsWith("+")) {
+    return `+${str.slice(1).replace(/\D+/g, "")}`;
+  }
+  return str.replace(/\D+/g, "");
+};
 
 // ----------------------------------------------------------
 // Vendor preview (minimal job info for bidding)
@@ -68,6 +76,14 @@ router.post("/:vendorToken", async (req, res, next) => {
         .json({ message: "vendorName and vendorPhone required" });
     }
 
+    const normalizedPhone = normalizePhone(vendorPhone);
+    if (!isNonEmpty(normalizedPhone)) {
+      return res
+        .status(400)
+        .json({ message: "Enter a valid phone number" });
+    }
+    const trimmedName = vendorName.trim();
+
     const isFixed = job.bidMode === "fixed";
     const eta = clamp(toInt(etaMinutes), 1, 720); // up to 12h
     if (!Number.isFinite(eta)) {
@@ -87,12 +103,12 @@ router.post("/:vendorToken", async (req, res, next) => {
 
     // Upsert: if this vendor (phone) already bid on this job, update it
     const bid = await Bid.findOneAndUpdate(
-      { jobId: job._id, vendorPhone: vendorPhone.trim() },
+      { jobId: job._id, vendorPhone: normalizedPhone },
       {
         $set: {
           jobId: job._id,
-          vendorName: vendorName.trim(),
-          vendorPhone: vendorPhone.trim(),
+          vendorName: trimmedName,
+          vendorPhone: normalizedPhone,
           etaMinutes: eta,
           price: pr,
         },

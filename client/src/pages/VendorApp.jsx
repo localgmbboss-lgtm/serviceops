@@ -3,10 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { vendorApi } from "../lib/vendorApi";
 import { useNotifications } from "../contexts/NotificationsContext";
 import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
-import GMap from "../components/GMap";
-import LiveMap from "../components/LiveMap";
-import ChatOverlay from "../components/ChatOverlay";
-import { useJobMessaging } from "../hooks/useJobMessaging";
 import { getGoogleMapsKey } from "../config/env.js";
 import "./VendorApp.css";
 
@@ -168,40 +164,6 @@ export default function VendorApp() {
   const hasGoogle = Boolean(mapsKey);
   const [requestingLocation, setRequestingLocation] = useState(false);
   const [locationError, setLocationError] = useState("");
-  const expandedAssignedJob = useMemo(
-    () =>
-      assigned.find((job) => job && job._id === expandedJobId) || null,
-    [assigned, expandedJobId]
-  );
-  const {
-    messages: vendorMessages,
-    participants: vendorParticipants,
-    sendMessage: sendVendorMessage,
-    sending: vendorSending,
-    loading: vendorMessagesLoading,
-    error: vendorMessagesError,
-    canMessage: vendorCanMessage,
-    realtimeReady: vendorRealtimeReady,
-    typingIndicators: vendorTypingIndicators,
-    emitTyping: emitVendorTyping,
-    unreadCount: vendorUnreadCount,
-  } = useJobMessaging({
-    jobId: expandedAssignedJob?._id,
-    role: "vendor",
-  });
-  const vendorChatSubtitle = useMemo(() => {
-    if (!expandedAssignedJob) return "";
-    const customerName =
-      vendorParticipants?.customer?.name ||
-      expandedAssignedJob.customerName ||
-      expandedAssignedJob.contactName ||
-      "your customer";
-    return vendorCanMessage ? `Share updates with ${customerName}` : "";
-  }, [
-    expandedAssignedJob,
-    vendorCanMessage,
-    vendorParticipants?.customer?.name,
-  ]);
 
   const handleToggleNoteLanguage = async (event, job) => {
     event?.stopPropagation?.();
@@ -663,6 +625,27 @@ export default function VendorApp() {
     }
   };
 
+  const openAssignedJobDetail = useCallback(
+    (job) => {
+      if (!job || !job._id) return;
+      nav(`/vendor/jobs/${job._id}`, {
+        state: {
+          job,
+          vendor: me,
+          from: "vendor-app",
+        },
+      });
+    },
+    [nav, me]
+  );
+
+  const handleAssignedJobKeyDown = (event, job) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openAssignedJobDetail(job);
+    }
+  };
+
   const dismissGeoPrompt = () => {
     setGeoPromptDismissed(true);
     setLocationError("");
@@ -1118,10 +1101,6 @@ export default function VendorApp() {
                       job.dropoffAddress ||
                       job.destination ||
                       job.dropoff?.address;
-                    const noteText = extractNote(job);
-                    const noteDisplay = noteText
-                      ? resolveNoteDisplay(job._id, noteText)
-                      : null;
                     const vehicleDetails = [
                       job.vehicleMake,
                       job.vehicleModel,
@@ -1129,21 +1108,12 @@ export default function VendorApp() {
                     ]
                       .filter(Boolean)
                       .join(" / ");
-                    const travelMinutes = estimateTravelMinutes(job.distanceKm);
-                    const pickupCoords = derivePickupCoordinates(job);
-                    const routeFallbackCopy = !vendorCoordinates
-                      ? "Add your base location in your vendor profile to unlock turn-by-turn directions."
-                      : !pickupCoords
-                      ? "Waiting on the customer to share a precise pickup coordinate."
-                      : "Route preview is unavailable right now.";
-                    const mapsLink = pickupCoords
-                      ? `https://www.google.com/maps/dir/?api=1${
-                          vendorCoordinates
-                            ? `&origin=${vendorCoordinates.lat},${vendorCoordinates.lng}`
-                            : ""
-                        }&destination=${pickupCoords.lat},${pickupCoords.lng}`
-                      : null;
-                    const detailRows = [
+                    const statusLabel =
+                      (job.status && String(job.status).trim()) || "Unassigned";
+                    const statusClass = statusLabel
+                      .toLowerCase()
+                      .replace(/\s+/g, "");
+                    const summaryRows = [
                       contactName
                         ? { label: "Contact", value: contactName }
                         : null,
@@ -1156,48 +1126,15 @@ export default function VendorApp() {
                       vehicleDetails
                         ? { label: "Vehicle", value: vehicleDetails }
                         : null,
-                      noteText
-                        ? {
-                            label: "Notes",
-                            value: noteDisplay?.text || noteText,
-                            isNote: true,
-                            noteStatus: noteDisplay?.status || "idle",
-                            noteMode: noteDisplay?.mode || "en",
-                            noteError: noteDisplay?.error,
-                          }
-                        : null,
                     ].filter(Boolean);
-                    const statusLabel =
-                      (job.status && String(job.status).trim()) || "Unassigned";
-                    const statusClass = statusLabel
-                      .toLowerCase()
-                      .replace(/\s+/g, "");
-                    const jobRouteSummary = jobRouteSummaries[job._id] || null;
-                    const routeDistanceText =
-                      jobRouteSummary?.distanceText ||
-                      (Number.isFinite(job.distanceKm)
-                        ? formatDistance(job.distanceKm)
-                        : null);
-                    const routeDurationText =
-                      jobRouteSummary?.durationText ||
-                      (travelMinutes ? `${travelMinutes} min` : null);
-                    const routeMetaText =
-                      routeDistanceText && routeDurationText
-                        ? `${routeDistanceText} \u2022 ${routeDurationText}`
-                        : routeDistanceText ||
-                          routeDurationText ||
-                          routeFallbackCopy;
                     return (
                       <li
                         key={job._id}
-                        className={
-                          "va-job" + (expanded ? " va-job--expanded" : "")
-                        }
-                        onClick={() => toggleJobExpansion(job._id)}
+                        className="va-job"
+                        onClick={() => openAssignedJobDetail(job)}
                         role="button"
                         tabIndex={0}
-                        aria-expanded={expanded}
-                        onKeyDown={(event) => handleJobKeyDown(event, job._id)}
+                        onKeyDown={(event) => handleAssignedJobKeyDown(event, job)}
                       >
                         <div className="va-job__main">
                           <div className="va-job__header">
@@ -1210,14 +1147,18 @@ export default function VendorApp() {
                               {statusLabel}
                             </span>
                           </div>
-                          <p className="va-job__address">{job.pickupAddress}</p>
+                          <p className="va-job__address">
+                            {job.pickupAddress ||
+                              job.pickup?.address ||
+                              "Pickup details coming soon"}
+                          </p>
                           <div className="va-job__meta">
                             <span>{formatDistance(job.distanceKm)}</span>
                             <span>Assigned {timeAgo(job.created)}</span>
                           </div>
-                          {expanded && detailRows.length > 0 ? (
+                          {summaryRows.length > 0 ? (
                             <div className="va-job__details">
-                              {detailRows.map((row) => (
+                              {summaryRows.map((row) => (
                                 <div className="va-detail" key={row.label}>
                                   <span className="va-detail__label">
                                     {row.label}
@@ -1225,141 +1166,26 @@ export default function VendorApp() {
                                   <span className="va-detail__value">
                                     {row.value}
                                   </span>
-                                  {row.isNote && (
-                                    <div className="va-detail__actions">
-                                      <button
-                                        type="button"
-                                        className="va-note-toggle"
-                                        onClick={(event) =>
-                                          handleToggleNoteLanguage(event, job)
-                                        }
-                                        disabled={row.noteStatus === "loading"}
-                                      >
-                                        {row.noteStatus === "loading"
-                                          ? "Translating..."
-                                          : row.noteMode === "es"
-                                          ? "View original"
-                                          : "Translate to Spanish"}
-                                      </button>
-                                      {row.noteStatus === "error" && (
-                                        <span className="va-note-error">
-                                          {row.noteError || "Translation failed"}
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
                                 </div>
                               ))}
                             </div>
                           ) : null}
-
-                          {expanded &&
-                          expandedAssignedJob &&
-                          job._id === expandedAssignedJob._id ? (
-                            <div
-                              className="va-job__messaging"
-                              onClick={(event) => event.stopPropagation()}
-                              onKeyDown={(event) => event.stopPropagation()}
-                            >
-                              <ChatOverlay
-                                title="Message the customer"
-                                subtitle={vendorChatSubtitle}
-                                messages={vendorMessages}
-                                participants={vendorParticipants}
-                                actorRole="vendor"
-                                canMessage={vendorCanMessage}
-                                onSend={sendVendorMessage}
-                                sending={vendorSending}
-                                loading={vendorMessagesLoading}
-                                error={vendorMessagesError}
-                                realtimeReady={vendorRealtimeReady}
-                                typingIndicators={vendorTypingIndicators}
-                                onTyping={emitVendorTyping}
-                                unreadCount={vendorUnreadCount}
-                              />
-                            </div>
-                          ) : null}
-
-                          {expanded ? (
-                            vendorCoordinates && pickupCoords ? (
-                              <div className="va-job__map">
-                                <div className="va-job__map-meta">
-                                  <span>{routeMetaText}</span>
-                                  {mapsLink && (
-                                    <a
-                                      href={mapsLink}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="va-job__map-button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                      }}
-                                    >
-                                      Open in Google Maps
-                                      <span aria-hidden="true">&rarr;</span>
-                                    </a>
-                                  )}
-                                </div>
-                                <div className="va-job__map-canvas">
-                                  {hasGoogle ? (
-                                    <GMap
-                                      vendors={[
-                                        {
-                                          lat: vendorCoordinates.lat,
-                                          lng: vendorCoordinates.lng,
-                                          label: "YOU",
-                                          name: me?.name || "You",
-                                        },
-                                      ]}
-                                      destination={{
-                                        position: pickupCoords,
-                                        label: "JOB",
-                                        role: "pickup",
-                                        title:
-                                          job.pickupAddress || "Pickup",
-                                        color: "#f97316",
-                                        textColor: "#0f172a",
-                                      }}
-                                      showRoute
-                                      zoom={13}
-                                      onRouteResult={(result) =>
-                                        handleJobRouteResult(job._id, result)
-                                      }
-                                    />
-                                  ) : (
-                                    <LiveMap
-                                      drivers={[
-                                        {
-                                          _id: "me",
-                                          lat: vendorCoordinates.lat,
-                                          lng: vendorCoordinates.lng,
-                                          name: me?.name || "You",
-                                        },
-                                      ]}
-                                      destination={pickupCoords}
-                                      showRoute
-                                      autoFit
-                                      routeDistanceMeters={
-                                        jobRouteSummary?.distanceMeters ??
-                                        (Number.isFinite(job.distanceKm)
-                                          ? job.distanceKm * 1000
-                                          : null)
-                                      }
-                                    />
-                                  )}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="va-job__map-placeholder">
-                                {routeFallbackCopy}
-                              </div>
-                            )
-                          ) : null}
                         </div>
 
                         <div className="va-job__cta va-job__cta--stack">
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openAssignedJobDetail(job);
+                            }}
+                          >
+                            Open trip
+                          </button>
                           {job.status === "Assigned" && (
                             <button
+                              type="button"
                               className="btn ghost"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -1371,6 +1197,7 @@ export default function VendorApp() {
                           )}
                           {job.status === "OnTheWay" && (
                             <button
+                              type="button"
                               className="btn ghost"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -1383,6 +1210,7 @@ export default function VendorApp() {
                           {(job.status === "OnTheWay" ||
                             job.status === "Arrived") && (
                             <button
+                              type="button"
                               className="btn"
                               onClick={(event) => {
                                 event.stopPropagation();

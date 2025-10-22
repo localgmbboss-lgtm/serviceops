@@ -19,6 +19,18 @@ export default function AdminSettings() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const cloneSettings = useCallback((value) => {
+    if (value === null || value === undefined) return {};
+    if (typeof structuredClone === "function") {
+      try {
+        return structuredClone(value);
+      } catch (error) {
+        /* fall through */
+      }
+    }
+    return JSON.parse(JSON.stringify(value));
+  }, []);
+
   useEffect(() => {
     api
       .get("/api/settings")
@@ -57,7 +69,7 @@ export default function AdminSettings() {
 
   const setK = (path, val) => {
     setS((prev) => {
-      const next = structuredClone(prev || {});
+      const next = cloneSettings(prev || {});
       const parts = path.split(".");
       let cursor = next;
       for (let i = 0; i < parts.length - 1; i += 1) {
@@ -78,7 +90,7 @@ export default function AdminSettings() {
 
   const mutateVendorCompliance = (mutator) => {
     setS((prev) => {
-      const next = structuredClone(prev);
+      const next = cloneSettings(prev || {});
       if (!next.compliance) next.compliance = {};
       if (!next.compliance.vendor) {
         next.compliance.vendor = {
@@ -108,13 +120,13 @@ export default function AdminSettings() {
   const mutateAutomation = useCallback(
     (mutator) => {
       setS((prev) => {
-        const next = structuredClone(prev || {});
+        const next = cloneSettings(prev || {});
         if (!next.automation) next.automation = {};
         mutator(next.automation);
         return next;
       });
     },
-    [setS]
+    [cloneSettings, setS]
   );
 
   const toggleCustomerChannels = useCallback((enabled) => {

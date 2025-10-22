@@ -16,7 +16,7 @@ const URGENCY_LABEL = {
 };
 
 const QUEUE_PAGE_SIZE = 8;
-const ROUTE_PAGE_SIZE = 6;
+const ROUTE_PAGE_SIZE = 3;
 const COMPLIANCE_PAGE_SIZE = 6;
 const SCORECARD_PAGE_SIZE = 6;
 

@@ -1,8 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LuX } from "react-icons/lu";
+import { API_BASE_URL } from "../config/env.js";
 import "./MessagingPanel.css";
 
 const MAX_MESSAGE_LENGTH = 2000;
+
+const API_PREFIX =
+  typeof API_BASE_URL === "string"
+    ? API_BASE_URL.replace(/\/+$/, "")
+    : "";
+
+const resolveAttachmentUrl = (value = "") => {
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  if (!API_PREFIX) return value;
+  return `${API_PREFIX}${value.startsWith("/") ? "" : "/"}${value}`;
+};
 
 const formatTimestamp = (iso) => {
   if (!iso) return "";
@@ -325,20 +338,63 @@ export default function MessagingPanel({
                     {Array.isArray(msg.attachments) &&
                     msg.attachments.length > 0 ? (
                       <div className="message-panel__attachments">
-                        {msg.attachments.map((file) => (
-                          <a
-                            key={file.key || file.url}
-                            href={file.url}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <img
-                              src={file.url}
-                              alt={file.fileName || "Vehicle photo"}
-                              loading="lazy"
-                            />
-                          </a>
-                        ))}
+                        {msg.attachments.map((file, index) => {
+                          const rawUrl =
+                            file?.url ||
+                            file?.downloadUrl ||
+                            file?.path ||
+                            file?.href ||
+                            "";
+                          const resolvedUrl = resolveAttachmentUrl(rawUrl);
+                          if (!resolvedUrl) return null;
+                          const key = file?.key || resolvedUrl || index;
+                          const displayName =
+                            file?.fileName || file?.name || "Attachment";
+                          const mime = file?.mimeType || "";
+                          const isVideo =
+                            file?.kind === "video" || mime.startsWith("video/");
+
+                          if (isVideo) {
+                            return (
+                              <div
+                                className="message-panel__attachment message-panel__attachment--video"
+                                key={key}
+                              >
+                                <video controls preload="metadata">
+                                  <source
+                                    src={resolvedUrl}
+                                    type={mime || "video/mp4"}
+                                  />
+                                  Your browser does not support the video tag.
+                                </video>
+                                <a
+                                  className="message-panel__attachment-link"
+                                  href={resolvedUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {displayName ? `Open ${displayName}` : "Open video"}
+                                </a>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <a
+                              key={key}
+                              className="message-panel__attachment"
+                              href={resolvedUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <img
+                                src={resolvedUrl}
+                                alt={displayName}
+                                loading="lazy"
+                              />
+                            </a>
+                          );
+                        })}
                       </div>
                     ) : null}
                   </div>
@@ -431,6 +487,3 @@ export default function MessagingPanel({
     </section>
   );
 }
-
-
-

@@ -10,7 +10,8 @@ import "./styles.css";
  *  - zoom?: number
  *  - autoFit?: boolean
  *  - staleMs?: number
- *  - destination?: { lat, lng }
+ *  - destination?: { lat, lng } | [lat, lng]
+ *  - routeCoordinates?: Array<[lat, lng]>
  */
 export default function LiveMap({
   vendors = [],
@@ -24,6 +25,7 @@ export default function LiveMap({
   routeColor = "#2563eb",
   routeWeight = 5,
   routeDistanceMeters = null,
+  routeCoordinates = [],
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -176,10 +178,15 @@ export default function LiveMap({
       }
     }
 
-    const destLat = toNumber(destination?.lat);
-    const destLng = toNumber(destination?.lng);
+    const destinationLatLng = Array.isArray(destination)
+      ? { lat: destination[0], lng: destination[1] }
+      : destination;
+    const destLat = toNumber(destinationLatLng?.lat);
+    const destLng = toNumber(destinationLatLng?.lng);
     const hasDestination =
-      destination && Number.isFinite(destLat) && Number.isFinite(destLng);
+      destinationLatLng &&
+      Number.isFinite(destLat) &&
+      Number.isFinite(destLng);
 
     if (hasDestination) {
       if (!destinationRef.current) {
@@ -203,6 +210,34 @@ export default function LiveMap({
       routesRef.current.forEach((polyline) => polyline.remove());
       routesRef.current.clear();
     } else {
+      const normalizedRoutePath =
+        showRoute &&
+        Array.isArray(routeCoordinates) &&
+        routeCoordinates.length >= 2
+          ? routeCoordinates
+              .map((pair) => {
+                if (!pair) return null;
+                if (Array.isArray(pair) && pair.length >= 2) {
+                  const latValue = toNumber(pair[0]);
+                  const lngValue = toNumber(pair[1]);
+                  if (Number.isFinite(latValue) && Number.isFinite(lngValue)) {
+                    return [latValue, lngValue];
+                  }
+                  return null;
+                }
+                if (
+                  typeof pair === "object" &&
+                  pair !== null &&
+                  Number.isFinite(toNumber(pair.lat)) &&
+                  Number.isFinite(toNumber(pair.lng))
+                ) {
+                  return [toNumber(pair.lat), toNumber(pair.lng)];
+                }
+                return null;
+              })
+              .filter(Boolean)
+          : null;
+
       const activeRouteKeys = new Set();
       activeVendors.forEach((vendor) => {
         const lat = toNumber(vendor?.lat);
@@ -211,13 +246,16 @@ export default function LiveMap({
         const key = String(vendor?._id || `${vendor?.name || "vendor"}-${vendor?.phone || ""}`);
         const routeKey = `route:${key}`;
         activeRouteKeys.add(routeKey);
-        const points = [
-          [lat, lng],
-          [destLat, destLng],
-        ];
+        const path =
+          normalizedRoutePath && normalizedRoutePath.length >= 2
+            ? normalizedRoutePath
+            : [
+                [lat, lng],
+                [destLat, destLng],
+              ];
         let poly = routesRef.current.get(routeKey);
         if (!poly) {
-          poly = L.polyline(points, {
+          poly = L.polyline(path, {
             color: routeColor,
             weight: routeWeight,
             opacity: 0.7,
@@ -225,7 +263,7 @@ export default function LiveMap({
           }).addTo(layer);
           routesRef.current.set(routeKey, poly);
         } else {
-          poly.setLatLngs(points);
+          poly.setLatLngs(path);
           poly.setStyle({
             color: routeColor,
             weight: routeWeight,
@@ -261,7 +299,18 @@ export default function LiveMap({
         map.setView(center, zoom);
       }
     }
-  }, [activeVendors, autoFit, staleMs, center, zoom, destination, showRoute, routeColor, routeWeight]);
+  }, [
+    activeVendors,
+    autoFit,
+    staleMs,
+    center,
+    zoom,
+    destination,
+    showRoute,
+    routeColor,
+    routeWeight,
+    routeCoordinates,
+  ]);
 
   return (
     <div className="lm-wrap">
