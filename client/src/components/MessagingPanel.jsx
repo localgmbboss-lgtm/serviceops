@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LuX } from "react-icons/lu";
-import { API_BASE_URL } from "../config/env.js";
+import { API_BASE_URL, APP_BASE_URL } from "../config/env.js";
 import "./MessagingPanel.css";
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -9,12 +9,33 @@ const API_PREFIX =
   typeof API_BASE_URL === "string"
     ? API_BASE_URL.replace(/\/+$/, "")
     : "";
+const APP_PREFIX =
+  typeof APP_BASE_URL === "string"
+    ? APP_BASE_URL.replace(/\/+$/, "")
+    : "";
+const API_PREFIX_NO_API = API_PREFIX.replace(/\/api(?:\/|$)/i, "");
+
+const joinUrl = (base, path) => {
+  if (!path) return "";
+  if (!base) return path;
+  const normalizedBase = base.replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+};
 
 const resolveAttachmentUrl = (value = "") => {
   if (!value) return "";
   if (/^https?:\/\//i.test(value)) return value;
-  if (!API_PREFIX) return value;
-  return `${API_PREFIX}${value.startsWith("/") ? "" : "/"}${value}`;
+  const sanitized = value.startsWith("/") ? value : `/${value}`;
+  if (sanitized.startsWith("/uploads/") || sanitized.startsWith("/media/")) {
+    const candidate =
+      joinUrl(API_PREFIX_NO_API, sanitized) ||
+      joinUrl(APP_PREFIX, sanitized) ||
+      joinUrl(API_PREFIX, sanitized);
+    return candidate || sanitized;
+  }
+  if (!API_PREFIX) return sanitized;
+  return `${API_PREFIX}${sanitized}`;
 };
 
 const formatTimestamp = (iso) => {

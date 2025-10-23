@@ -108,18 +108,29 @@
 }
 
 .rh-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 1.15rem;
+  color: #d1d5db;
+  letter-spacing: 0;
+}
+
+.rh-rating__star {
+  color: inherit;
+  line-height: 1;
+}
+
+.rh-rating__star.filled {
   color: #facc15;
-  font-size: 1.2rem;
-  letter-spacing: 2px;
 }
 
-.rh-rating span {
-  opacity: 0.4;
-}
-
-.rh-rating span.filled,
-.rh-rating span.half {
-  opacity: 1;
+.rh-rating__star.half {
+  background: linear-gradient(90deg, #facc15 50%, #d1d5db 50%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .rh-label {

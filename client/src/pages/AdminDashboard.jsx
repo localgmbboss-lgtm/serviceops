@@ -317,11 +317,11 @@ export default function AdminDashboard() {
     };
   }, [satisfactionRatio, totalReviews, viewportW]);
 
-  // Work vs revenue dual line chart (14-day window)
+  // Work vs revenue dual bar chart (14-day window)
   useEffect(() => {
-    if (!workCanvasRef.current) return;
-    const trend = dash?.workVsRevenue;
     const canvas = workCanvasRef.current;
+    if (!canvas) return;
+    const trend = dash?.workVsRevenue;
     const { ctx, cssW, cssH } = sizeCanvas(canvas);
     ctx.clearRect(0, 0, cssW, cssH);
 
@@ -330,60 +330,83 @@ export default function AdminDashboard() {
     const revenueRaw = Array.isArray(trend?.revenue) ? trend.revenue : [];
 
     if (labels.length === 0 || jobsRaw.length === 0 || revenueRaw.length === 0) {
-      ctx.fillStyle = "#94a3b8";
+      ctx.fillStyle = "rgba(148, 163, 184, 0.65)";
       ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
       ctx.textAlign = "center";
       ctx.fillText("No trend data yet", cssW / 2, cssH / 2);
       return;
     }
 
-    const padding = { top: 28, right: 60, bottom: 40, left: 60 };
+    const padding = { top: 42, right: 48, bottom: 56, left: 64 };
     const chartW = Math.max(0, cssW - padding.left - padding.right);
     const chartH = Math.max(0, cssH - padding.top - padding.bottom);
-    if (chartW === 0 || chartH === 0) return;
+    if (chartW <= 0 || chartH <= 0) return;
 
-    const jobs = labels.map((_, idx) => Number(jobsRaw[idx] || 0));
-    const revenueK = labels.map((_, idx) => Number(revenueRaw[idx] || 0) / 1000);
+    const jobs = labels.map((_, idx) => Math.max(0, Number(jobsRaw[idx] || 0)));
+    const revenueK = labels.map((_, idx) =>
+      Math.max(0, Number(revenueRaw[idx] || 0) / 1000)
+    );
 
-    const rawMax = Math.max(...jobs, ...revenueK, 1);
-    const maxScale = rawMax * 1.12;
-    const stepX = labels.length > 1 ? chartW / (labels.length - 1) : 0;
+    const maxRevenue = Math.max(...revenueK, 1);
+    const maxJobs = Math.max(...jobs, 1);
+    const topHalf = chartH / 2;
+    const bottomHalf = chartH / 2;
+    const axisY = padding.top + topHalf;
+    const stepX = chartW / labels.length;
+    const barWidth = Math.min(26, stepX * 0.55);
 
-    // Axes
-    ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
-    ctx.lineWidth = 1;
+    // background panel
+    const panelGradient = ctx.createLinearGradient(
+      padding.left,
+      padding.top,
+      padding.left + chartW,
+      padding.top + chartH
+    );
+    panelGradient.addColorStop(0, "rgba(14, 165, 233, 0.14)");
+    panelGradient.addColorStop(0.45, "rgba(37, 99, 235, 0.22)");
+    panelGradient.addColorStop(1, "rgba(15, 23, 42, 0.35)");
+    ctx.fillStyle = panelGradient;
+    ctx.fillRect(padding.left, padding.top, chartW, chartH);
+
+    // axis baseline
+    ctx.strokeStyle = "rgba(37, 99, 235, 0.45)";
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(padding.left, padding.top);
-    ctx.lineTo(padding.left, padding.top + chartH);
-    ctx.lineTo(padding.left + chartW, padding.top + chartH);
+    ctx.moveTo(padding.left, axisY);
+    ctx.lineTo(padding.left + chartW, axisY);
     ctx.stroke();
 
-    // Y ticks & grid
-    const ticks = 4;
+    // helper to draw horizontal grid/ticks
     ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto";
-    ctx.fillStyle = "#cbd5f5";
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-    for (let i = 0; i <= ticks; i++) {
-      const value = (maxScale / ticks) * i;
-      const displayValue =
-        maxScale <= 6
-          ? parseFloat(value.toFixed(1)).toString()
-          : Math.round(value).toString();
-      const y = padding.top + chartH - (value / maxScale) * chartH;
-      ctx.fillText(displayValue, padding.left - 10, y);
-      if (i !== 0) {
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.18)";
-        ctx.beginPath();
-        ctx.moveTo(padding.left, y);
-        ctx.lineTo(padding.left + chartW, y);
-        ctx.stroke();
-      }
+    const tickCount = 4;
+    for (let i = 1; i <= tickCount; i++) {
+      const value = (maxRevenue / tickCount) * i;
+      const y = axisY - (value / maxRevenue) * topHalf;
+      ctx.fillStyle = "rgba(203, 213, 225, 0.78)";
+      ctx.fillText(Math.round(value).toString(), padding.left - 12, y);
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.18)";
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(padding.left + chartW, y);
+      ctx.stroke();
+    }
+    for (let i = 1; i <= tickCount; i++) {
+      const value = (maxJobs / tickCount) * i;
+      const y = axisY + (value / maxJobs) * bottomHalf;
+      ctx.fillStyle = "rgba(203, 213, 225, 0.78)";
+      ctx.fillText(Math.round(value).toString(), padding.left - 12, y);
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.12)";
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(padding.left + chartW, y);
+      ctx.stroke();
     }
 
-    // X labels (adaptive skipping)
-    const labelSkip = labels.length > 7 ? Math.ceil(labels.length / 7) : 1;
-    ctx.fillStyle = "#cbd5f5";
+    // x labels
+    const labelSkip = labels.length > 9 ? Math.ceil(labels.length / 9) : 1;
+    ctx.fillStyle = "rgba(226, 232, 240, 0.78)";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     const formatter = new Intl.DateTimeFormat(undefined, {
@@ -392,95 +415,77 @@ export default function AdminDashboard() {
     });
     labels.forEach((label, idx) => {
       if (idx % labelSkip !== 0 && idx !== labels.length - 1) return;
-      const x = padding.left + stepX * idx;
+      const centerX = padding.left + stepX * (idx + 0.5);
       const [yy, mm, dd] = label.split("-").map((s) => parseInt(s, 10));
       const dateObj = new Date(yy, (mm || 1) - 1, dd || 1);
-      ctx.fillText(formatter.format(dateObj), x, padding.top + chartH + 10);
+      ctx.fillText(formatter.format(dateObj), centerX, padding.top + chartH + 12);
     });
 
-    const toPoints = (series) =>
-      series.map((value, idx) => {
-        const x = padding.left + stepX * idx;
-        const y = padding.top + chartH - (value / maxScale) * chartH;
-        return { x, y };
-      });
+    const drawBar = ({
+      value,
+      max,
+      half,
+      direction,
+      colors,
+      index,
+    }) => {
+      if (!max || !value) return;
+      const height = (value / max) * half;
+      if (height <= 0) return;
+      const centerX = padding.left + stepX * (index + 0.5);
+      const barX = centerX - barWidth / 2;
+      const radius = Math.min(10, barWidth / 2, height);
+      const startY = direction === "up" ? axisY - height : axisY;
+      const endY = direction === "up" ? axisY : axisY + height;
 
-    const buildSmoothPath = (points, smoothness = 0.4) => {
-      if (points.length < 2) return [];
-      const commands = [];
-      for (let i = 0; i < points.length - 1; i++) {
-        const p0 = points[i - 1] || points[i];
-        const p1 = points[i];
-        const p2 = points[i + 1];
-        const p3 = points[i + 2] || p2;
+      const gradient = ctx.createLinearGradient(0, startY, 0, endY);
+      gradient.addColorStop(0, colors[0]);
+      gradient.addColorStop(1, colors[1]);
 
-        const cp1x = p1.x + ((p2.x - p0.x) * smoothness) / 6;
-        const cp1y = p1.y + ((p2.y - p0.y) * smoothness) / 6;
-        const cp2x = p2.x - ((p3.x - p1.x) * smoothness) / 6;
-        const cp2y = p2.y - ((p3.y - p1.y) * smoothness) / 6;
-
-        commands.push({
-          cp1x,
-          cp1y,
-          cp2x,
-          cp2y,
-          x: p2.x,
-          y: p2.y,
-        });
-      }
-      return commands;
-    };
-
-    const drawSeries = (series, color, options = {}) => {
-      const { fill } = options;
-      if (!series.length) return;
-      const points = toPoints(series);
-      if (points.length < 2) return;
-      const commands = buildSmoothPath(points);
-
-      ctx.lineWidth = 2.75;
-      ctx.strokeStyle = color;
+      ctx.save();
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      commands.forEach((cmd) => {
-        ctx.bezierCurveTo(cmd.cp1x, cmd.cp1y, cmd.cp2x, cmd.cp2y, cmd.x, cmd.y);
-      });
-      ctx.stroke();
-
-      if (fill) {
-        const gradient = ctx.createLinearGradient(
-          0,
-          padding.top,
-          0,
-          padding.top + chartH
-        );
-        gradient.addColorStop(0, fill);
-        gradient.addColorStop(1, "rgba(255,255,255,0)");
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, padding.top + chartH);
-        ctx.lineTo(points[0].x, points[0].y);
-        commands.forEach((cmd) => {
-          ctx.bezierCurveTo(cmd.cp1x, cmd.cp1y, cmd.cp2x, cmd.cp2y, cmd.x, cmd.y);
-        });
-        ctx.lineTo(points[points.length - 1].x, padding.top + chartH);
-        ctx.closePath();
-        ctx.fill();
+      if (direction === "up") {
+        ctx.moveTo(barX, endY);
+        ctx.lineTo(barX, startY + radius);
+        ctx.quadraticCurveTo(barX, startY, barX + radius, startY);
+        ctx.lineTo(barX + barWidth - radius, startY);
+        ctx.quadraticCurveTo(barX + barWidth, startY, barX + barWidth, startY + radius);
+        ctx.lineTo(barX + barWidth, endY);
+      } else {
+        ctx.moveTo(barX, startY);
+        ctx.lineTo(barX, endY - radius);
+        ctx.quadraticCurveTo(barX, endY, barX + radius, endY);
+        ctx.lineTo(barX + barWidth - radius, endY);
+        ctx.quadraticCurveTo(barX + barWidth, endY, barX + barWidth, endY - radius);
+        ctx.lineTo(barX + barWidth, startY);
       }
-
-      ctx.fillStyle = color;
-      points.forEach((pt) => {
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-      });
+      ctx.closePath();
+      ctx.shadowColor =
+        direction === "up" ? "rgba(253, 224, 71, 0.28)" : "rgba(14, 165, 233, 0.28)";
+      ctx.shadowBlur = 18;
+      ctx.fill();
+      ctx.restore();
     };
 
-    drawSeries(revenueK, "rgba(37, 99, 235, 1)", {
-      fill: "rgba(37, 99, 235, 0.16)",
+    labels.forEach((_, idx) => {
+      drawBar({
+        value: revenueK[idx] || 0,
+        max: maxRevenue,
+        half: topHalf,
+        direction: "up",
+        colors: ["rgba(253, 224, 71, 0.96)", "rgba(249, 115, 22, 0.78)"],
+        index: idx,
+      });
+      drawBar({
+        value: jobs[idx] || 0,
+        max: maxJobs,
+        half: bottomHalf,
+        direction: "down",
+        colors: ["rgba(37, 99, 235, 0.92)", "rgba(14, 165, 233, 0.72)"],
+        index: idx,
+      });
     });
-    drawSeries(jobs, "rgba(34, 197, 94, 1)");
   }, [dash, viewportW]);
 
   const snap = dash?.revenue?.[slice] || {
@@ -835,11 +840,12 @@ export default function AdminDashboard() {
               </div>
               <canvas ref={workCanvasRef} className="chart-canvas" />
               <div className="legend">
-                <span className="dot blue"></span> Revenue ($k)
-                <span className="dot green"></span> Completed Jobs
+                <span className="dot gold"></span> Revenue ($k)
+                <span className="dot cyan"></span> Completed jobs
               </div>
               <p className="muted small tip">
-                Revenue plotted in thousands for a shared scale.
+                Golden bars track revenue (thousands), cyan bars show completed jobs within
+                the same window.
               </p>
             </div>
             <div className="card performers-card">

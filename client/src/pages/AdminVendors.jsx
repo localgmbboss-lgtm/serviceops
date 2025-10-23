@@ -61,6 +61,19 @@ export default function AdminVendors() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [overridePending, setOverridePending] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [creatingVendor, setCreatingVendor] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const openAddModal = () => {
+    setFormError("");
+    setShowAddModal(true);
+  };
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setFormError("");
+  };
 
   const load = async ({ keepPage = false } = {}) => {
     try {
@@ -169,11 +182,18 @@ export default function AdminVendors() {
           : Number(form.earningsSplit) || 0.6,
     };
     try {
+      setCreatingVendor(true);
+      setFormError("");
       await api.post("/api/vendors", payload);
       setForm({ name: "", phone: "", city: "", earningsSplit: "60" });
-      load();
+      await load({ keepPage: true });
+      closeAddModal();
     } catch (error) {
-      setErr(error?.response?.data?.message || "Failed to create vendor");
+      const message = error?.response?.data?.message || "Failed to create vendor";
+      setErr(message);
+      setFormError(message);
+    } finally {
+      setCreatingVendor(false);
     }
   };
 
@@ -242,46 +262,91 @@ export default function AdminVendors() {
             </strong>
           </div>
         </div>
-      </section>
-
-      <form className="card form" onSubmit={submit}>
-        <div className="form-header">
-          <div>
-            <h3 className="section-title">Add vendor</h3>
-            <p className="section-copy">
-              Spin up a new service partner and invite them to the platform.
-            </p>
-          </div>
-          <button className="btn" type="submit" disabled={!form.name.trim()}>
-            Save vendor
+        <div className="avendors-header__actions">
+          <button
+            type="button"
+            className="avendors-add-btn"
+            onClick={openAddModal}
+          >
+            + Add vendor
           </button>
         </div>
-        <div className="form-grid">
-          <label>
-            <span>Name</span>
-            <input value={form.name} onChange={set("name")} required />
-          </label>
-          <label>
-            <span>Phone</span>
-            <input value={form.phone} onChange={set("phone")} />
-          </label>
-          <label>
-            <span>City</span>
-            <input value={form.city} onChange={set("city")} />
-          </label>
-          <label>
-            <span>Split %</span>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={form.earningsSplit}
-              onChange={set("earningsSplit")}
-            />
-          </label>
+      </section>
+
+      {showAddModal ? (
+        <div className="avendors-modal" role="dialog" aria-modal="true">
+          <div
+            className="avendors-modal__backdrop"
+            onClick={() => !creatingVendor && closeAddModal()}
+          />
+          <div className="avendors-modal__panel">
+            <header className="avendors-modal__head">
+              <div>
+                <h3>New vendor</h3>
+                <p>Spin up a new service partner and invite them to the platform.</p>
+              </div>
+              <button
+                type="button"
+                className="avendors-modal__close"
+                onClick={closeAddModal}
+                aria-label="Close add vendor form"
+                disabled={creatingVendor}
+              >
+                X
+              </button>
+            </header>
+            {formError ? (
+              <div className="avendors-modal__error" role="alert">
+                {formError}
+              </div>
+            ) : null}
+            <form className="avendors-modal__form" onSubmit={submit}>
+              <div className="form-grid">
+                <label>
+                  <span>Name</span>
+                  <input value={form.name} onChange={set("name")} required />
+                </label>
+                <label>
+                  <span>Phone</span>
+                  <input value={form.phone} onChange={set("phone")} />
+                </label>
+                <label>
+                  <span>City</span>
+                  <input value={form.city} onChange={set("city")} />
+                </label>
+                <label>
+                  <span>Split %</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={form.earningsSplit}
+                    onChange={set("earningsSplit")}
+                  />
+                </label>
+              </div>
+              <div className="avendors-modal__actions">
+                <button
+                  type="button"
+                  className="avendors-modal__cancel"
+                  onClick={closeAddModal}
+                  disabled={creatingVendor}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="avendors-modal__submit"
+                  disabled={creatingVendor || !form.name.trim()}
+                >
+                  {creatingVendor ? "Saving..." : "Save vendor"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </form>
+      ) : null}
 
       <div className="card">
         <div className="table-wrap">
@@ -502,3 +567,6 @@ export default function AdminVendors() {
     </div>
   );
 }
+
+
+

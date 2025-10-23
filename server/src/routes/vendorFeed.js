@@ -170,6 +170,7 @@ router.post("/bid", requireVendorAuth, async (req, res, next) => {
 
   const vendor = await loadVendorWithCompliance(req.vendorId);
   if (!vendor) return res.status(401).json({ message: "Vendor not found" });
+  const vendorPhone = normalizePhone(vendor.phone);
 
   if (!vendor.compliance?.allowed) {
     return res.status(403).json({

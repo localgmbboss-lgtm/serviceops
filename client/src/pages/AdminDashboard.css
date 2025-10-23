@@ -423,10 +423,34 @@
 
 .admindash .chart-canvas {
   width: 100%;
-  height: var(--chart-h, 260px);
-  background: rgba(15, 23, 42, 0.34);
+  height: var(--chart-h, 280px);
+  background: transparent;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: none;
+}
+
+.admindash .trends-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  padding: clamp(22px, 3vw, 32px);
+  background:
+    radial-gradient(140% 120% at 18% -10%, rgba(37, 99, 235, 0.35), transparent),
+    radial-gradient(120% 120% at 86% 120%, rgba(14, 165, 233, 0.32), transparent),
+    linear-gradient(140deg, rgba(9, 11, 28, 0.88), rgba(10, 14, 38, 0.94));
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  box-shadow: 0 36px 72px rgba(8, 21, 56, 0.45);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.admindash .trends-card::after {
+  content: "";
+  position: absolute;
+  inset: 12% -30% -45%;
+  background: radial-gradient(circle at center, rgba(14, 165, 233, 0.28), transparent 70%);
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .admindash .legend {
@@ -452,6 +476,14 @@
 
 .admindash .dot.green {
   background: #34d399;
+}
+
+.admindash .dot.gold {
+  background: #facc15;
+}
+
+.admindash .dot.cyan {
+  background: #0ea5e9;
 }
 
 .admindash .dot.gray {

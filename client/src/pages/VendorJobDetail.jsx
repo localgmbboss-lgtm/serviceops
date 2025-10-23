@@ -264,7 +264,7 @@ function useAssignedJob(jobId, fallbackJob, fallbackVendor) {
         }
       }
     },
-    [jobId, loadRemote]
+    [jobId, fallbackJob, loadRemote]
   );
 
   return {
@@ -296,6 +296,10 @@ export default function VendorJobDetail() {
   const [navError, setNavError] = useState("");
   const [navStarted, setNavStarted] = useState(false);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [showStepList, setShowStepList] = useState(false);
+  const [isCompactLayout, setIsCompactLayout] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
   const jobStatus = job?.status || "Assigned";
   const statusIndex = Math.max(STATUS_SEQUENCE.indexOf(jobStatus), 0);
   const statusActions = useMemo(() => {
@@ -334,6 +338,7 @@ export default function VendorJobDetail() {
     setNavError("");
     setNavStarted(false);
     setActiveStepIndex(0);
+    setShowStepList(false);
   }, [jobId]);
 
   useEffect(() => {
@@ -507,7 +512,8 @@ export default function VendorJobDetail() {
       .filter(Boolean);
   }, [navData.geometry]);
 
-  const routeReady = navData.steps.length > 0;
+  const stepCount = navData.steps.length;
+  const routeReady = stepCount > 0;
   const navDistanceLabel =
     navData.distanceText || (distanceKm ? formatDistance(distanceKm) : "Distance TBD");
   const navDurationLabel = navData.durationText
@@ -521,8 +527,29 @@ export default function VendorJobDetail() {
       : navData.provider === "osrm"
       ? "Routing by OSRM"
       : "";
-  const currentStep = routeReady ? navData.steps[activeStepIndex] : null;
+  const boundedStepIndex = routeReady
+    ? Math.min(activeStepIndex, Math.max(stepCount - 1, 0))
+    : 0;
+  const currentStep = routeReady ? navData.steps[boundedStepIndex] : null;
+  const isLastStep = routeReady && boundedStepIndex >= stepCount - 1;
 
+  useEffect(() => {
+    if (!routeReady) {
+      setShowStepList(false);
+      return;
+    }
+    if (!isCompactLayout) {
+      setShowStepList(true);
+    }
+  }, [routeReady, isCompactLayout]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handler = () => setIsCompactLayout(window.innerWidth <= 768);
+    handler();
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
   useEffect(() => {
     if (!hasGoogle) return;
     if (!pickupCoordinates || !vendorCoordinates) return;
@@ -732,16 +759,18 @@ export default function VendorJobDetail() {
       const next = !prev;
       if (!prev) {
         setActiveStepIndex(0);
+        if (isCompactLayout) {
+          setShowStepList(false);
+        }
       }
       return next;
     });
-  }, [navLoading, routeReady]);
+  }, [navLoading, routeReady, isCompactLayout]);
 
   const handleNextStep = useCallback(() => {
-    setActiveStepIndex((prev) =>
-      Math.min(prev + 1, Math.max(navData.steps.length - 1, 0))
-    );
-  }, [navData.steps.length]);
+    if (!stepCount) return;
+    setActiveStepIndex((prev) => Math.min(prev + 1, Math.max(stepCount - 1, 0)));
+  }, [stepCount]);
 
   const handlePrevStep = useCallback(() => {
     setActiveStepIndex((prev) => Math.max(prev - 1, 0));
@@ -760,14 +789,6 @@ export default function VendorJobDetail() {
           </span>
           Back to jobs
         </button>
-        <div className="vendor-job-detail__status">
-          <span className="badge">{formatStatusLabel(jobStatus)}</span>
-          {assignedTimestamp ? (
-            <span className="muted">
-              Assigned {assignedTimestamp.toLocaleString()}
-            </span>
-          ) : null}
-        </div>
       </header>
 
       {loading ? (
@@ -779,14 +800,20 @@ export default function VendorJobDetail() {
       ) : (
         <>
           <section className="vendor-job-detail__hero">
-            <div>
+            <div className="vendor-job-detail__hero-main">
+              <div className="hero-topline">
+                <span className="hero-status">{formatStatusLabel(jobStatus)}</span>
+                {assignedTimestamp ? (
+                  <span className="hero-assigned">
+                    Assigned {assignedTimestamp.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - {assignedTimestamp.toLocaleDateString()}
+                  </span>
+                ) : null}
+              </div>
               <h1>{job.serviceType || "Assigned job"}</h1>
               <p className="address">{job.pickupAddress || "Pickup address unavailable"}</p>
               <div className="meta">
-                <span>{formatStatusLabel(jobStatus)}</span>
-                <span>
-                  {distanceKm ? formatDistance(distanceKm) : "Distance TBD"}
-                </span>
+                <span>{customerName}</span>
+                <span>{distanceKm ? formatDistance(distanceKm) : "Distance TBD"}</span>
                 {distanceKm ? <span>~{formatEta(distanceKm)} drive</span> : null}
               </div>
             </div>
@@ -988,96 +1015,118 @@ export default function VendorJobDetail() {
                     </a>
                   ) : null}
                 </div>
-                <div className="map-navigation">
+                <div className={`map-navigation${navStarted ? " is-active" : ""}${isCompactLayout ? " map-navigation--compact" : ""}`}>
                   <div className="map-navigation__head">
                     <div className="map-navigation__summary">
-                      <span className="map-navigation__title">Turn-by-turn</span>
+                      <span className="map-navigation__title">Trip navigation</span>
                       {routeReady ? (
-                        <span className="map-navigation__meta">
-                          {navDistanceLabel}
-                          {navDurationLabel ? ` • ${navDurationLabel}` : ""}
-                        </span>
-                      ) : null}
-                      {navStarted && currentStep ? (
-                        <span className="map-navigation__current">
-                          Next: {currentStep.instruction || "Continue"}
-                        </span>
+                        <>
+                          <span className="map-navigation__meta">
+                            {navDistanceLabel}
+                            {navDurationLabel ? ` - ${navDurationLabel}` : ""}
+                          </span>
+                          {currentStep ? (
+                            <span className="map-navigation__current">
+                              {navStarted ? "Next up" : "Preview"}: {currentStep.instruction || "Continue straight"}
+                            </span>
+                          ) : null}
+                        </>
                       ) : null}
                       {navProviderLabel ? (
-                        <span className="map-navigation__provider">
-                          {navProviderLabel}
-                        </span>
+                        <span className="map-navigation__provider">{navProviderLabel}</span>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
-                      className="btn ghost map-navigation__toggle"
-                      onClick={handleToggleNavigation}
-                      disabled={navLoading || !routeReady}
-                    >
-                      {navLoading
-                        ? "Calculating..."
-                        : navStarted
-                        ? "Pause navigation"
-                        : routeReady
-                        ? "Start navigation"
-                        : "Preparing route"}
-                    </button>
+                    <div className="map-navigation__actions">
+                      {routeReady && stepCount > 1 ? (
+                        <button
+                          type="button"
+                          className="btn ghost map-navigation__toggle-steps"
+                          onClick={() => setShowStepList((prev) => !prev)}
+                        >
+                          {showStepList ? "Hide steps" : "View steps"}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn map-navigation__toggle"
+                        onClick={handleToggleNavigation}
+                        disabled={navLoading || !routeReady}
+                      >
+                        {navLoading
+                          ? "Calculating..."
+                          : navStarted
+                          ? "Pause navigation"
+                          : routeReady
+                          ? "Start navigation"
+                          : "Preparing route"}
+                      </button>
+                    </div>
                   </div>
-                  {navLoading ? (
-                    <p className="map-navigation__status">
-                      Calculating the best route...
-                    </p>
-                  ) : navError ? (
+                  {navError ? (
                     <p className="map-navigation__error">{navError}</p>
                   ) : routeReady ? (
                     <>
-                      <ol className="map-navigation__steps">
-                        {navData.steps.map((step, index) => (
-                          <li
-                            key={`nav-step-${index}`}
-                            className={`map-navigation__step${
-                              navStarted && index === activeStepIndex ? " is-active" : ""
-                            }`}
-                          >
-                            <span className="map-navigation__index">
-                              {index + 1}
-                            </span>
-                            <div className="map-navigation__body">
-                              <p className="map-navigation__instruction">
-                                {step.instruction || "Continue"}
-                              </p>
-                              <p className="map-navigation__step-meta">
-                                {step.distanceText || "—"}
-                                {step.durationText ? ` • ${step.durationText}` : ""}
-                              </p>
-                            </div>
-                          </li>
-                        ))}
-                      </ol>
-                      {navStarted && routeReady && (
+                      {currentStep ? (
+                        <div className="map-navigation__step-card">
+                          <span className="map-navigation__index">{boundedStepIndex + 1}</span>
+                          <div className="map-navigation__step-detail">
+                            <span className="map-navigation__chip">{navStarted ? "Next up" : "Preview"}</span>
+                            <p className="map-navigation__instruction">
+                              {currentStep.instruction || "Continue straight"}
+                            </p>
+                            <p className="map-navigation__step-meta">
+                              {[currentStep.distanceText || "--", currentStep.durationText]
+                                .filter(Boolean)
+                                .join(" - ") || "--"}
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+                      {stepCount > 1 ? (
+                        <ol className={`map-navigation__steps${showStepList ? " is-expanded" : ""}`}>
+                          {navData.steps.map((step, index) => (
+                            <li
+                              key={`nav-step-${index}`}
+                              className={`map-navigation__step${navStarted && index === boundedStepIndex ? " is-active" : ""}`}
+                            >
+                              <span className="map-navigation__index">{index + 1}</span>
+                              <div className="map-navigation__body">
+                                <p className="map-navigation__instruction">
+                                  {step.instruction || "Continue"}
+                                </p>
+                                <p className="map-navigation__step-meta">
+                                  {[step.distanceText || "--", step.durationText]
+                                    .filter(Boolean)
+                                    .join(" - ") || "--"}
+                                </p>
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : null}
+                      {navStarted && stepCount > 0 ? (
                         <div className="map-navigation__controls">
                           <button
                             type="button"
                             className="btn ghost"
                             onClick={handlePrevStep}
-                            disabled={activeStepIndex === 0}
+                            disabled={boundedStepIndex === 0}
                           >
-                            Previous
+                            Back
                           </button>
                           <button
                             type="button"
                             className="btn"
                             onClick={handleNextStep}
-                            disabled={activeStepIndex >= navData.steps.length - 1}
+                            disabled={isLastStep}
                           >
-                            {activeStepIndex >= navData.steps.length - 1
-                              ? "Arrived"
-                              : "Next step"}
+                            {isLastStep ? "Arrived" : "Next step"}
                           </button>
                         </div>
-                      )}
+                      ) : null}
                     </>
+                  ) : navLoading ? (
+                    <p className="map-navigation__status">Calculating the best route...</p>
                   ) : (
                     <p className="map-navigation__status">
                       Tap "Start navigation" to view step-by-step directions.

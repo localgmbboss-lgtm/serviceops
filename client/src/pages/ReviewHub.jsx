@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useNotifications } from "../contexts/NotificationsContext";
 import "./ReviewHub.css";
@@ -18,16 +18,25 @@ const VISIBILITY_OPTIONS = [
 
 function RatingStars({ rating }) {
   const rounded = Math.round((rating || 0) * 2) / 2;
+  const label = Number.isFinite(rounded) ? `${rounded} out of 5` : "Not yet rated";
   return (
-    <span className="rh-rating">
-      {[1, 2, 3, 4, 5].map((index) => (
-        <span key={index} className={rounded >= index ? "filled" : rounded >= index - 0.5 ? "half" : ""}>
-          ★
-        </span>
-      ))}
+    <span className="rh-rating" aria-label={`Rating ${label}`}>
+      {[1, 2, 3, 4, 5].map((index) => {
+        const isFilled = rounded >= index;
+        const isHalf = !isFilled && rounded >= index - 0.5;
+        const classes = ["rh-rating__star"];
+        if (isFilled) classes.push("filled");
+        if (isHalf) classes.push("half");
+        return (
+          <span key={index} className={classes.join(" ")} aria-hidden="true">
+            ★
+          </span>
+        );
+      })}
     </span>
   );
 }
+
 
 export default function ReviewHub() {
   const [reviews, setReviews] = useState([]);
@@ -175,7 +184,7 @@ export default function ReviewHub() {
             onClick={() => setToast(null)}
             aria-label="Dismiss notification"
           >
-            ×
+            {"\u00D7"}
           </button>
         </div>
       )}
@@ -331,7 +340,7 @@ export default function ReviewHub() {
                           aria-label="Open AI response assistant"
                           aria-expanded={assistantReviewId === review._id}
                         >
-                          🤖
+                          <span aria-hidden="true">AI</span>
                         </button>
                       </div>
                       <button type="button" className="btn secondary" onClick={() => submitResponse(review._id)}>
@@ -366,7 +375,7 @@ export default function ReviewHub() {
           <div className="rh-ai-panel">
             <div className="rh-ai-panel__head">
               <span className="rh-ai-panel__icon" aria-hidden="true">
-                🤖
+                AI
               </span>
               <strong>AI response assistant</strong>
               <button
@@ -375,7 +384,7 @@ export default function ReviewHub() {
                 onClick={closeAssistant}
                 aria-label="Close AI assistant"
               >
-                ×
+                {"\u00D7"}
               </button>
             </div>
             {currentAssistantReview ? (

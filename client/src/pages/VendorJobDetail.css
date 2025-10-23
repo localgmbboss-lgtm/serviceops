@@ -66,6 +66,34 @@
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08);
 }
 
+.vendor-job-detail__hero-main {
+  display: grid;
+  gap: 14px;
+}
+
+.hero-topline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.hero-status {
+  background: rgba(99, 102, 241, 0.18);
+  color: #312e81;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.hero-assigned {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
 .vendor-job-detail__hero h1 {
   margin: 0;
   font-size: clamp(1.5rem, 3.2vw, 2rem);
@@ -514,5 +542,88 @@
 
   .map-navigation__toggle {
     width: 100%;
+  }
+}
+.map-navigation__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-navigation__toggle {
+  min-width: 150px;
+}
+
+.map-navigation__toggle-steps {
+  min-width: 120px;
+}
+
+.map-navigation__step-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: rgba(37, 99, 235, 0.12);
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.08);
+}
+
+.map-navigation__step-detail {
+  display: grid;
+  gap: 4px;
+}
+
+.map-navigation__chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+}
+
+.map-navigation__step-card .map-navigation__index {
+  background: #1d4ed8;
+  color: #ffffff;
+  border-color: #1d4ed8;
+}
+
+.map-navigation--compact .map-navigation__actions {
+  flex-direction: column-reverse;
+  align-items: stretch;
+}
+
+.map-navigation--compact .map-navigation__toggle,
+.map-navigation--compact .map-navigation__toggle-steps {
+  width: 100%;
+}
+
+.map-navigation--compact .map-navigation__steps {
+  display: none;
+  max-height: none;
+}
+
+.map-navigation--compact .map-navigation__steps.is-expanded {
+  display: grid;
+}
+
+.map-navigation--compact .map-navigation__controls {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.map-navigation--compact .map-navigation__controls .btn {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .map-navigation__head {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .map-navigation__actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
   }
 }
