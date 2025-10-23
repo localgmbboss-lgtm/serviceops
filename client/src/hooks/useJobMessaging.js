@@ -92,13 +92,14 @@ export function useJobMessaging({ jobId, role }) {
       }
       setCanMessage(Boolean(data?.canMessage));
       setError("");
-    } catch (err) {
-      if (!mountedRef.current) return;
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Unable to load conversation."
-      );
+  } catch (err) {
+    if (!mountedRef.current) return;
+    resetState();
+    setError(
+      err?.response?.data?.message ||
+        err?.message ||
+        "Unable to load conversation."
+    );
     } finally {
       if (mountedRef.current) setLoading(false);
     }

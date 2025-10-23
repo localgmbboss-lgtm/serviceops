@@ -18,8 +18,16 @@ export default function ChatOverlay({
   typingIndicators,
   onTyping,
   unreadCount = 0,
+  defaultOpen = false,
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(defaultOpen));
+
+  useEffect(() => {
+    if (defaultOpen) {
+      setOpen(true);
+      onTyping?.(false);
+    }
+  }, [defaultOpen, onTyping]);
 
   useEffect(() => {
     if (!open) return undefined;

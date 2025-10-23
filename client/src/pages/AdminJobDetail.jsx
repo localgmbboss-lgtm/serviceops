@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
@@ -103,6 +103,7 @@ const TIMELINE_LABELS = {
 export default function AdminJobDetail() {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const hasGoogleMaps = Boolean(getGoogleMapsKey());
 
   const [payload, setPayload] = useState(null);
@@ -144,6 +145,17 @@ export default function AdminJobDetail() {
     }
   }, [jobId]);
 
+  useEffect(() => {
+    if (!location) return;
+    try {
+      const params = new URLSearchParams(location.search || "");
+      if (location.state?.openChat || params.get("chat") === "1" || params.get("tab") === "conversation") {
+        setActiveTab("conversation");
+      }
+    } catch (error) {
+      /* ignore malformed query params */
+    }
+  }, [location]);
   useEffect(() => {
     load();
   }, [load]);

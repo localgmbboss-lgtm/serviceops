@@ -32,16 +32,25 @@ const resolveTarget = (notification) => {
       return `/choose/${meta.customerToken}`;
     }
     if (meta.jobId) {
-      return `/status/${meta.jobId}`;
+      const query = meta.chat ? "?chat=1" : "";
+      return `/status/${meta.jobId}${query}`;
     }
     return "/customer/home";
   }
 
   if (meta.role === "vendor") {
+    if (meta.jobId) {
+      const query = meta.chat ? "?chat=1" : "";
+      return `/vendor/jobs/${meta.jobId}${query}`;
+    }
     return "/vendor/app";
   }
 
   if (meta.role === "admin") {
+    if (meta.jobId) {
+      const query = meta.chat ? "?tab=conversation" : "";
+      return `/admin/jobs/${meta.jobId}${query}`;
+    }
     return "/admin";
   }
 

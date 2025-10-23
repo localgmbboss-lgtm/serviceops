@@ -102,6 +102,91 @@ const sanitizeMessage = (doc) => {
   };
 };
 
+const VENDOR_ACTIVE_STATUSES = new Set(["assigned", "ontheway", "arrived"]);
+
+const CONTACT_PATTERNS = [
+  /\+?\d[\d().\s-]{6,}\d/,
+  /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/,
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+  /(https?:\/\/|www\.)\S+/i,
+];
+
+const CONTACT_KEYWORDS =
+  /\b(call|text|phone|number|email|whatsapp|telegram|contact|reach me|dm)\b/i;
+
+const POLICY_WARNING_MESSAGE =
+  "For security, messages cannot include phone numbers, email addresses, or external links. Please keep communication inside the app.";
+
+const containsContactInfo = (value) => {
+  if (!value) return false;
+  const normalized = String(value).replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  if (CONTACT_PATTERNS.some((regex) => regex.test(normalized))) {
+    return true;
+  }
+  if (CONTACT_KEYWORDS.test(normalized)) {
+    const digitCount = (normalized.match(/\d/g) || []).length;
+    if (digitCount >= 7) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const notifyPolicyWarning = async ({
+  conversationContext,
+  job,
+  baseUrl,
+}) => {
+  const { isVendor, isCustomer, vendorId, customerId } = conversationContext;
+  const jobId = job?._id ? String(job._id) : null;
+  if (!jobId) return;
+
+  if (isVendor && vendorId) {
+    const vendorRoute = `/vendor/jobs/${jobId}?chat=1`;
+    await sendVendorPushNotifications([
+      {
+        vendorId,
+        jobId,
+        title: "Message blocked",
+        body: POLICY_WARNING_MESSAGE,
+        severity: "warn",
+        meta: {
+          role: "vendor",
+          jobId,
+          kind: "policy",
+          chat: true,
+          route: vendorRoute,
+          absoluteUrl: buildAbsoluteUrl(baseUrl, vendorRoute),
+          dedupeKey: `vendor:policy:${jobId}:${Date.now()}`,
+        },
+      },
+    ]);
+  }
+
+  if (isCustomer && customerId) {
+    const customerRoute = `/status/${jobId}?chat=1`;
+    await sendCustomerPushNotifications([
+      {
+        customerId,
+        jobId,
+        title: "Message blocked",
+        body: POLICY_WARNING_MESSAGE,
+        severity: "warn",
+        meta: {
+          role: "customer",
+          jobId,
+          kind: "policy",
+          chat: true,
+          route: customerRoute,
+          absoluteUrl: buildAbsoluteUrl(baseUrl, customerRoute),
+          dedupeKey: `customer:policy:${jobId}:${Date.now()}`,
+        },
+      },
+    ]);
+  }
+};
+
 const getParticipantSnapshot = async (context) => {
   const { job, isCustomer, isVendor, isAdmin, customerId, vendorId, actor } = context;
 
@@ -162,6 +247,16 @@ router.get(
       const { conversationContext } = req;
       const { actor, job } = conversationContext;
 
+      const jobStatusNormalized = String(job?.status || "").toLowerCase();
+      if (
+        conversationContext.isVendor &&
+        !VENDOR_ACTIVE_STATUSES.has(jobStatusNormalized)
+      ) {
+        return res
+          .status(403)
+          .json({ message: "Chat is available while the job is active." });
+      }
+
       const limitRaw = Number(req.query?.limit || 50);
       const limit = Number.isFinite(limitRaw)
         ? Math.min(200, Math.max(1, limitRaw))
@@ -179,13 +274,17 @@ router.get(
         .lean();
 
       const participants = await getParticipantSnapshot(conversationContext);
+      const vendorChatAllowed = VENDOR_ACTIVE_STATUSES.has(
+        jobStatusNormalized
+      );
+      const canMessage =
+        Boolean(conversationContext.isAdmin) ||
+        Boolean(conversationContext.isCustomer) ||
+        (Boolean(conversationContext.isVendor) && vendorChatAllowed);
 
       res.json({
         messages: messages.map(sanitizeMessage),
-        canMessage:
-          Boolean(conversationContext.isCustomer) ||
-          Boolean(conversationContext.isVendor) ||
-          Boolean(conversationContext.isAdmin),
+        canMessage,
         actor: {
           role: actor.role,
           id: actor.id,
@@ -221,6 +320,16 @@ router.post(
         customerId,
       } = conversationContext;
 
+      if (
+        isVendor &&
+        !VENDOR_ACTIVE_STATUSES.has(String(job?.status || "").toLowerCase())
+      ) {
+        return res.status(403).json({
+          message:
+            "This conversation is closed because the job is no longer active.",
+        });
+      }
+
       if (!vendorId && actor.role === "vendor") {
         return res.status(409).json({
           message: "Messaging is available once a vendor is assigned.",
@@ -238,6 +347,17 @@ router.post(
         return res.status(400).json({
           message: "Send a message or attach images of the vehicle.",
         });
+      }
+
+      const baseUrl = resolveClientBaseUrl(req);
+
+      if (body && containsContactInfo(body)) {
+        await notifyPolicyWarning({
+          conversationContext,
+          job,
+          baseUrl,
+        });
+        return res.status(422).json({ message: POLICY_WARNING_MESSAGE });
       }
 
       const attachments = files.map((file) => {
@@ -290,7 +410,6 @@ router.post(
 
       const sanitized = sanitizeMessage(messageDoc);
 
-      const baseUrl = resolveClientBaseUrl(req);
       const messagePreview = sanitized.body
         ? sanitized.body.slice(0, 140)
         : sanitized.attachments?.length
@@ -298,7 +417,7 @@ router.post(
         : "New message";
 
       if (isVendor && customerId) {
-        const customerRoute = `/status/${job._id}`;
+        const customerRoute = `/status/${job._id}?chat=1`;
         await sendCustomerPushNotifications([
           {
             customerId,
@@ -310,6 +429,7 @@ router.post(
               role: "customer",
               jobId: job._id,
               kind: "message",
+              chat: true,
               route: customerRoute,
               absoluteUrl: buildAbsoluteUrl(baseUrl, customerRoute),
               dedupeKey: `customer:job:${job._id}:message:${sanitized.id}`,
@@ -319,6 +439,7 @@ router.post(
       }
 
       if (isCustomer && vendorId) {
+        const vendorRoute = `/vendor/jobs/${job._id}?chat=1`;
         await sendVendorPushNotifications([
           {
             vendorId,
@@ -330,7 +451,9 @@ router.post(
               role: "vendor",
               jobId: job._id,
               kind: "message",
-              route: "/vendor/app",
+              chat: true,
+              route: vendorRoute,
+              absoluteUrl: buildAbsoluteUrl(baseUrl, vendorRoute),
               dedupeKey: `vendor:job:${job._id}:message:${sanitized.id}`,
             },
           },
@@ -338,6 +461,7 @@ router.post(
       }
 
       if (isAdmin && vendorId) {
+        const vendorRoute = `/vendor/jobs/${job._id}?chat=1`;
         await sendVendorPushNotifications([
           {
             vendorId,
@@ -349,7 +473,9 @@ router.post(
               role: "vendor",
               jobId: job._id,
               kind: "message",
-              route: "/vendor/app",
+              chat: true,
+              route: vendorRoute,
+              absoluteUrl: buildAbsoluteUrl(baseUrl, vendorRoute),
               dedupeKey: `vendor:job:${job._id}:message:${sanitized.id}`,
             },
           },
@@ -357,7 +483,7 @@ router.post(
       }
 
       if (isAdmin && customerId) {
-        const customerRoute = `/status/${job._id}`;
+        const customerRoute = `/status/${job._id}?chat=1`;
         await sendCustomerPushNotifications([
           {
             customerId,
@@ -369,6 +495,7 @@ router.post(
               role: "customer",
               jobId: job._id,
               kind: "message",
+              chat: true,
               route: customerRoute,
               absoluteUrl: buildAbsoluteUrl(baseUrl, customerRoute),
               dedupeKey: `customer:job:${job._id}:message:${sanitized.id}`,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { copyText } from "../utils/clipboard";
 import {
@@ -56,6 +56,7 @@ const formatDistanceLabel = (km) => {
 
 export default function CustomerDashboard() {
   const { id } = useParams();
+  const location = useLocation();
   const [state, setState] = useState({
     customer: null,
     job: null,
@@ -146,6 +147,15 @@ export default function CustomerDashboard() {
     }
     return "";
   }, [chatEnabled, job, vendorDisplayName]);
+  const autoOpenChat = useMemo(() => {
+    if (location?.state?.openChat) return true;
+    try {
+      const params = new URLSearchParams(location.search || "");
+      return params.get("chat") === "1";
+    } catch {
+      return false;
+    }
+  }, [location?.state?.openChat, location.search]);
 
   const currentStage = job?.status || "Unassigned";
   const activeIndex = Math.max(STAGES.indexOf(currentStage), 0);
@@ -850,6 +860,7 @@ export default function CustomerDashboard() {
             typingIndicators={chatTypingIndicators}
             onTyping={emitChatTyping}
             unreadCount={chatUnreadCount}
+            defaultOpen={autoOpenChat && chatEnabled}
           />
         )}
 

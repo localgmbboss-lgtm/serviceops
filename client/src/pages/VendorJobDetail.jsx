@@ -301,6 +301,19 @@ export default function VendorJobDetail() {
     typeof window !== "undefined" ? window.innerWidth <= 768 : false
   );
   const jobStatus = job?.status || "Assigned";
+  const jobStatusNormalized = String(jobStatus || "").toLowerCase();
+  const chatStatusAllowed = ["assigned", "ontheway", "arrived"].includes(
+    jobStatusNormalized
+  );
+  const autoOpenChat = useMemo(() => {
+    if (location?.state?.openChat) return true;
+    try {
+      const params = new URLSearchParams(location.search || "");
+      return params.get("chat") === "1";
+    } catch {
+      return false;
+    }
+  }, [location?.state?.openChat, location.search]);
   const statusIndex = Math.max(STATUS_SEQUENCE.indexOf(jobStatus), 0);
   const statusActions = useMemo(() => {
     if (!job) return [];
@@ -924,22 +937,30 @@ export default function VendorJobDetail() {
                 <div className="vendor-job-card chat">
                   <h2>Message the customer</h2>
                   <p className="muted">{chatSubtitle}</p>
-                  <ChatOverlay
-                    title="Message the customer"
-                    subtitle={chatSubtitle}
-                    messages={messages}
-                    participants={participants}
-                    actorRole="vendor"
-                    canMessage={canMessage}
-                    onSend={sendMessage}
-                    sending={sending}
-                    loading={chatLoading}
-                    error={chatError}
-                    realtimeReady={realtimeReady}
-                    typingIndicators={typingIndicators}
-                    onTyping={emitTyping}
-                    unreadCount={unreadCount}
-                  />
+                  {chatStatusAllowed ? (
+                    <ChatOverlay
+                      title="Message the customer"
+                      subtitle={chatSubtitle}
+                      messages={messages}
+                      participants={participants}
+                      actorRole="vendor"
+                      canMessage={canMessage && chatStatusAllowed}
+                      onSend={sendMessage}
+                      sending={sending}
+                      loading={chatLoading}
+                      error={chatError}
+                      realtimeReady={realtimeReady}
+                      typingIndicators={typingIndicators}
+                      onTyping={emitTyping}
+                      unreadCount={unreadCount}
+                      defaultOpen={autoOpenChat && chatStatusAllowed && canMessage}
+                    />
+                  ) : (
+                    <p className="muted">
+                      Chat is available while a job is active. Once completed, customer
+                      conversations are hidden for privacy.
+                    </p>
+                  )}
                 </div>
               ) : null}
 
