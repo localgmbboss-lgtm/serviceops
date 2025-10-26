@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useNotifications } from "../contexts/NotificationsContext";
+import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
+import { LuBriefcase, LuBuilding2, LuCalendarDays, LuEye, LuMapPin, LuShield, LuTag, LuUser } from "react-icons/lu";
 import "./ReviewHub.css";
 
 const STATUS_OPTIONS = [
@@ -17,19 +19,23 @@ const VISIBILITY_OPTIONS = [
 ];
 
 function RatingStars({ rating }) {
-  const rounded = Math.round((rating || 0) * 2) / 2;
-  const label = Number.isFinite(rounded) ? `${rounded} out of 5` : "Not yet rated";
+  const numericRating = Number(rating);
+  const isValid = Number.isFinite(numericRating);
+  const safeRating = isValid ? Math.min(Math.max(numericRating, 0), 5) : 0;
+  const rounded = Math.round(safeRating * 2) / 2;
+  const label = isValid ? `${safeRating.toFixed(safeRating % 1 === 0 ? 0 : 1)} out of 5` : "Not yet rated";
+
   return (
     <span className="rh-rating" aria-label={`Rating ${label}`}>
       {[1, 2, 3, 4, 5].map((index) => {
         const isFilled = rounded >= index;
         const isHalf = !isFilled && rounded >= index - 0.5;
-        const classes = ["rh-rating__star"];
-        if (isFilled) classes.push("filled");
-        if (isHalf) classes.push("half");
+        const Icon = isFilled ? FaStar : isHalf ? FaStarHalfAlt : FaRegStar;
+        const state = isFilled ? "filled" : isHalf ? "half" : "empty";
+
         return (
-          <span key={index} className={classes.join(" ")} aria-hidden="true">
-            ★
+          <span key={index} className={`rh-rating__star ${state}`} aria-hidden="true">
+            <Icon className="rh-rating__icon" />
           </span>
         );
       })}
@@ -233,14 +239,50 @@ export default function ReviewHub() {
           bySeverity.map((review) => {
             const fullComment = review.comment || "No comment left";
             const summary =
-              fullComment.length > 140 ? `${fullComment.slice(0, 140)}...` : fullComment;
+              fullComment.length > 160 ? `${fullComment.slice(0, 160)}...` : fullComment;
             const isExpanded = !!expandedReviews[review._id];
+            const numericRating = Number.isFinite(Number(review.rating)) ? Number(review.rating) : null;
+            const ratingDisplay =
+              numericRating === null ? "--" : numericRating.toFixed(numericRating % 1 === 0 ? 0 : 1);
+            const statusLabel =
+              STATUS_OPTIONS.find((option) => option.value === review.status)?.label ||
+              review.status ||
+              "Unknown";
+            const createdAt = review.createdAt ? new Date(review.createdAt) : null;
+            const formattedDate = createdAt
+              ? createdAt.toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })
+              : "Date unavailable";
+
             return (
-              <article key={review._id} className="rh-card">
-                <header>
-                  <div>
-                    <RatingStars rating={review.rating} />
-                    <h2>{summary}</h2>
+              <article key={review._id} className={`rh-card${isExpanded ? " is-open" : ""}`}>
+                <div className="rh-card__hero">
+                  <div className="rh-card__hero-main">
+                    <div className="rh-card__score">
+                      <span className="rh-card__score-value">{ratingDisplay}</span>
+                      <RatingStars rating={numericRating ?? 0} />
+                      <span className="rh-card__score-label">Customer rating</span>
+                    </div>
+                    <div className="rh-card__title">
+                      <h2>{summary}</h2>
+                      <div className="rh-card__meta">
+                        <span className="rh-card__meta-item">
+                          <LuCalendarDays aria-hidden="true" />
+                          {formattedDate}
+                        </span>
+                        <span className="rh-card__meta-item">
+                          <LuShield aria-hidden="true" />
+                          {statusLabel}
+                        </span>
+                        <span className={`rh-tag rh-tag--${review.visibility}`}>
+                          <LuEye aria-hidden="true" />
+                          {review.visibility}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -252,39 +294,63 @@ export default function ReviewHub() {
                       }))
                     }
                   >
-                    {isExpanded ? "Hide details" : "Show details"}
+                    {isExpanded ? "Hide details" : "View full thread"}
                   </button>
-                </header>
-                <div className="rh-card__summary">
-                  <span>{new Date(review.createdAt).toLocaleDateString()}</span>
-                  <span className={`rh-tag rh-tag--${review.visibility}`}>{review.visibility}</span>
                 </div>
-                {isExpanded && (
-                  <>
+
+                {isExpanded ? (
+                  <div className="rh-card__body">
                     <p className="rh-comment-full">{fullComment}</p>
-                    <div className="rh-card__grid">
-                      <div>
-                        <span className="rh-label">Job</span>
-                        <strong>
-                          {review.job
-                            ? `${review.job.serviceType || "Service"} - ${review.job.status}`
-                            : "Unknown job"}
-                        </strong>
-                        {review.job?.pickupAddress ? (
-                          <p className="muted">{review.job.pickupAddress}</p>
-                        ) : null}
+                    <div className="rh-card__sections">
+                      <div className="rh-section">
+                        <span className="rh-section__icon" aria-hidden="true">
+                          <LuBriefcase />
+                        </span>
+                        <div>
+                          <span className="rh-section__label">Job</span>
+                          <strong>
+                            {review.job
+                              ? `${review.job.serviceType || "Service"} - ${review.job.status || "Unknown"}`
+                              : "Unmatched job"}
+                          </strong>
+                          {review.job?.pickupAddress ? (
+                            <span className="rh-section__muted">
+                              <LuMapPin aria-hidden="true" />
+                              {review.job.pickupAddress}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                      <div>
-                        <span className="rh-label">Vendor</span>
-                        <p>{review.vendor ? review.vendor.name : "-"}</p>
+                      <div className="rh-section">
+                        <span className="rh-section__icon" aria-hidden="true">
+                          <LuBuilding2 />
+                        </span>
+                        <div>
+                          <span className="rh-section__label">Vendor</span>
+                          <strong>{review.vendor ? review.vendor.name : "Not assigned"}</strong>
+                          <span className="rh-section__muted">
+                            <LuTag aria-hidden="true" />
+                            {review.vendor?.category || "Category pending"}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="rh-label">Customer</span>
-                        <p>{review.customer ? review.customer.name : "-"}</p>
+                      <div className="rh-section">
+                        <span className="rh-section__icon" aria-hidden="true">
+                          <LuUser />
+                        </span>
+                        <div>
+                          <span className="rh-section__label">Customer</span>
+                          <strong>{review.customer ? review.customer.name : "Anonymous"}</strong>
+                          <span className="rh-section__muted">
+                            <LuMapPin aria-hidden="true" />
+                            {review.customer?.city || "Location unknown"}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="rh-card__status">
-                      <label>
+
+                    <div className="rh-card__controls">
+                      <label className="rh-control">
                         <span>Status</span>
                         <select
                           value={review.status}
@@ -303,7 +369,7 @@ export default function ReviewHub() {
                           ))}
                         </select>
                       </label>
-                      <label>
+                      <label className="rh-control">
                         <span>Visibility</span>
                         <select
                           value={review.visibility}
@@ -323,11 +389,12 @@ export default function ReviewHub() {
                         </select>
                       </label>
                     </div>
-                    <div className="rh-reply">
+
+                    <div className="rh-card__reply">
                       <div className="rh-reply__input">
                         <textarea
-                          rows={3}
-                          placeholder="Craft a public reply or internal note..."
+                          rows={4}
+                          placeholder="Draft a public response or internal note..."
                           value={activeReply[review._id] || ""}
                           onChange={(event) =>
                             setActiveReply((prev) => ({ ...prev, [review._id]: event.target.value }))
@@ -343,10 +410,15 @@ export default function ReviewHub() {
                           <span aria-hidden="true">AI</span>
                         </button>
                       </div>
-                      <button type="button" className="btn secondary" onClick={() => submitResponse(review._id)}>
+                      <button
+                        type="button"
+                        className="rh-card__respond"
+                        onClick={() => submitResponse(review._id)}
+                      >
                         Respond
                       </button>
                     </div>
+
                     {Array.isArray(review.responseLog) && review.responseLog.length > 0 ? (
                       <details className="rh-history">
                         <summary>Response history ({review.responseLog.length})</summary>
@@ -362,8 +434,8 @@ export default function ReviewHub() {
                         </ul>
                       </details>
                     ) : null}
-                  </>
-                )}
+                  </div>
+                ) : null}
               </article>
             );
           })
@@ -431,4 +503,3 @@ export default function ReviewHub() {
     </div>
   );
 }
-

@@ -80,32 +80,61 @@ export default function KnowledgeBase() {
     }
   };
 
+  const metrics = useMemo(() => {
+    const total = articles.length;
+    const canned = articles.reduce(
+      (sum, article) =>
+        sum + (Array.isArray(article.cannedResponses) ? article.cannedResponses.length : 0),
+      0
+    );
+    const latestStamp = articles.reduce((latest, article) => {
+      const stamp = article.updatedAt || article.createdAt;
+      if (!stamp) return latest;
+      const time = new Date(stamp).getTime();
+      return time > latest ? time : latest;
+    }, 0);
+    return {
+      total,
+      canned,
+      lastUpdated: latestStamp ? new Date(latestStamp) : null,
+    };
+  }, [articles]);
+
+  const lastUpdatedLabel = metrics.lastUpdated
+    ? metrics.lastUpdated.toLocaleString()
+    : "Awaiting first article";
+
   return (
     <div className="kb">
-      <header className="kb-header">
-        <div>
-          <h1>Knowledge Base & Macros</h1>
-          <p>Pre-approved answers and playbooks that dispatchers and vendors can reuse instantly.</p>
+      <header className="kb-hero">
+        <div className="kb-hero__intro">
+          <div>
+            <span className="kb-eyebrow">Playbooks & canned replies</span>
+            <h1>Knowledge Base</h1>
+            <p>
+              Curate reusable answers, escalation guides, and macros for dispatchers, vendors, and
+              customer care. Everyone stays on-message, every time.
+            </p>
+          </div>
+          <div className="kb-hero__actions">
+            <button
+              type="button"
+              className="btn primary kb-hero__cta"
+              onClick={() => setShowComposer((prev) => !prev)}
+            >
+              {showComposer ? "Close composer" : "New article"}
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          className="btn primary"
-          onClick={() => setShowComposer((prev) => !prev)}
-        >
-          {showComposer ? "Close composer" : "New article"}
-        </button>
-      </header>
-
-      <section className="kb-toolbar">
-        <div className="kb-search">
-          <input
-            placeholder="Search articles or canned responses"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
-        <div className="kb-audience">
-          <label>
+        <div className="kb-hero__controls">
+          <div className="kb-search">
+            <input
+              placeholder="Search titles, summaries, or canned responses…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          <label className="kb-audience">
             <span>Audience</span>
             <select value={audience} onChange={(event) => setAudience(event.target.value)}>
               {AUDIENCE_OPTIONS.map((option) => (
@@ -116,9 +145,26 @@ export default function KnowledgeBase() {
             </select>
           </label>
         </div>
-      </section>
+        <div className="kb-hero__metrics">
+          <div className="kb-metric">
+            <span className="kb-metric__label">Articles</span>
+            <strong className="kb-metric__value">{metrics.total}</strong>
+            <span className="kb-metric__hint">Matching current filters</span>
+          </div>
+          <div className="kb-metric">
+            <span className="kb-metric__label">Canned responses</span>
+            <strong className="kb-metric__value">{metrics.canned}</strong>
+            <span className="kb-metric__hint">Ready to reuse snippets</span>
+          </div>
+          <div className="kb-metric">
+            <span className="kb-metric__label">Last update</span>
+            <strong className="kb-metric__value">{lastUpdatedLabel}</strong>
+            <span className="kb-metric__hint">Most recent publish or edit</span>
+          </div>
+        </div>
+      </header>
 
-      {error ? <div className="kb-error">{error}</div> : null}
+      {error ? <div className="kb-banner kb-banner--error">{error}</div> : null}
 
       {showComposer ? (
         <section className="kb-composer">
@@ -141,6 +187,7 @@ export default function KnowledgeBase() {
                   onChange={(event) =>
                     setComposer((prev) => ({ ...prev, summary: event.target.value }))
                   }
+                  placeholder="Short recap for the list view (optional)"
                 />
               </label>
               <label>
@@ -162,9 +209,10 @@ export default function KnowledgeBase() {
             <label className="kb-composer__body">
               <span>Article body</span>
               <textarea
-                rows={6}
+                rows={8}
                 value={composer.body}
                 onChange={(event) => setComposer((prev) => ({ ...prev, body: event.target.value }))}
+                placeholder="Document the steps, links, and talking points people should follow."
                 required
               />
             </label>
@@ -177,67 +225,81 @@ export default function KnowledgeBase() {
         </section>
       ) : null}
 
-      <section className="kb-layout">
-        <aside className="kb-list">
-          {loading ? (
-            <p className="muted">Loading…</p>
-          ) : articles.length === 0 ? (
-            <p className="muted">No articles found. Try expanding your search.</p>
-          ) : (
-            <ul>
-              {articles.map((article) => (
-                <li
+      <div className="kb-body">
+        <aside className="kb-panel kb-list-panel">
+          <div className="kb-panel__head">
+            <h2>Articles</h2>
+            <span className="kb-chip">{metrics.total}</span>
+          </div>
+          <div className="kb-list-panel__items">
+            {loading ? (
+              <div className="kb-empty">Loading knowledge base…</div>
+            ) : articles.length === 0 ? (
+              <div className="kb-empty">
+                No articles found. Adjust filters or create a new playbook.
+              </div>
+            ) : (
+              articles.map((article) => (
+                <div
                   key={article._id}
-                  className={article._id === selectedId ? "active" : ""}
+                  className={`kb-list-item${article._id === selectedId ? " active" : ""}`}
                   onClick={() => setSelectedId(article._id)}
                 >
                   <strong>{article.title}</strong>
-                  <span>{article.summary || article.body.slice(0, 80)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+                  <span>{article.summary || article.body.slice(0, 90)}</span>
+                </div>
+              ))
+            )}
+          </div>
         </aside>
-        <article className="kb-article">
+
+        <section className="kb-panel kb-article-panel">
           {selected ? (
             <>
-              <header>
-                <h2>{selected.title}</h2>
-                <div className="kb-article__meta">
-                  <span className="kb-tag">{selected.audience}</span>
-                  <span>
-                    Updated {selected.updatedAt ? new Date(selected.updatedAt).toLocaleString() : "—"}
-                  </span>
+              <div className="kb-article__header">
+                <div>
+                  <h2>{selected.title}</h2>
+                  <div className="kb-article__meta">
+                    <span className="kb-chip">{selected.audience}</span>
+                    <span>
+                      Updated{" "}
+                      {selected.updatedAt
+                        ? new Date(selected.updatedAt).toLocaleString()
+                        : "—"}
+                    </span>
+                  </div>
                 </div>
-              </header>
+              </div>
               {selected.summary ? <p className="kb-summary">{selected.summary}</p> : null}
-              <div className="kb-body">
-                {selected.body.split(/\n{2,}/).map((para, index) => (
-                  <p key={index}>{para}</p>
+              <div className="kb-article__body">
+                {selected.body.split(/\n{2,}/).map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
                 ))}
               </div>
               {Array.isArray(selected.cannedResponses) && selected.cannedResponses.length > 0 ? (
-                <section className="kb-macros">
+                <div className="kb-macros">
                   <h3>Canned responses</h3>
-                  <ul>
+                  <ul className="kb-macro-list">
                     {selected.cannedResponses.map((macro, index) => (
                       <li key={`${selected._id}-macro-${index}`}>
                         <header>
                           <strong>{macro.title}</strong>
-                          <span className="kb-tag">{macro.channel}</span>
+                          <span className="kb-chip">{macro.channel}</span>
                         </header>
                         <pre>{macro.body}</pre>
                       </li>
                     ))}
                   </ul>
-                </section>
+                </div>
               ) : null}
             </>
           ) : (
-            <p className="muted">Select an article to preview the playbook.</p>
+            <div className="kb-empty">
+              Select an article to preview the playbook, or create a new one to get started.
+            </div>
           )}
-        </article>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

@@ -811,38 +811,38 @@ export default function CustomerDashboard() {
               </div>
             )}
           </section>
-        </div>
 
-        <section className="card custdash-action-rail">
-          <div className="custdash-action-rail__header">
-            <h3>Control center</h3>
-            <span className="custdash-chip secondary">Quick actions</span>
-          </div>
-          <div className="custdash-action-rail__grid">
-            {quickTiles.map((tile) => (
-              <button
-                key={tile.key}
-                type="button"
-                className={`custdash-action ${tile.tone}`}
-                onClick={() => {
-                  if (!tile.disabled) tile.action();
-                }}
-                disabled={tile.disabled}
-                aria-disabled={tile.disabled ? "true" : "false"}
-              >
-                <span className="custdash-action__icon" aria-hidden="true">
-                  {tile.icon}
-                </span>
-                <span className="custdash-action__text">
-                  <span className="custdash-action__label">{tile.label}</span>
-                  <span className="custdash-action__caption">
-                    {tile.caption}
+          <section className="card custdash-action-rail">
+            <div className="custdash-action-rail__header">
+              <h3>Control center</h3>
+              <span className="custdash-chip secondary">Quick actions</span>
+            </div>
+            <div className="custdash-action-rail__grid">
+              {quickTiles.map((tile) => (
+                <button
+                  key={tile.key}
+                  type="button"
+                  className={`custdash-action ${tile.tone}`}
+                  onClick={() => {
+                    if (!tile.disabled) tile.action();
+                  }}
+                  disabled={tile.disabled}
+                  aria-disabled={tile.disabled ? "true" : "false"}
+                >
+                  <span className="custdash-action__icon" aria-hidden="true">
+                    {tile.icon}
                   </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
+                  <span className="custdash-action__text">
+                    <span className="custdash-action__label">{tile.label}</span>
+                    <span className="custdash-action__caption">
+                      {tile.caption}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
 
         {job && (
           <ChatOverlay

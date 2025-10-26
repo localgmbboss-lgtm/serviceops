@@ -27,6 +27,7 @@ export default function LeadPipeline() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
   const [creating, setCreating] = useState(false);
+  const [showComposer, setShowComposer] = useState(true);
   const [form, setForm] = useState({
     name: "",
     company: "",
@@ -66,6 +67,26 @@ export default function LeadPipeline() {
       buckets.get(stage).push(lead);
     }
     return buckets;
+  }, [leads]);
+
+  const metrics = useMemo(() => {
+    const total = leads.length;
+    const won = leads.filter((lead) => lead.pipelineStage === "won").length;
+    const lost = leads.filter((lead) => lead.pipelineStage === "lost").length;
+    const active = Math.max(0, total - won - lost);
+    const conversion = total ? Math.round((won / total) * 100) : 0;
+    const newestTimestamp = leads.reduce((latest, lead) => {
+      const stamp = lead.updatedAt || lead.createdAt;
+      if (!stamp) return latest;
+      const time = new Date(stamp).getTime();
+      return time > latest ? time : latest;
+    }, 0);
+    return {
+      total,
+      active,
+      conversion,
+      newest: newestTimestamp ? new Date(newestTimestamp) : null,
+    };
   }, [leads]);
 
   const handleCreate = async (event) => {
@@ -121,21 +142,40 @@ export default function LeadPipeline() {
     }
   };
 
+  const lastUpdatedDate = metrics.newest
+    ? metrics.newest.toLocaleDateString()
+    : "Awaiting activity";
+  const lastUpdatedTime = metrics.newest
+    ? metrics.newest.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "";
+
   return (
     <div className="lp">
-      <header className="lp-header">
-        <div>
-          <h1>Lead Pipeline</h1>
-          <p>
-            Capture inbound calls and web forms, nurture conversations, and convert wins directly
-            into jobs.
-          </p>
+      <header className="lp-hero">
+        <div className="lp-hero__intro">
+          <div>
+            <span className="lp-eyebrow">Sales ops</span>
+            <h1>Lead Pipeline</h1>
+            <p>
+              Capture inbound calls and web forms, nurture conversations, and convert wins directly
+              into jobs.
+            </p>
+          </div>
+          <div className="lp-hero__actions">
+            <button
+              type="button"
+              className="btn primary lp-hero__cta"
+              onClick={() => setShowComposer((prev) => !prev)}
+            >
+              {showComposer ? "Hide form" : "New lead"}
+            </button>
+          </div>
         </div>
-        <div className="lp-filters">
-          <label>
-            <span>Stage</span>
+        <div className="lp-hero__controls">
+          <label className="lp-stage-filter">
+            <span>Stage filter</span>
             <select value={filter} onChange={(event) => setFilter(event.target.value)}>
-              <option value="all">All</option>
+              <option value="all">All stages</option>
               {STAGE_ORDER.map((stage) => (
                 <option key={stage} value={stage}>
                   {STAGE_LABELS[stage]}
@@ -144,12 +184,36 @@ export default function LeadPipeline() {
             </select>
           </label>
         </div>
+        <div className="lp-hero__metrics">
+          <div className="lp-metric">
+            <span className="lp-metric__label">Total leads</span>
+            <strong className="lp-metric__value">{metrics.total}</strong>
+            <span className="lp-metric__hint">All time</span>
+          </div>
+          <div className="lp-metric">
+            <span className="lp-metric__label">Active pipeline</span>
+            <strong className="lp-metric__value">{metrics.active}</strong>
+            <span className="lp-metric__hint">Currently working</span>
+          </div>
+          <div className="lp-metric">
+            <span className="lp-metric__label">Conversion rate</span>
+            <strong className="lp-metric__value">{metrics.conversion}%</strong>
+            <span className="lp-metric__hint">Won vs. total leads</span>
+          </div>
+          <div className="lp-metric">
+            <span className="lp-metric__label">Last update</span>
+            <strong className="lp-metric__value">{lastUpdatedDate}</strong>
+            <span className="lp-metric__hint">{lastUpdatedTime || "No recent touches"}</span>
+          </div>
+        </div>
       </header>
 
-      <section className="lp-create">
-        <form onSubmit={handleCreate}>
-          <div className="lp-create__grid">
-            <div>
+      {error ? <div className="lp-banner lp-banner--error">{error}</div> : null}
+
+      {showComposer ? (
+        <section className="lp-composer-card">
+          <form onSubmit={handleCreate}>
+            <div className="lp-create__grid">
               <label>
                 <span>Name *</span>
                 <input
@@ -158,8 +222,6 @@ export default function LeadPipeline() {
                   required
                 />
               </label>
-            </div>
-            <div>
               <label>
                 <span>Company</span>
                 <input
@@ -169,8 +231,6 @@ export default function LeadPipeline() {
                   }
                 />
               </label>
-            </div>
-            <div>
               <label>
                 <span>Phone</span>
                 <input
@@ -180,8 +240,6 @@ export default function LeadPipeline() {
                   }
                 />
               </label>
-            </div>
-            <div>
               <label>
                 <span>Email</span>
                 <input
@@ -192,8 +250,6 @@ export default function LeadPipeline() {
                   }
                 />
               </label>
-            </div>
-            <div>
               <label>
                 <span>Source</span>
                 <input
@@ -204,46 +260,48 @@ export default function LeadPipeline() {
                 />
               </label>
             </div>
-          </div>
-          <label className="lp-create__notes">
-            <span>Notes</span>
-            <textarea
-              rows={2}
-              value={form.notes}
-              onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
-            />
-          </label>
-          <div className="lp-create__actions">
-            <button type="submit" className="btn primary" disabled={creating}>
-              {creating ? "Saving…" : "Add lead"}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      {error ? <div className="lp-error">{error}</div> : null}
+            <label className="lp-create__notes">
+              <span>Notes</span>
+              <textarea
+                rows={3}
+                value={form.notes}
+                onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+                placeholder="Context to help the next follow-up (optional)"
+              />
+            </label>
+            <div className="lp-create__actions">
+              <button type="submit" className="btn primary lp-create__submit" disabled={creating}>
+                {creating ? "Saving…" : "Add lead"}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
 
       <section className="lp-board">
         {STAGE_ORDER.map((stage) => {
           const items = grouped.get(stage) || [];
           return (
-            <div className="lp-column" key={stage}>
-              <header className="lp-column__header">
-                <h2>{STAGE_LABELS[stage]}</h2>
-                <span className="lp-count">{items.length}</span>
+            <div className="lp-stage" key={stage}>
+              <header className="lp-stage__header">
+                <div>
+                  <span className="lp-stage__eyebrow">Stage</span>
+                  <h2>{STAGE_LABELS[stage]}</h2>
+                </div>
+                <span className="lp-stage__count">{items.length}</span>
               </header>
-              <div className="lp-column__body">
+              <div className="lp-stage__body">
                 {loading ? (
-                  <p className="muted">Loading…</p>
+                  <p className="lp-empty">Loading pipeline…</p>
                 ) : items.length === 0 ? (
-                  <p className="muted">No leads in this stage.</p>
+                  <p className="lp-empty">No leads in this stage.</p>
                 ) : (
                   items.map((lead) => (
                     <article className="lp-card" key={lead._id}>
-                      <header>
-                        <div>
+                      <header className="lp-card__header">
+                        <div className="lp-card__title">
                           <strong>{lead.name}</strong>
-                          <span className="muted">{lead.company || "—"}</span>
+                          <span>{lead.company || "—"}</span>
                         </div>
                         <button
                           type="button"
@@ -257,16 +315,16 @@ export default function LeadPipeline() {
                       <ul className="lp-card__meta">
                         {lead.phone ? <li>{lead.phone}</li> : null}
                         {lead.email ? <li>{lead.email}</li> : null}
-                        {lead.source ? <li>Source: {lead.source}</li> : null}
+                        {lead.source ? <li>Source · {lead.source}</li> : null}
                         {lead.lastContactedAt ? (
                           <li>
-                            Last touch: {new Date(lead.lastContactedAt).toLocaleDateString()}
+                            Last touch · {new Date(lead.lastContactedAt).toLocaleDateString()}
                           </li>
                         ) : null}
                       </ul>
                       {lead.notes ? <p className="lp-card__notes">{lead.notes}</p> : null}
-                      <footer>
-                        <label>
+                      <footer className="lp-card__footer">
+                        <label className="lp-card__field">
                           <span>Status</span>
                           <select
                             value={lead.status}
@@ -285,7 +343,7 @@ export default function LeadPipeline() {
                             ))}
                           </select>
                         </label>
-                        <label>
+                        <label className="lp-card__field">
                           <span>Next follow-up</span>
                           <input
                             type="datetime-local"
@@ -323,3 +381,4 @@ export default function LeadPipeline() {
     </div>
   );
 }
+

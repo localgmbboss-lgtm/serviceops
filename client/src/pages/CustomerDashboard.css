@@ -14,7 +14,7 @@
 /* shell */
 .custdash .custdash-shell {
   display: grid;
-  gap: 24px;
+  gap: clamp(18px, 2.8vw, 26px);
   max-width: 1180px;
   margin: 0 auto;
   box-sizing: border-box;
@@ -233,9 +233,12 @@
 /* main area: map + driver column */
 .custdash .custdash-main {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-areas:
+    "map driver"
+    "map actions";
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 /* cards in main */
@@ -246,6 +249,19 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.custdash .custdash-map {
+  grid-area: map;
+}
+
+.custdash .custdash-driver {
+  grid-area: driver;
+}
+
+.custdash .custdash-action-rail {
+  grid-area: actions;
+  align-self: stretch;
 }
 
 .custdash .custdash-map__header,
@@ -608,6 +624,10 @@
 
   .custdash .custdash-main {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "map"
+      "driver"
+      "actions";
   }
 
   .custdash .custdash-map__canvas {
@@ -659,6 +679,14 @@
 
   .custdash .custdash-action-rail__grid {
     grid-template-columns: 1fr;
+  }
+
+  .custdash .custdash-main {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "map"
+      "driver"
+      "actions";
   }
 
   .custdash .custdash-driver__identity {

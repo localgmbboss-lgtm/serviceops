@@ -348,8 +348,8 @@ export default function AdminVendors() {
         </div>
       ) : null}
 
-      <div className="card">
-        <div className="table-wrap">
+      <div className="card avendors-table-card">
+        <div className="avendors-table-wrapper">
           <table className="table">
             <thead>
               <tr>

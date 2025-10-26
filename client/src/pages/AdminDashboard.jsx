@@ -62,6 +62,15 @@ export default function AdminDashboard() {
   const [slice, setSlice] = useState("month");
   const [reviewRange, setReviewRange] = useState("30");
   const [reviewCategory, setReviewCategory] = useState("all");
+  const [digestRange, setDigestRange] = useState("daily");
+  const [digest, setDigest] = useState(null);
+  const [digestMeta, setDigestMeta] = useState(null);
+  const [digestError, setDigestError] = useState("");
+  const [digestLoading, setDigestLoading] = useState(false);
+
+  const activeDigestRange = digestMeta?.range || digestRange;
+  const activeDigestRangeLabel =
+    activeDigestRange === "weekly" ? "Last 7 days" : "Last 24 hours";
 
   // trigger re-draw of canvases on window resize
   const [viewportW, setViewportW] = useState(
@@ -82,9 +91,9 @@ export default function AdminDashboard() {
         api.get("/api/admin/vendors"),
         api.get("/api/documents"),
         api.get("/api/reports/dashboard"),
-    ]);
-    setSummary(s.data);
-    setVendors(Array.isArray(v.data) ? v.data : []);
+      ]);
+      setSummary(s.data);
+      setVendors(Array.isArray(v.data) ? v.data : []);
       setDocs(dc.data);
       setDash(db.data);
       setErr("");
@@ -95,6 +104,50 @@ export default function AdminDashboard() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchDigest = async () => {
+      setDigestLoading(true);
+      setDigestError("");
+      try {
+        const { data } = await api.get(
+          `/api/ai/reports/digest?range=${digestRange}`
+        );
+        if (cancelled) return;
+        setDigest(data?.digest || null);
+        setDigestMeta({
+          generatedAt: data?.generatedAt || null,
+          range: data?.range || digestRange,
+        });
+      } catch (error) {
+        if (cancelled) return;
+        const status = error?.response?.status;
+        if (status === 503) {
+          setDigestError(
+            "AI operations digest is disabled. Add OPENAI_API_KEY on the server to enable."
+          );
+        } else {
+          setDigestError(
+            error?.response?.data?.message ||
+              "Unable to load AI operations digest."
+          );
+        }
+        setDigest(null);
+        setDigestMeta(null);
+      } finally {
+        if (!cancelled) {
+          setDigestLoading(false);
+        }
+      }
+    };
+
+    fetchDigest();
+    return () => {
+      cancelled = true;
+    };
+  }, [digestRange]);
 
   const expiring = useMemo(() => {
     const week = 7 * 24 * 3600 * 1000;
@@ -158,6 +211,39 @@ export default function AdminDashboard() {
       : reviewRange === "30"
       ? "last 30 days"
       : "last 90 days";
+  const reviewWindowDays = Number(reviewRange) || 30;
+  const reviewsPerDay = totalReviews ? totalReviews / reviewWindowDays : 0;
+  const reviewsPerDayValue = reviewsPerDay
+    ? reviewsPerDay >= 10
+      ? Math.round(reviewsPerDay)
+      : reviewsPerDay >= 1
+      ? reviewsPerDay.toFixed(1)
+      : reviewsPerDay.toFixed(2)
+    : null;
+  const fiveStarSharePercent = totalReviews
+    ? Math.round((positiveReviews / totalReviews) * 100)
+    : 0;
+  const privateSharePercent = totalReviews
+    ? Math.round((privateReviews / totalReviews) * 100)
+    : 0;
+
+  const renderDigestSection = (title, items, modifier) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <section
+        className={`digest-card__section${
+          modifier ? ` digest-card__section--${modifier}` : ""
+        }`}
+      >
+        <h4>{title}</h4>
+        <ul>
+          {items.map((item, index) => (
+            <li key={`${modifier || title}-${index}`}>{item}</li>
+          ))}
+        </ul>
+      </section>
+    );
+  };
 
   // Work vs revenue trend canvas
   const workCanvasRef = useRef(null);
@@ -343,11 +429,11 @@ export default function AdminDashboard() {
     if (chartW <= 0 || chartH <= 0) return;
 
     const jobs = labels.map((_, idx) => Math.max(0, Number(jobsRaw[idx] || 0)));
-    const revenueK = labels.map((_, idx) =>
-      Math.max(0, Number(revenueRaw[idx] || 0) / 1000)
+    const revenueVals = labels.map((_, idx) =>
+      Math.max(0, Number(revenueRaw[idx] || 0))
     );
 
-    const maxRevenue = Math.max(...revenueK, 1);
+    const maxRevenue = Math.max(...revenueVals, 1);
     const maxJobs = Math.max(...jobs, 1);
     const topHalf = chartH / 2;
     const bottomHalf = chartH / 2;
@@ -381,11 +467,16 @@ export default function AdminDashboard() {
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
     const tickCount = 4;
+    const formatRevenueTick = (value) => {
+      const decimals = value < 1000 ? 0 : 1;
+      return formatAbbr(value, { currency: true, decimals });
+    };
+
     for (let i = 1; i <= tickCount; i++) {
       const value = (maxRevenue / tickCount) * i;
       const y = axisY - (value / maxRevenue) * topHalf;
       ctx.fillStyle = "rgba(203, 213, 225, 0.78)";
-      ctx.fillText(Math.round(value).toString(), padding.left - 12, y);
+      ctx.fillText(formatRevenueTick(value), padding.left - 12, y);
       ctx.strokeStyle = "rgba(56, 189, 248, 0.18)";
       ctx.beginPath();
       ctx.moveTo(padding.left, y);
@@ -470,7 +561,7 @@ export default function AdminDashboard() {
 
     labels.forEach((_, idx) => {
       drawBar({
-        value: revenueK[idx] || 0,
+        value: revenueVals[idx] || 0,
         max: maxRevenue,
         half: topHalf,
         direction: "up",
@@ -655,8 +746,120 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        <section className="admindash-panel">
-          <div className="admindash-panel__grid">
+        <section className="admindash-summary">
+          <div className="card satisfaction-card">
+            <div className="satisfaction-card__header">
+              <div>
+                <h3 className="section-title">Summary data</h3>
+                <p className="muted small">
+                  Customer sentiment across the selected filters.
+                </p>
+              </div>
+              <div className="satisfaction-card__filters">
+                <select
+                  value={reviewRange}
+                  onChange={(event) => setReviewRange(event.target.value)}
+                  aria-label="Review range"
+                >
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                </select>
+                <select
+                  value={reviewCategory}
+                  onChange={(event) => setReviewCategory(event.target.value)}
+                  aria-label="Review category"
+                >
+                  <option value="all">All categories</option>
+                  <option value="residential">Residential</option>
+                  <option value="commercial">Commercial</option>
+                </select>
+              </div>
+            </div>
+            <div className="satisfaction-card__body">
+              <div className="satisfaction-card__gauge">
+                <span className="satisfaction-card__glow satisfaction-card__glow--left" />
+                <span className="satisfaction-card__glow satisfaction-card__glow--right" />
+                <canvas ref={satCanvasRef} className="gauge-canvas" />
+              </div>
+              <div className="satisfaction-card__info">
+                <div className="satisfaction-card__scoreblock">
+                  <span className="score-main">
+                    {totalReviews ? satisfactionScore10.toFixed(1) : "--"}
+                  </span>
+                  <span className="score-sub">
+                    Avg rating /10{" "}
+                    {totalReviews ? `(${satisfactionScorePercent}% positive)` : ""}
+                  </span>
+                </div>
+                <div className="satisfaction-card__statgrid">
+                  <div className="satisfaction-card__stat">
+                    <span className="stat-label">Total reviews</span>
+                    <strong className="stat-value">
+                      {totalReviews ? formatCount(totalReviews) : "--"}
+                    </strong>
+                    <span className="stat-meta">{reviewRangeLabel}</span>
+                  </div>
+                  <div className="satisfaction-card__stat">
+                    <span className="stat-label">5-star share</span>
+                    <strong className="stat-value">
+                      {totalReviews ? `${fiveStarSharePercent}%` : "--"}
+                    </strong>
+                    <span className="stat-meta">
+                      {positiveReviews} five-star ratings
+                    </span>
+                  </div>
+                  <div className="satisfaction-card__stat">
+                    <span className="stat-label">Private feedback</span>
+                    <strong className="stat-value">
+                      {totalReviews ? privateReviews : "--"}
+                    </strong>
+                    <span className="stat-meta">
+                      {totalReviews ? `${privateSharePercent}% of responses` : "N/A"}
+                    </span>
+                  </div>
+                  <div className="satisfaction-card__stat">
+                    <span className="stat-label">Daily pace</span>
+                    <strong className="stat-value">
+                      {reviewsPerDayValue !== null ? reviewsPerDayValue : "--"}
+                    </strong>
+                    <span className="stat-meta">
+                      {reviewsPerDayValue !== null
+                        ? "Reviews per day"
+                        : "No recent activity"}
+                    </span>
+                  </div>
+                </div>
+                <p className="satisfaction-card__note muted small">
+                  {totalReviews
+                    ? `${positiveReviews} of ${totalReviews} reviews were 5-star in the ${reviewRangeLabel}.`
+                    : "We'll show review insights once feedback starts coming in."}
+                </p>
+                <div className="satisfaction-card__legend">
+                  <span className="legend-chip positive">
+                    <span className="legend-dot" aria-hidden="true" />
+                    5-star positive
+                    <strong>{totalReviews ? `${fiveStarSharePercent}%` : "--"}</strong>
+                  </span>
+                  <span className="legend-chip neutral">
+                    <span className="legend-dot" aria-hidden="true" />
+                    Private feedback
+                    <strong>{totalReviews ? `${privateSharePercent}%` : "--"}</strong>
+                  </span>
+                </div>
+                <Link
+                  to="/admin/crm/reviews"
+                  className="satisfaction-card__cta satisfaction-card__cta--full"
+                >
+                  Open reviews hub
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="admindash-layout">
+          <div className="admindash-layout__primary">
             <div className="card revenue-card">
               <div className="card-head space">
                 <h3 className="section-title">Revenue Snapshot</h3>
@@ -703,151 +906,83 @@ export default function AdminDashboard() {
               </p>
             </div>
 
-            <div className="card satisfaction-card">
-              <div className="satisfaction-card__header">
-                <div>
-                  <h3 className="section-title">Summary data</h3>
-                  <p className="muted small">
-                    Customer sentiment across the selected filters.
-                  </p>
-                </div>
-                <div className="satisfaction-card__filters">
-                  <select
-                    value={reviewRange}
-                    onChange={(event) => setReviewRange(event.target.value)}
-                    aria-label="Review range"
-                  >
-                    <option value="7">Last 7 days</option>
-                    <option value="30">Last 30 days</option>
-                    <option value="90">Last 90 days</option>
-                  </select>
-                  <select
-                    value={reviewCategory}
-                    onChange={(event) => setReviewCategory(event.target.value)}
-                    aria-label="Review category"
-                  >
-                    <option value="all">All categories</option>
-                    <option value="residential">Residential</option>
-                    <option value="commercial">Commercial</option>
-                  </select>
-                </div>
-              </div>
-              <div className="satisfaction-card__body">
-                <div className="satisfaction-card__gauge">
-                  <span className="satisfaction-card__glow satisfaction-card__glow--left" />
-                  <span className="satisfaction-card__glow satisfaction-card__glow--right" />
-                  <canvas ref={satCanvasRef} className="gauge-canvas" />
-                </div>
-                <div className="satisfaction-card__info">
-                  <div className="satisfaction-card__score">
-                    <span className="score-main">
-                      {totalReviews ? satisfactionScore10.toFixed(1) : "--"}
-                    </span>
-                    <span className="score-sub">
-                      Avg rating /10{" "}
-                      {totalReviews ? `(${satisfactionScorePercent}% positive)` : ""}
-                    </span>
-                  </div>
-                  <Link to="/admin/crm/reviews" className="satisfaction-card__cta">
-                    MORE DETAILED
-                  </Link>
-                  <p className="muted small">
-                    {totalReviews
-                      ? `${positiveReviews} of ${totalReviews} reviews were 5* in the ${reviewRangeLabel}.`
-                      : "We'll show review insights once feedback starts coming in."}
-                  </p>
-                  <div className="satisfaction-card__segments">
-                    <span className="segment positive">
-                      5* <strong>{positiveReviews}</strong>
-                    </span>
-                    <span className="segment neutral">
-                      Private <strong>{privateReviews}</strong>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="admindash-panel">
-          <div className="admindash-panel__grid">
-            <div className="card vendors-card">
-              <div className="card-head">
-                <h3 className="section-title">Live Vendors</h3>
-                <span className="online-count">{onlineVendors} active</span>
-              </div>
-              {hasGoogle ? (
-                <GMap vendors={vendors} showRoute={false} />
-              ) : (
-                <LiveMap vendors={vendors} />
-              )}
-            </div>
-            <div className="card docs-card">
-              <div className="card-head">
-                <h3 className="section-title">Expiring Documents (7 days)</h3>
-                <Link to="/admin/documents" className="small link view-all">
-                  View all &gt;
-                </Link>
-              </div>
-              <ul className="doc-list">
-                {expiring.length === 0 && (
-                  <li className="muted empty-state">
-                    All documents are up to date
-                  </li>
-                )}
-                {expiring.map((d) => (
-                  <li key={d._id} className="doc-item">
-                    <div className="doc-main">
-                      <strong className="doc-title">
-                        {d.title || d.type || "Document"}
-                      </strong>
-                      <span className="doc-owner">
-                        {d.ownerType === "vendor"
-                          ? d.vendorName || "Vendor"
-                          : "Company"}
-                      </span>
-                    </div>
-                    <div className="doc-meta">
-                      <span
-                        className={
-                          "badge " +
-                          (d.daysLeft <= 0
-                            ? "bad"
-                            : d.daysLeft <= 3
-                            ? "warn"
-                            : "ok")
-                        }
-                      >
-                        {d.daysLeft <= 0 ? "Expired" : `${d.daysLeft}d`}
-                      </span>
-                      <span className="muted small">
-                        {new Date(d.expiresAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section className="admindash-panel">
-          <div className="admindash-panel__grid">
             <div className="card trends-card">
               <div className="card-head">
                 <h3 className="section-title">Work vs Revenue (14 days)</h3>
               </div>
               <canvas ref={workCanvasRef} className="chart-canvas" />
               <div className="legend">
-                <span className="dot gold"></span> Revenue ($k)
+                <span className="dot gold"></span> Revenue
                 <span className="dot cyan"></span> Completed jobs
               </div>
               <p className="muted small tip">
-                Golden bars track revenue (thousands), cyan bars show completed jobs within
-                the same window.
+                Golden bars track gross revenue, cyan bars show completed jobs within the
+                same window.
               </p>
             </div>
+
+          </div>
+
+          <aside className="admindash-layout__sidebar">
+            <div className="card digest-card">
+              <div className="card-head space">
+                <h3 className="section-title">AI operations digest</h3>
+                <div className="seg">
+                  {["daily", "weekly"].map((rangeKey) => (
+                    <button
+                      key={rangeKey}
+                      className={`segbtn ${digestRange === rangeKey ? "active" : ""}`}
+                      onClick={() => setDigestRange(rangeKey)}
+                    >
+                      {rangeKey === "daily" ? "Daily" : "Weekly"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="digest-card__body">
+                {digestLoading ? (
+                  <p className="muted small">Generating fresh insights...</p>
+                ) : digestError ? (
+                  <p className="muted small tip">{digestError}</p>
+                ) : digest ? (
+                  <>
+                    {digestMeta?.generatedAt || activeDigestRangeLabel ? (
+                      <p className="digest-card__meta muted small">
+                        {digestMeta?.generatedAt
+                          ? `Updated ${new Date(
+                              digestMeta.generatedAt
+                            ).toLocaleString()}`
+                          : "Latest insight"}
+                        {activeDigestRangeLabel ? ` - ${activeDigestRangeLabel}` : ""}
+                      </p>
+                    ) : null}
+                    {digest.summary ? (
+                      <p className="digest-card__summary">{digest.summary}</p>
+                    ) : null}
+                    <div className="digest-card__grid">
+                      {renderDigestSection("Wins", digest.wins, "wins")}
+                      {renderDigestSection("Risks", digest.risks, "risks")}
+                    </div>
+                    {renderDigestSection("Next actions", digest.nextActions, "actions")}
+                    {renderDigestSection("Follow-ups", digest.followUps, "followups")}
+                    {digest.tone ? (
+                      <p className="digest-card__tone muted">{digest.tone}</p>
+                    ) : null}
+                    {digest.parseError ? (
+                      <p className="digest-card__warning muted small">
+                        AI response trimmed due to formatting issues. Showing best-effort
+                        summary.
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="muted small">
+                    Insights will appear once AI operations data is available.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="card performers-card">
               <div className="card-head">
                 <h3 className="section-title">Top Performers (30 days)</h3>
@@ -877,9 +1012,72 @@ export default function AdminDashboard() {
                 )}
               </ul>
             </div>
+          </aside>
+        </div>
+
+        <div className="admindash-layout__footer">
+          <div className="card vendors-card">
+            <div className="card-head">
+              <h3 className="section-title">Live Vendors</h3>
+              <span className="online-count">{onlineVendors} active</span>
+            </div>
+            {hasGoogle ? (
+              <GMap vendors={vendors} showRoute={false} />
+            ) : (
+              <LiveMap vendors={vendors} />
+            )}
           </div>
-        </section>
+
+          <div className="card docs-card">
+            <div className="card-head">
+              <h3 className="section-title">Expiring Documents (7 days)</h3>
+              <Link to="/admin/documents" className="small link view-all">
+                View all &gt;
+              </Link>
+            </div>
+            <ul className="doc-list">
+              {expiring.length === 0 && (
+                <li className="muted empty-state">
+                  All documents are up to date
+                </li>
+              )}
+              {expiring.map((d) => (
+                <li key={d._id} className="doc-item">
+                  <div className="doc-main">
+                    <strong className="doc-title">
+                      {d.title || d.type || "Document"}
+                    </strong>
+                    <span className="doc-owner">
+                      {d.ownerType === "vendor"
+                        ? d.vendorName || "Vendor"
+                        : "Company"}
+                    </span>
+                  </div>
+                  <div className="doc-meta">
+                    <span
+                      className={
+                        "badge " +
+                        (d.daysLeft <= 0
+                          ? "bad"
+                          : d.daysLeft <= 3
+                          ? "warn"
+                          : "ok")
+                      }
+                    >
+                      {d.daysLeft <= 0 ? "Expired" : `${d.daysLeft}d`}
+                    </span>
+                    <span className="muted small">
+                      {new Date(d.expiresAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
+
