@@ -18,6 +18,7 @@ import { ensureCustomerPushSubscription } from "../lib/pushNotifications";
 import { useNotifications } from "../contexts/NotificationsContext";
 import {
   LuCar,
+  LuClock,
   LuFlag,
   LuMapPin,
   LuSearch,
@@ -538,6 +539,51 @@ export default function CustomerDashboard() {
     },
   ];
 
+  const summaryStats = useMemo(() => {
+    const stats = [
+      {
+        key: "status",
+        label: "Status",
+        value: currentTitle,
+        icon: stageMeta[currentStage]?.icon || LuSearch,
+      },
+      {
+        key: "eta",
+        label: "ETA",
+        value: etaText,
+        icon: LuClock,
+      },
+    ];
+
+    if (routeDistanceLabel) {
+      stats.push({
+        key: "distance",
+        label:
+          destinationRoleLabel === "customer"
+            ? "Distance to you"
+            : "Distance to destination",
+        value: routeDistanceLabel,
+        icon: LuMapPin,
+      });
+    }
+
+    stats.push({
+      key: "driver",
+      label: "Driver",
+      value: driver?.name ? driver.name : "Matching driver",
+      icon: LuTruck,
+    });
+
+    return stats;
+  }, [
+    currentTitle,
+    currentStage,
+    etaText,
+    routeDistanceLabel,
+    destinationRoleLabel,
+    driver?.name,
+  ]);
+
   if (err)
     return (
       <div className="custdash" role="status" aria-live="polite">
@@ -618,7 +664,7 @@ export default function CustomerDashboard() {
               </ul>
             </div>
 
-            <div>
+            <div className="custdash-hero__pane">
               <div
                 className="custdash-tracker"
                 role="status"
@@ -642,6 +688,40 @@ export default function CustomerDashboard() {
                   {isFinalStage ? "All wrapped" : nextCopy}
                 </span>
               </div>
+
+              {summaryStats.length > 0 && (
+                <div
+                  className="custdash-summary"
+                  role="list"
+                  aria-label="Job at a glance"
+                >
+                  {summaryStats.map((stat) => {
+                    const Icon = stat.icon;
+                    return (
+                      <div
+                        key={stat.key}
+                        className="custdash-summary__item"
+                        role="listitem"
+                      >
+                        <span
+                          className="custdash-summary__icon"
+                          aria-hidden="true"
+                        >
+                          <Icon />
+                        </span>
+                        <div className="custdash-summary__text">
+                          <span className="custdash-summary__label">
+                            {stat.label}
+                          </span>
+                          <span className="custdash-summary__value">
+                            {stat.value}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

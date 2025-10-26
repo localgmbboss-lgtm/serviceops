@@ -1081,9 +1081,22 @@
     justify-content: space-between;
   }
 
+  .satisfaction-card__body {
+    flex-direction: column;
+    align-items: center;
+  }
+
   .satisfaction-card__gauge,
   .satisfaction-card__info {
     max-width: 100%;
+  }
+
+  .satisfaction-card__info {
+    width: 100%;
+  }
+
+  .satisfaction-card__statgrid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
 }
 
@@ -1112,6 +1125,19 @@
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
+  }
+
+  .satisfaction-card__body {
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .satisfaction-card__gauge {
+    justify-content: center;
+  }
+
+  .satisfaction-card__info {
+    text-align: left;
   }
 
   .satisfaction-card__filters select,
