@@ -343,6 +343,7 @@ export default function CustomerDashboard() {
     }
     return null;
   }, [driverMarkers]);
+  
 
   const mapCenter = useMemo(() => {
     if (routeDestination?.position) return routeDestination.position;
