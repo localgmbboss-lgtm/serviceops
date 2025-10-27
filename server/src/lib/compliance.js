@@ -207,7 +207,12 @@ export async function evaluateVendorCompliance(vendorId, options = {}) {
 }
 
 export async function refreshVendorCompliance(vendorId, options = {}) {
-  const evaluation = await evaluateVendorCompliance(vendorId, options);
+  const [evaluation, vendorDoc] = await Promise.all([
+    evaluateVendorCompliance(vendorId, options),
+    Vendor.findById(vendorId).select("complianceOverride").lean(),
+  ]);
+  const override = vendorDoc?.complianceOverride === true;
+  const allowed = override ? true : evaluation.allowed;
   await Vendor.findByIdAndUpdate(
     vendorId,
     {
@@ -215,7 +220,8 @@ export async function refreshVendorCompliance(vendorId, options = {}) {
       compliance: {
         lastCheckedAt: new Date(),
         enforcement: evaluation.enforcement,
-        allowed: evaluation.allowed,
+        allowed,
+        override,
         missing: evaluation.missing,
         requirements: evaluation.requirements,
       },

@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import "./AdminVendors.css";
 
@@ -23,13 +23,21 @@ const complianceSnapshot = (vendor) => {
   const missing = Array.isArray(vendor?.compliance?.missing)
     ? vendor.compliance.missing
     : [];
-  const label = status.replace(/_/g, " ");
-  const badgeClass =
+  const overrideActive =
+    vendor?.complianceOverride === true ||
+    vendor?.compliance?.override === true;
+  let label = status.replace(/_/g, " ");
+  let badgeClass =
     status === "compliant"
       ? "badge ok"
       : status === "non_compliant"
       ? "badge bad"
       : "badge warn";
+
+  if (overrideActive) {
+    label = `${label} • override`;
+    badgeClass = "badge warn";
+  }
 
   return {
     status,
@@ -37,6 +45,7 @@ const complianceSnapshot = (vendor) => {
     badgeClass,
     missingCount: missing.length,
     missing,
+    overrideActive,
   };
 };
 
@@ -51,13 +60,29 @@ export default function AdminVendors() {
   const [err, setErr] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [overridePending, setOverridePending] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [creatingVendor, setCreatingVendor] = useState(false);
+  const [formError, setFormError] = useState("");
 
-  const load = async () => {
+  const openAddModal = () => {
+    setFormError("");
+    setShowAddModal(true);
+  };
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setFormError("");
+  };
+
+  const load = async ({ keepPage = false } = {}) => {
     try {
       const response = await api.get("/api/admin/vendors/overview");
       setItems(response.data || []);
       setErr("");
-      setPage(1);
+      if (!keepPage) {
+        setPage(1);
+      }
     } catch (error) {
       setErr(error?.response?.data?.message || "Failed to load vendors");
     }
@@ -157,11 +182,36 @@ export default function AdminVendors() {
           : Number(form.earningsSplit) || 0.6,
     };
     try {
+      setCreatingVendor(true);
+      setFormError("");
       await api.post("/api/vendors", payload);
       setForm({ name: "", phone: "", city: "", earningsSplit: "60" });
-      load();
+      await load({ keepPage: true });
+      closeAddModal();
     } catch (error) {
-      setErr(error?.response?.data?.message || "Failed to create vendor");
+      const message = error?.response?.data?.message || "Failed to create vendor";
+      setErr(message);
+      setFormError(message);
+    } finally {
+      setCreatingVendor(false);
+    }
+  };
+
+  const toggleComplianceOverride = async (vendor, enabled) => {
+    if (!vendor?._id) return;
+    setOverridePending(vendor._id);
+    try {
+      await api.patch(`/api/admin/vendors/${vendor._id}`, {
+        complianceOverride: enabled,
+      });
+      await load({ keepPage: true });
+    } catch (error) {
+      setErr(
+        error?.response?.data?.message ||
+          "Failed to update compliance override"
+      );
+    } finally {
+      setOverridePending(null);
     }
   };
 
@@ -212,49 +262,94 @@ export default function AdminVendors() {
             </strong>
           </div>
         </div>
-      </section>
-
-      <form className="card form" onSubmit={submit}>
-        <div className="form-header">
-          <div>
-            <h3 className="section-title">Add vendor</h3>
-            <p className="section-copy">
-              Spin up a new service partner and invite them to the platform.
-            </p>
-          </div>
-          <button className="btn" type="submit" disabled={!form.name.trim()}>
-            Save vendor
+        <div className="avendors-header__actions">
+          <button
+            type="button"
+            className="avendors-add-btn"
+            onClick={openAddModal}
+          >
+            + Add vendor
           </button>
         </div>
-        <div className="form-grid">
-          <label>
-            <span>Name</span>
-            <input value={form.name} onChange={set("name")} required />
-          </label>
-          <label>
-            <span>Phone</span>
-            <input value={form.phone} onChange={set("phone")} />
-          </label>
-          <label>
-            <span>City</span>
-            <input value={form.city} onChange={set("city")} />
-          </label>
-          <label>
-            <span>Split %</span>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={form.earningsSplit}
-              onChange={set("earningsSplit")}
-            />
-          </label>
-        </div>
-      </form>
+      </section>
 
-      <div className="card">
-        <div className="table-wrap">
+      {showAddModal ? (
+        <div className="avendors-modal" role="dialog" aria-modal="true">
+          <div
+            className="avendors-modal__backdrop"
+            onClick={() => !creatingVendor && closeAddModal()}
+          />
+          <div className="avendors-modal__panel">
+            <header className="avendors-modal__head">
+              <div>
+                <h3>New vendor</h3>
+                <p>Spin up a new service partner and invite them to the platform.</p>
+              </div>
+              <button
+                type="button"
+                className="avendors-modal__close"
+                onClick={closeAddModal}
+                aria-label="Close add vendor form"
+                disabled={creatingVendor}
+              >
+                X
+              </button>
+            </header>
+            {formError ? (
+              <div className="avendors-modal__error" role="alert">
+                {formError}
+              </div>
+            ) : null}
+            <form className="avendors-modal__form" onSubmit={submit}>
+              <div className="form-grid">
+                <label>
+                  <span>Name</span>
+                  <input value={form.name} onChange={set("name")} required />
+                </label>
+                <label>
+                  <span>Phone</span>
+                  <input value={form.phone} onChange={set("phone")} />
+                </label>
+                <label>
+                  <span>City</span>
+                  <input value={form.city} onChange={set("city")} />
+                </label>
+                <label>
+                  <span>Split %</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={form.earningsSplit}
+                    onChange={set("earningsSplit")}
+                  />
+                </label>
+              </div>
+              <div className="avendors-modal__actions">
+                <button
+                  type="button"
+                  className="avendors-modal__cancel"
+                  onClick={closeAddModal}
+                  disabled={creatingVendor}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="avendors-modal__submit"
+                  disabled={creatingVendor || !form.name.trim()}
+                >
+                  {creatingVendor ? "Saving..." : "Save vendor"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="card avendors-table-card">
+        <div className="avendors-table-wrapper">
           <table className="table">
             <thead>
               <tr>
@@ -263,6 +358,7 @@ export default function AdminVendors() {
                 <th>Phone</th>
                 <th>Docs</th>
                 <th>Compliance</th>
+                <th>Override</th>
                 <th>Completed</th>
                 <th>Avg Rating</th>
                 <th>Revenue</th>
@@ -295,6 +391,26 @@ export default function AdminVendors() {
                         </span>
                       )}
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        className={
+                          "avendors-override-btn" +
+                          (vendor.complianceOverride ? " is-enabled" : "")
+                        }
+                        onClick={() =>
+                          toggleComplianceOverride(vendor, !vendor.complianceOverride)
+                        }
+                        disabled={overridePending === vendor._id}
+                        aria-pressed={vendor.complianceOverride ? "true" : "false"}
+                      >
+                        {overridePending === vendor._id
+                          ? "Saving..."
+                          : vendor.complianceOverride
+                          ? "Revoke override"
+                          : "Allow override"}
+                      </button>
+                    </td>
                     <td>{(stats.completed || 0).toLocaleString()}</td>
                     <td>{formatRating(stats.avgRating)}</td>
                     <td>{formatCurrency(stats.revenue)}</td>
@@ -304,7 +420,7 @@ export default function AdminVendors() {
               })}
               {pagination.pageItems.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="muted">
+                  <td colSpan="10" className="muted">
                     No vendors
                   </td>
                 </tr>
@@ -347,6 +463,29 @@ export default function AdminVendors() {
                     <dd>
                       <span className={compliance.badgeClass}>{compliance.label}</span>
                       {compliance.missingCount > 0 ? ` - ${compliance.missingCount} missing` : ""}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Override</dt>
+                    <dd>
+                      <button
+                        type="button"
+                        className={
+                          "avendors-override-btn" +
+                          (vendor.complianceOverride ? " is-enabled" : "")
+                        }
+                        onClick={() =>
+                          toggleComplianceOverride(vendor, !vendor.complianceOverride)
+                        }
+                        disabled={overridePending === vendor._id}
+                        aria-pressed={vendor.complianceOverride ? "true" : "false"}
+                      >
+                        {overridePending === vendor._id
+                          ? "Saving..."
+                          : vendor.complianceOverride
+                          ? "Revoke override"
+                          : "Allow override"}
+                      </button>
                     </dd>
                   </div>
                   <div>
@@ -428,3 +567,6 @@ export default function AdminVendors() {
     </div>
   );
 }
+
+
+

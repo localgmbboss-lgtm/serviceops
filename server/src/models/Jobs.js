@@ -62,6 +62,23 @@ const schedulingSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const jobMediaSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true },
+    url: { type: String, required: true },
+    fileName: { type: String },
+    mimeType: { type: String },
+    size: { type: Number },
+    kind: {
+      type: String,
+      enum: ["image", "video", "file"],
+      default: "image",
+    },
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const JobSchema = new mongoose.Schema(
   {
     // Core relations
@@ -111,6 +128,7 @@ const JobSchema = new mongoose.Schema(
       default: null,
     },
     biddingOpen: { type: Boolean, default: false },
+    unbidAlertSentAt: { type: Date, default: null },
     bidMode: {
       type: String,
       enum: ["open", "fixed"],
@@ -132,6 +150,10 @@ const JobSchema = new mongoose.Schema(
     dropoffAddress: { type: String, trim: true },
     serviceType: { type: String, trim: true },
     notes: { type: String, trim: true },
+    media: {
+      type: [jobMediaSchema],
+      default: [],
+    },
 
     // Vehicle information (from guest form)
     vehicleMake: { type: String, trim: true },
@@ -256,6 +278,7 @@ JobSchema.index({ serviceType: 1, status: 1 });
 JobSchema.index({ priority: 1, status: 1 });
 JobSchema.index({ "commission.status": 1, created: -1 });
 JobSchema.index({ "flags.underReport": 1, created: -1 });
+JobSchema.index({ status: 1, unbidAlertSentAt: 1, created: 1 });
 
 // Geospatial index for location-based queries
 JobSchema.index({ pickupLat: 1, pickupLng: 1 });

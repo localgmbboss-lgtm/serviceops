@@ -98,20 +98,19 @@ h3 {
   border-radius: 999px;
   padding: 12px 20px;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.3s ease, background 0.3s ease;
+  transition: background 0.3s ease;
   font-size: 15px;
   line-height: 1.2;
-  box-shadow: 0 18px 32px rgba(37, 99, 235, 0.28);
+  box-shadow: none;
 }
 
 .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 26px 40px rgba(37, 99, 235, 0.35);
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
 }
 
 .btn:active {
-  transform: translateY(0) scale(0.98);
-  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.25);
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  box-shadow: none;
 }
 
 .btn:disabled {
@@ -272,6 +271,9 @@ h3 {
   .topbar-notify__badge {
     top: 4px;
     right: 4px;
+  }
+  body.chat-overlay-open .topbar {
+    display: none;
   }
 }
 

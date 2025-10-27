@@ -310,6 +310,17 @@ export function NotificationsProvider({ children }) {
     [store.notifications]
   );
 
+  React.useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    if (typeof navigator.setAppBadge === "function") {
+      if (unreadCount > 0) {
+        navigator.setAppBadge(unreadCount).catch(() => {});
+      } else if (typeof navigator.clearAppBadge === "function") {
+        navigator.clearAppBadge().catch(() => {});
+      }
+    }
+  }, [unreadCount]);
+
   const value = React.useMemo(
     () => ({
       notifications: store.notifications,

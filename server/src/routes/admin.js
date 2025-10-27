@@ -5,7 +5,7 @@ import Job from "../models/Jobs.js";
 import Feedback from "../models/Feedback.js";
 import Payment from "../models/Payment.js";
 import Document from "../models/Document.js";
-import { complianceSummary } from "../lib/compliance.js";
+import { complianceSummary, refreshVendorCompliance } from "../lib/compliance.js";
 import {
   broadcastVendorUpdate,
   broadcastVendorRemoval,
@@ -57,6 +57,7 @@ const serializeVendorListItem = (vendor, compliance, stats) => ({
   heavyDuty: !!vendor.heavyDuty,
   complianceStatus: vendor.complianceStatus || "pending",
   compliance,
+  complianceOverride: vendor.complianceOverride === true,
   stats,
   activity: buildVendorActivity(vendor),
 });
@@ -257,6 +258,7 @@ const buildVendorDetail = async (vendor) => {
       earningsSplit: split,
       complianceStatus: vendor.complianceStatus || "pending",
       compliance,
+      complianceOverride: vendor.complianceOverride === true,
       activity: buildVendorActivity(vendor),
     },
     stats: {
@@ -325,6 +327,19 @@ router.patch("/vendors/:vendorId", async (req, res, next) => {
     if (payload.updatesPaused !== undefined) {
       update.updatesPaused = toBoolean(payload.updatesPaused);
     }
+    let overrideProvided = false;
+    let overrideValue = null;
+    if (payload.complianceOverride !== undefined) {
+      overrideProvided = true;
+      overrideValue = toBoolean(payload.complianceOverride);
+      update.complianceOverride = overrideValue;
+      if (overrideValue) {
+        update["compliance.allowed"] = true;
+        update["compliance.override"] = true;
+      } else {
+        update["compliance.override"] = false;
+      }
+    }
     if (payload.lat !== undefined) {
       const lat = toFiniteNumber(payload.lat);
       if (Number.isFinite(lat)) update.lat = lat;
@@ -338,7 +353,7 @@ router.patch("/vendors/:vendorId", async (req, res, next) => {
       return res.status(400).json({ message: "No updates supplied" });
     }
 
-    const vendor = await Vendor.findByIdAndUpdate(
+    let vendor = await Vendor.findByIdAndUpdate(
       vendorId,
       { $set: update },
       { new: true }
@@ -346,6 +361,11 @@ router.patch("/vendors/:vendorId", async (req, res, next) => {
 
     if (!vendor) {
       return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    if (overrideProvided && overrideValue === false) {
+      await refreshVendorCompliance(vendorId);
+      vendor = await Vendor.findById(vendorId).lean();
     }
 
     broadcastVendorUpdate(vendor);

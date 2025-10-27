@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import "./AdminSettings.css";
 
@@ -18,6 +18,18 @@ export default function AdminSettings() {
   const [s, setS] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const cloneSettings = useCallback((value) => {
+    if (value === null || value === undefined) return {};
+    if (typeof structuredClone === "function") {
+      try {
+        return structuredClone(value);
+      } catch (error) {
+        /* fall through */
+      }
+    }
+    return JSON.parse(JSON.stringify(value));
+  }, []);
 
   useEffect(() => {
     api
@@ -55,11 +67,9 @@ export default function AdminSettings() {
     }
   };
 
-  if (!s) return <p>Loading...</p>;
-
   const setK = (path, val) => {
     setS((prev) => {
-      const next = structuredClone(prev || {});
+      const next = cloneSettings(prev || {});
       const parts = path.split(".");
       let cursor = next;
       for (let i = 0; i < parts.length - 1; i += 1) {
@@ -80,7 +90,7 @@ export default function AdminSettings() {
 
   const mutateVendorCompliance = (mutator) => {
     setS((prev) => {
-      const next = structuredClone(prev);
+      const next = cloneSettings(prev || {});
       if (!next.compliance) next.compliance = {};
       if (!next.compliance.vendor) {
         next.compliance.vendor = {
@@ -106,6 +116,221 @@ export default function AdminSettings() {
     mutateVendorCompliance((vendor) => {
       vendor.autoSuspendOnExpiry = value;
     });
+
+  const mutateAutomation = useCallback(
+    (mutator) => {
+      setS((prev) => {
+        const next = cloneSettings(prev || {});
+        if (!next.automation) next.automation = {};
+        mutator(next.automation);
+        return next;
+      });
+    },
+    [cloneSettings, setS]
+  );
+
+  const toggleCustomerChannels = useCallback((enabled) => {
+    mutateAutomation((automation) => {
+      if (!automation.alerts) automation.alerts = {};
+      const customer = automation.alerts.customer || {};
+      const channels = { ...(customer.channels || {}) };
+      ["sms", "email", "push"].forEach((channel) => {
+        channels[channel] = Boolean(enabled);
+      });
+      customer.channels = channels;
+      automation.alerts.customer = customer;
+    });
+  }, [mutateAutomation]);
+
+  const toggleVendorAlerts = useCallback((enabled) => {
+    mutateAutomation((automation) => {
+      if (!automation.alerts) automation.alerts = {};
+      const vendor = automation.alerts.vendor || {};
+      const channels = { ...(vendor.channels || {}) };
+      ["sms", "email", "push"].forEach((channel) => {
+        channels[channel] = Boolean(enabled);
+      });
+      vendor.channels = channels;
+      vendor.jobAssigned = Boolean(enabled);
+      automation.alerts.vendor = vendor;
+    });
+  }, [mutateAutomation]);
+
+  const toggleDigests = useCallback((enabled) => {
+    mutateAutomation((automation) => {
+      if (!automation.digests) automation.digests = {};
+      ["adminDaily", "adminWeekly", "vendorWeekly"].forEach((key) => {
+        const digest = automation.digests[key] || {};
+        digest.enabled = Boolean(enabled);
+        automation.digests[key] = digest;
+      });
+    });
+  }, [mutateAutomation]);
+
+  const toggleComplianceAutomations = useCallback((enabled) => {
+    mutateAutomation((automation) => {
+      if (!automation.compliance) automation.compliance = {};
+      automation.compliance.autoNotifyMissingDocs = Boolean(enabled);
+    });
+  }, [mutateAutomation]);
+
+  const customerChannels = s?.automation?.alerts?.customer?.channels || {};
+  const vendorChannels = s?.automation?.alerts?.vendor?.channels || {};
+  const digestsConfig = s?.automation?.digests || {};
+  const complianceAutomation = s?.automation?.compliance || {};
+
+  const customerChannelCount = ["sms", "email", "push"].filter(
+    (channel) => customerChannels[channel]
+  ).length;
+  const vendorChannelCount = ["sms", "email", "push"].filter(
+    (channel) => vendorChannels[channel]
+  ).length;
+  const digestEnabledCount = ["adminDaily", "adminWeekly", "vendorWeekly"].filter(
+    (key) => digestsConfig?.[key]?.enabled
+  ).length;
+
+  const automationSummary = useMemo(
+    () => [
+      {
+        key: "customer",
+        title: "Customer alerts",
+        description: "ETA reminders, satisfaction surveys, and check-ins keep customers in the loop.",
+        enabled: customerChannelCount > 0,
+        statusLabel:
+          customerChannelCount > 0
+            ? `${customerChannelCount} channel${customerChannelCount === 1 ? "" : "s"} on`
+            : "Muted",
+        actionLabel: customerChannelCount > 0 ? "Mute all" : "Enable channels",
+        onAction: () => toggleCustomerChannels(!(customerChannelCount > 0)),
+        meta: [
+          `ETA reminder: ${
+            (s?.automation?.alerts?.customer?.driverEtaMinutes ?? 0) > 0
+              ? `${s?.automation?.alerts?.customer?.driverEtaMinutes} min before`
+              : "off"
+          }`,
+          `Post-service survey: ${
+            (s?.automation?.alerts?.customer?.followUpSurveyHours ?? 0) > 0
+              ? `${s?.automation?.alerts?.customer?.followUpSurveyHours}h later`
+              : "off"
+          }`,
+          `Re-engagement: ${
+            (s?.automation?.alerts?.customer?.reengagementDays ?? 0) > 0
+              ? `every ${s?.automation?.alerts?.customer?.reengagementDays} days`
+              : "disabled"
+          }`,
+        ],
+      },
+      {
+        key: "vendor",
+        title: "Vendor nudges",
+        description: "Automated SMS/email/push nudges to keep vendors responsive and SLA-aware.",
+        enabled: vendorChannelCount > 0 && (s?.automation?.alerts?.vendor?.jobAssigned ?? true),
+        statusLabel:
+          vendorChannelCount > 0
+            ? `${vendorChannelCount} channel${vendorChannelCount === 1 ? "" : "s"} on`
+            : "Muted",
+        actionLabel:
+          vendorChannelCount > 0 && (s?.automation?.alerts?.vendor?.jobAssigned ?? true)
+            ? "Pause nudges"
+            : "Enable nudges",
+        onAction: () =>
+          toggleVendorAlerts(
+            !(
+              vendorChannelCount > 0 &&
+              (s?.automation?.alerts?.vendor?.jobAssigned ?? true)
+            )
+          ),
+        meta: [
+          `Assignment alerts: ${
+            s?.automation?.alerts?.vendor?.jobAssigned ?? true ? "on" : "off"
+          }`,
+          `SLA reminder: ${
+            (s?.automation?.alerts?.vendor?.slaReminderMinutes ?? 0) > 0
+              ? `${s?.automation?.alerts?.vendor?.slaReminderMinutes} min before`
+              : "off"
+          }`,
+        ],
+      },
+      {
+        key: "digests",
+        title: "Scheduled digests",
+        description: "Morning briefings and weekly recaps delivered automatically.",
+        enabled: digestEnabledCount > 0,
+        statusLabel:
+          digestEnabledCount > 0
+            ? `${digestEnabledCount} digest${digestEnabledCount === 1 ? "" : "s"} active`
+            : "All off",
+        actionLabel: digestEnabledCount > 0 ? "Disable digests" : "Enable all",
+        onAction: () => toggleDigests(!(digestEnabledCount > 0)),
+        meta: [
+          `Admin daily: ${
+            digestsConfig?.adminDaily?.enabled
+              ? `@ ${digestsConfig?.adminDaily?.time || "07:30"}`
+              : "off"
+          }`,
+          `Admin weekly: ${
+            digestsConfig?.adminWeekly?.enabled
+              ? `${digestsConfig?.adminWeekly?.weekday?.toUpperCase?.() || "FRI"} @ ${
+                  digestsConfig?.adminWeekly?.time || "09:00"
+                }`
+              : "off"
+          }`,
+          `Vendor weekly: ${
+            digestsConfig?.vendorWeekly?.enabled
+              ? `${digestsConfig?.vendorWeekly?.weekday?.toUpperCase?.() || "FRI"} @ ${
+                  digestsConfig?.vendorWeekly?.time || "17:00"
+                }`
+              : "off"
+          }`,
+        ],
+      },
+      {
+        key: "compliance",
+        title: "Compliance workflows",
+        description: "Automatic emails and tasks when vendor paperwork is missing or expiring.",
+        enabled: complianceAutomation?.autoNotifyMissingDocs ?? true,
+        statusLabel:
+          complianceAutomation?.autoNotifyMissingDocs ?? true ? "Notifications on" : "Muted",
+        actionLabel:
+          complianceAutomation?.autoNotifyMissingDocs ?? true
+            ? "Pause notifications"
+            : "Resume notifications",
+        onAction: () =>
+          toggleComplianceAutomations(!(complianceAutomation?.autoNotifyMissingDocs ?? true)),
+        meta: [
+          `Expiry reminder: ${complianceAutomation?.remindBeforeExpiryDays ?? 7} day${
+            (complianceAutomation?.remindBeforeExpiryDays ?? 7) === 1 ? "" : "s"
+          } before`,
+        ],
+      },
+    ],
+    [
+      customerChannelCount,
+      vendorChannelCount,
+      digestEnabledCount,
+      s?.automation?.alerts?.customer?.driverEtaMinutes,
+      s?.automation?.alerts?.customer?.followUpSurveyHours,
+      s?.automation?.alerts?.customer?.reengagementDays,
+      s?.automation?.alerts?.vendor?.jobAssigned,
+      s?.automation?.alerts?.vendor?.slaReminderMinutes,
+      digestsConfig?.adminDaily?.enabled,
+      digestsConfig?.adminDaily?.time,
+      digestsConfig?.adminWeekly?.enabled,
+      digestsConfig?.adminWeekly?.time,
+      digestsConfig?.adminWeekly?.weekday,
+      digestsConfig?.vendorWeekly?.enabled,
+      digestsConfig?.vendorWeekly?.time,
+      digestsConfig?.vendorWeekly?.weekday,
+      complianceAutomation?.autoNotifyMissingDocs,
+      complianceAutomation?.remindBeforeExpiryDays,
+      toggleCustomerChannels,
+      toggleVendorAlerts,
+      toggleDigests,
+      toggleComplianceAutomations,
+    ]
+  );
+
+  if (!s) return <p>Loading...</p>;
 
   const addVendorRequirement = () =>
     mutateVendorCompliance((vendor) => {
@@ -490,6 +715,38 @@ export default function AdminSettings() {
             operators in sync without extra clicks.
           </p>
         </div>
+        <div className="aset-automation-summary">
+          {automationSummary.map((card) => (
+            <article
+              key={card.key}
+              className={
+                "aset-automation-summary__card" + (card.enabled ? " is-active" : "")
+              }
+            >
+              <header className="aset-automation-summary__head">
+                <div>
+                  <h3>{card.title}</h3>
+                  <p>{card.description}</p>
+                </div>
+                <span className="aset-automation-summary__status">{card.statusLabel}</span>
+              </header>
+              {card.meta?.length ? (
+                <ul className="aset-automation-summary__meta">
+                  {card.meta.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <button
+                type="button"
+                className="aset-automation-summary__action"
+                onClick={card.onAction}
+              >
+                {card.actionLabel}
+              </button>
+            </article>
+          ))}
+        </div>
         <div className="row aset-automation-row">
           <div className="aset-automation-card">
             <h3>Customer touchpoints</h3>
@@ -815,3 +1072,4 @@ export default function AdminSettings() {
     </div>
   );
 }
+

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationsContext";
+import { ensureCustomerPushSubscription } from "../lib/pushNotifications";
 import "./CustomerHome.css";
 
 export default function CustomerHome() {
@@ -18,14 +19,13 @@ export default function CustomerHome() {
   const jobsInitializedRef = useRef(false);
   const bidSnapshotRef = useRef(new Map());
   const bidsInitializedRef = useRef(false);
-  const [scheduleForm, setScheduleForm] = useState({
-    jobId: null,
-    start: "",
-    end: "",
-    notes: "",
-  });
-  const [scheduleBusy, setScheduleBusy] = useState(false);
-  const [scheduleError, setScheduleError] = useState("");
+  const pushAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (pushAttemptedRef.current) return;
+    pushAttemptedRef.current = true;
+    ensureCustomerPushSubscription({ source: "customer-home" }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -164,8 +164,10 @@ export default function CustomerHome() {
             newBids.forEach((bid) => {
               publish({
                 title: "New bid received",
-                body: `${bid.vendorName || "A vendor"} offered \${
-                  Number.isFinite(bid.price) ? Number(bid.price).toFixed(0) : "--"
+                body: `${bid.vendorName || "A vendor"} offered ${
+                  Number.isFinite(bid.price)
+                    ? Number(bid.price).toFixed(0)
+                    : "--"
                 } with an ETA of ${bid.etaMinutes || "--"} minutes.`,
                 severity: "info",
                 meta: {
@@ -204,11 +206,6 @@ export default function CustomerHome() {
     };
   }, [jobs, publish]);
 
-  const activeJobs = useMemo(
-    () => (jobs || []).filter((job) => job.status !== "Completed"),
-    [jobs]
-  );
-
   const grouped = useMemo(() => {
     const byStatus = { Active: [], Completed: [] };
     (jobs || []).forEach((j) =>
@@ -217,69 +214,7 @@ export default function CustomerHome() {
     return byStatus;
   }, [jobs]);
 
-  useEffect(() => {
-    if (!scheduleForm.jobId && activeJobs.length > 0) {
-      setScheduleForm((prev) => ({ ...prev, jobId: activeJobs[0]._id }));
-    } else if (
-      scheduleForm.jobId &&
-      activeJobs.length > 0 &&
-      !activeJobs.some((job) => job._id === scheduleForm.jobId)
-    ) {
-      setScheduleForm((prev) => ({ ...prev, jobId: activeJobs[0]._id }));
-    }
-  }, [activeJobs, scheduleForm.jobId]);
-
-  const selectedSchedulingJob = useMemo(
-    () =>
-      activeJobs.find((job) => job._id === scheduleForm.jobId) ||
-      activeJobs[0] ||
-      null,
-    [activeJobs, scheduleForm.jobId]
-  );
-
   const startNew = () => nav("/request");
-
-  const handleScheduleSubmit = async (event) => {
-    event.preventDefault();
-    if (!scheduleForm.jobId || !scheduleForm.start || !scheduleForm.end) {
-      setScheduleError("Choose a start and end time for your service window.");
-      return;
-    }
-    try {
-      setScheduleBusy(true);
-      setScheduleError("");
-      await api.post(`/api/jobs/${scheduleForm.jobId}/scheduling`, {
-        requestedWindowStart: scheduleForm.start,
-        requestedWindowEnd: scheduleForm.end,
-        customerNotes: scheduleForm.notes,
-        lastUpdatedBy: "customer",
-      });
-      publish({
-        title: "Scheduling updated",
-        body: "We'll confirm the window once dispatch locks it in.",
-        severity: "success",
-        meta: {
-          role: "customer",
-          kind: "scheduling",
-          jobId: scheduleForm.jobId,
-        },
-      });
-      setScheduleForm((prev) => ({ ...prev, notes: "" }));
-    } catch (error) {
-      setScheduleError(
-        error?.response?.data?.message || "We couldn't update scheduling right now."
-      );
-    } finally {
-      setScheduleBusy(false);
-    }
-  };
-
-  const formatWindow = (start, end) => {
-    if (!start && !end) return null;
-    const startLabel = start ? new Date(start).toLocaleString() : "Pending";
-    const endLabel = end ? new Date(end).toLocaleString() : "Pending";
-    return `${startLabel} -> ${endLabel}`;
-  };
 
   if (loading) {
     return (
@@ -383,109 +318,6 @@ export default function CustomerHome() {
           <div className="stat-icon"></div>
         </div>
       </div>
-
-      {selectedSchedulingJob && (
-        <section className="card custdash-scheduler">
-          <div className="custdash-scheduler__head">
-            <div>
-              <h3>Self‑serve scheduling</h3>
-              <p>
-                Pick a time window that works for you. Dispatch will confirm or share alternatives
-                so you stay in control.
-              </p>
-            </div>
-            {activeJobs.length > 1 ? (
-              <div className="custdash-scheduler__picker">
-                <label htmlFor="custdash-scheduler-job">Job</label>
-                <select
-                  id="custdash-scheduler-job"
-                  value={scheduleForm.jobId || ""}
-                  onChange={(event) =>
-                    setScheduleForm({
-                      jobId: event.target.value,
-                      start: "",
-                      end: "",
-                      notes: "",
-                    })
-                  }
-                >
-                  {activeJobs.map((job) => (
-                    <option key={job._id} value={job._id}>
-                      {job.serviceType || "Service"} — {job.pickupAddress}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-          </div>
-
-          {selectedSchedulingJob?.scheduling &&
-          selectedSchedulingJob.scheduling.status &&
-          selectedSchedulingJob.scheduling.status !== "none" ? (
-            <div className="custdash-scheduler__status">
-              <span
-                className={`custdash-status-chip ${String(
-                  selectedSchedulingJob.scheduling.status
-                ).toLowerCase()}`}
-              >
-                {selectedSchedulingJob.scheduling.status}
-              </span>
-              <span>
-                {formatWindow(
-                  selectedSchedulingJob.scheduling.confirmedWindowStart ||
-                    selectedSchedulingJob.scheduling.requestedWindowStart,
-                  selectedSchedulingJob.scheduling.confirmedWindowEnd ||
-                    selectedSchedulingJob.scheduling.requestedWindowEnd
-                ) || "Window pending confirmation"}
-              </span>
-            </div>
-          ) : null}
-
-          <form className="custdash-scheduler__form" onSubmit={handleScheduleSubmit}>
-            <div className="custdash-scheduler__grid">
-              <label>
-                <span>Preferred start</span>
-                <input
-                  type="datetime-local"
-                  value={scheduleForm.start}
-                  onChange={(event) =>
-                    setScheduleForm((prev) => ({ ...prev, start: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-              <label>
-                <span>Preferred end</span>
-                <input
-                  type="datetime-local"
-                  value={scheduleForm.end}
-                  onChange={(event) =>
-                    setScheduleForm((prev) => ({ ...prev, end: event.target.value }))
-                  }
-                  required
-                />
-              </label>
-            </div>
-            <label className="custdash-scheduler__notes">
-              <span>Notes for dispatch (optional)</span>
-              <textarea
-                rows={2}
-                value={scheduleForm.notes}
-                onChange={(event) =>
-                  setScheduleForm((prev) => ({ ...prev, notes: event.target.value }))
-                }
-                placeholder="Share availability, gate codes, or alternate times."
-              />
-            </label>
-            {scheduleError ? (
-              <p className="custdash-scheduler__error">{scheduleError}</p>
-            ) : null}
-            <button className="btn primary" type="submit" disabled={scheduleBusy}>
-              {scheduleBusy ? "Sending…" : "Submit scheduling request"}
-            </button>
-          </form>
-        </section>
-      )}
 
       {/* Tabs */}
       <div className="tabs-container">

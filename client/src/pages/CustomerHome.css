@@ -10,18 +10,18 @@
 
 /* Header */
 .customer-home-container .customer-home-header {
-    background: linear-gradient(135deg, rgba(10, 122, 255, 0.14) 0%, rgba(10, 122, 255, 0.05) 100%);
+    background: linear-gradient(135deg, rgba(10, 122, 255, 0.48) 0%, rgba(10, 122, 255, 0.32) 100%);
     border-radius: 20px;
     padding: 24px;
     margin-bottom: 24px;
-    color: var(--color-text-strong, #0f172a);
+    color: #ffffff;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 16px;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 12px 32px rgba(10, 122, 255, 0.25);
 }
 
 .customer-home-container .user-info {
@@ -34,32 +34,35 @@
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: rgba(10, 122, 255, 0.12);
+    background: rgba(255, 255, 255, 0.18);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.5rem;
     font-weight: 600;
-    color: var(--color-text-strong, #0f172a);
+    color: #ffffff;
     backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
 .customer-home-container .user-details h1 {
     margin: 0 0 4px 0;
     font-size: 1.5rem;
     font-weight: 700;
+    color: #ffffff;
 }
 
 .customer-home-container .user-email {
     margin: 0;
-    opacity: 0.9;
+    opacity: 0.92;
     font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.92);
 }
 
 .customer-home-container .new-request-btn {
-    background: rgba(10, 122, 255, 0.08);
-    color: var(--color-text-strong, #0f172a);
-    border: 2px solid rgba(10, 122, 255, 0.18);
+    background: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    border: 2px solid rgba(255, 255, 255, 0.32);
     padding: 10px 18px;
     border-radius: 16px;
     font-weight: 600;
@@ -73,9 +76,9 @@
 }
 
 .customer-home-container .new-request-btn:hover {
-    background: rgba(10, 122, 255, 0.14);
+    background: rgba(255, 255, 255, 0.24);
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(15, 23, 42, 0.12);
+    box-shadow: 0 8px 20px rgba(10, 122, 255, 0.25);
 }
 
 /* Stats Grid */

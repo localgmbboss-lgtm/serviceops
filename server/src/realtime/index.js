@@ -1,12 +1,15 @@
 import { Server } from "socket.io";
 import mongoose from "mongoose";
 import Vendor from "../models/Vendor.js";
+import Job from "../models/Jobs.js";
+import { decodeAppToken } from "../lib/authTokens.js";
 
 let ioInstance = null;
 let allowAllOrigins = false;
 let allowedOriginSet = new Set();
 
 const VENDOR_ROOM = "vendors/live";
+const MESSAGE_ROOM_PREFIX = "messages/job/";
 const SOCKET_METHODS = ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"];
 
 const toFiniteNumber = (value) => {
@@ -56,6 +59,32 @@ const sanitizeVendor = (input) => {
 const fetchVendorSnapshot = async () => {
   const vendors = await Vendor.find().lean({ virtuals: false });
   return vendors.map(sanitizeVendor).filter(Boolean);
+};
+
+const roomForJob = (jobId) => `${MESSAGE_ROOM_PREFIX}${jobId}`;
+
+const canAccessJobConversation = async (actor, jobId) => {
+  if (!mongoose.Types.ObjectId.isValid(jobId)) {
+    return { ok: false, reason: "Invalid job id" };
+  }
+
+  const job = await Job.findById(jobId).select("customerId vendorId").lean();
+  if (!job) {
+    return { ok: false, reason: "Job not found" };
+  }
+
+  const customerId = job.customerId ? String(job.customerId) : null;
+  const vendorId = job.vendorId ? String(job.vendorId) : null;
+
+  const isCustomer = actor.role === "customer" && actor.id === customerId;
+  const isVendor = actor.role === "vendor" && actor.id === vendorId;
+  const isAdmin = actor.role === "admin";
+
+  if (!isCustomer && !isVendor && !isAdmin) {
+    return { ok: false, reason: "Access denied" };
+  }
+
+  return { ok: true, job, isCustomer, isVendor, isAdmin };
 };
 
 const isAllowedOrigin = (origin) => {
@@ -218,6 +247,65 @@ export const initRealtime = (httpServer, options = {}) => {
         }
       }
     });
+
+    socket.on("messages:join", async (payload = {}, ack) => {
+      try {
+        const { token, jobId } = payload || {};
+        if (!token || !jobId) {
+          if (typeof ack === "function") {
+            ack({ ok: false, error: "Missing token or jobId" });
+          }
+          return;
+        }
+
+        let actor;
+        try {
+          actor = decodeAppToken(token);
+        } catch (error) {
+          if (typeof ack === "function") {
+            ack({ ok: false, error: error.message || "Invalid token" });
+          }
+          return;
+        }
+
+        const result = await canAccessJobConversation(actor, jobId);
+        if (!result.ok) {
+          if (typeof ack === "function") {
+            ack({ ok: false, error: result.reason || "Access denied" });
+          }
+          return;
+        }
+
+        socket.join(roomForJob(jobId));
+        if (typeof ack === "function") {
+          ack({ ok: true });
+        }
+      } catch (error) {
+        if (typeof ack === "function") {
+          ack({ ok: false, error: error.message || "Unable to join room" });
+        }
+      }
+    });
+
+    socket.on("messages:leave", (payload = {}, ack) => {
+      try {
+        const { jobId } = payload || {};
+        if (!jobId) {
+          if (typeof ack === "function") {
+            ack({ ok: false, error: "Missing jobId" });
+          }
+          return;
+        }
+        socket.leave(roomForJob(jobId));
+        if (typeof ack === "function") {
+          ack({ ok: true });
+        }
+      } catch (error) {
+        if (typeof ack === "function") {
+          ack({ ok: false, error: error.message || "Unable to leave room" });
+        }
+      }
+    });
   });
 
   return ioInstance;
@@ -253,3 +341,4 @@ export const withVendorSnapshot = async (callback) => {
   const snapshot = await fetchVendorSnapshot();
   return callback(snapshot);
 };
+

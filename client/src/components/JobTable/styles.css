@@ -56,30 +56,44 @@
 }
 
 .jobtable-pagination-btn {
-    padding: 0.5rem 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.5rem 0.85rem;
     border: 1px solid var(--jt-gray-300);
-    background: var(--color-card);
+    background: #ffffff;
     border-radius: var(--jt-radius-md);
     cursor: pointer;
     transition: var(--jt-transition);
     font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--jt-gray-700);
+    min-width: 96px;
+    box-shadow: var(--jt-shadow-sm);
 }
 
 .jobtable-pagination-btn:hover:not(:disabled) {
     background: var(--jt-primary);
     color: var(--primary-ink);
     border-color: var(--jt-primary);
+    box-shadow: var(--jt-shadow-md);
 }
 
 .jobtable-pagination-btn:disabled {
-    opacity: 0.5;
     cursor: not-allowed;
+    background: rgba(148, 163, 184, 0.12);
+    border-color: rgba(148, 163, 184, 0.3);
+    color: rgba(148, 163, 184, 0.8);
+    box-shadow: none;
+    opacity: 1;
 }
 
 .jobtable-pagination-btn.active {
     background: var(--jt-primary);
     color: var(--primary-ink);
     border-color: var(--jt-primary);
+    box-shadow: var(--jt-shadow-md);
 }
 
 .jobtable-pagination-ellipsis {
@@ -506,30 +520,276 @@
 }
 
 .jobtable-detail-content {
-    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.75rem;
+    border-radius: calc(var(--jt-radius-lg) + 6px);
+    background: linear-gradient(135deg, rgba(15, 98, 254, 0.08), rgba(236, 72, 153, 0.05));
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: var(--jt-shadow-md);
 }
 
-.jobtable-detail-section {
-    margin-bottom: 1.5rem;
+.jobtable-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
 }
 
-.jobtable-detail-section h4 {
-    margin: 0 0 0.75rem 0;
+.jobtable-detail-title {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-width: min(520px, 100%);
+}
+
+.jobtable-detail-overline {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--jt-gray-500);
+}
+
+.jobtable-detail-title h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--jt-gray-900);
+}
+
+.jobtable-detail-subtitle {
+    margin: 0;
+    color: var(--jt-gray-600);
+    font-size: 0.9rem;
+}
+
+.jobtable-detail-meta {
+    font-size: 0.78rem;
+    color: var(--jt-gray-500);
+}
+
+.jobtable-detail-chip-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.jobtable-detail-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(148, 163, 184, 0.18);
     color: var(--jt-gray-700);
-    font-size: 0.875rem;
+    text-transform: capitalize;
+    letter-spacing: 0.02em;
+}
+
+.jobtable-detail-chip.status.completed {
+    background: rgba(34, 197, 94, 0.18);
+    color: var(--jt-success);
+}
+
+.jobtable-detail-chip.status.unassigned {
+    background: rgba(96, 165, 250, 0.18);
+    color: var(--jt-primary);
+}
+
+.jobtable-detail-chip.priority.urgent {
+    background: rgba(248, 113, 113, 0.18);
+    color: var(--jt-danger);
+}
+
+.jobtable-detail-chip.mode.fixed {
+    background: rgba(59, 130, 246, 0.18);
+    color: var(--jt-primary-dark);
+}
+
+.jobtable-detail-chip.mode.open {
+    background: rgba(250, 204, 21, 0.18);
+    color: #b45309;
+}
+
+.jobtable-detail-body {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 1.5rem;
+}
+
+.jobtable-detail-main,
+.jobtable-detail-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.jobtable-detail-card {
+    background: #ffffff;
+    border-radius: var(--jt-radius-lg);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: var(--jt-shadow-sm);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.jobtable-detail-card h5 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--jt-gray-800);
+}
+
+.jobtable-detail-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.jobtable-detail-summary {
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.jobtable-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.jobtable-summary-item {
+    padding: 0.85rem 1rem;
+    border-radius: var(--jt-radius-md);
+    background: rgba(15, 23, 42, 0.02);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.jobtable-summary-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--jt-gray-500);
     font-weight: 600;
 }
 
-.jobtable-detail-grid {
+.jobtable-summary-value {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--jt-gray-900);
+}
+
+.jobtable-summary-hint {
+    font-size: 0.75rem;
+    color: var(--jt-gray-600);
+}
+
+.jobtable-detail-text {
+    margin: 0;
+    line-height: 1.55;
+    color: var(--jt-gray-700);
+    font-size: 0.9rem;
+}
+
+.jobtable-contact-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
 }
 
-.jobtable-detail-actions {
-    margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--jt-gray-200);
+.jobtable-contact-card {
+    border: 1px dashed rgba(148, 163, 184, 0.5);
+    border-radius: var(--jt-radius-md);
+    padding: 0.9rem 1rem;
+    background: rgba(248, 250, 252, 0.6);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.jobtable-contact-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--jt-gray-500);
+    font-weight: 600;
+}
+
+.jobtable-contact-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--jt-gray-900);
+}
+
+.jobtable-contact-meta {
+    font-size: 0.82rem;
+    color: var(--jt-gray-600);
+    word-break: break-word;
+}
+
+.jobtable-contact-empty {
+    font-size: 0.82rem;
+    color: var(--jt-gray-500);
+}
+
+.jobtable-notes-card {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.jobtable-notes-translate {
+    margin-left: auto;
+}
+
+.jobtable-translation {
+    margin-top: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: var(--jt-radius-md);
+    background: rgba(37, 99, 235, 0.08);
+    border: 1px solid rgba(37, 99, 235, 0.15);
+}
+
+.jobtable-translation-label {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--jt-gray-500);
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.jobtable-translation-error {
+    margin-top: 0.5rem;
+    color: var(--jt-danger);
+    font-size: 0.82rem;
+}
+
+.jobtable-followup-card {
+    background: rgba(37, 99, 235, 0.06);
+    border: 1px solid rgba(37, 99, 235, 0.18);
+}
+
+.jobtable-chat-card {
+    background: rgba(15, 23, 42, 0.03);
+}
+
+.jobtable-detail-quick-actions {
+    gap: 0.75rem;
+}
+
+.jobtable-detail-quick-actions button {
+    align-self: flex-start;
 }
 
 /* Responsive design */
@@ -544,8 +804,12 @@
         justify-content: center;
     }
 
-    .jobtable-detail-grid {
+    .jobtable-detail-body {
         grid-template-columns: 1fr;
+    }
+
+    .jobtable-detail-chip-group {
+        justify-content: flex-start;
     }
 }
 
@@ -578,6 +842,19 @@
     .jobtable-pagination-btn {
         padding: 0.375rem 0.5rem;
         font-size: 0.75rem;
+    }
+
+    .jobtable-detail-content {
+        padding: 1.25rem;
+    }
+
+    .jobtable-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .jobtable-detail-chip-group {
+        width: 100%;
+        justify-content: flex-start;
     }
 
     .jobtable-vendor-dropdown {
@@ -669,20 +946,397 @@
     color: #b05a00;
 }
 
-.jobtable-translation {
-    margin-top: 8px;
-    padding: 10px;
-    border-radius: 8px;
-    background: #f7f7f7;
+.jobtable-followup {
+    display: grid;
+    gap: 0.75rem;
+    background: rgba(37, 99, 235, 0.06);
+    border: 1px dashed rgba(37, 99, 235, 0.35);
+    border-radius: 10px;
+    padding: 12px;
 }
 
-.jobtable-translation strong {
-    display: block;
-    margin-bottom: 4px;
+.jobtable-followup-hint {
+    margin: 0;
+    font-size: 0.82rem;
+    color: rgba(15, 23, 42, 0.75);
 }
 
-.jobtable-translation-error {
-    margin-top: 6px;
-    color: #c03a2b;
+.jobtable-followup-warning {
+    color: rgba(185, 94, 0, 0.9);
+}
+
+.jobtable-followup-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.jobtable-followup-error {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--jt-danger);
+}
+
+.jobtable-followup-meta {
+    margin: 0;
+    font-size: 0.78rem;
+    color: rgba(30, 41, 59, 0.65);
+    font-style: italic;
+}
+
+.jobtable-followup-draft {
+    display: grid;
+    gap: 0.6rem;
+    padding: 0.75rem;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.jobtable-followup-header {
     font-size: 0.85rem;
+    color: rgba(15, 23, 42, 0.8);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.jobtable-followup-row {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.jobtable-followup-label {
+    font-size: 0.78rem;
+    color: rgba(51, 65, 85, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.jobtable-followup-tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.jobtable-followup-tab {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    background: rgba(37, 99, 235, 0.12);
+    color: rgba(30, 64, 175, 0.85);
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.jobtable-followup-tab.active {
+    background: var(--jt-primary);
+    color: var(--primary-ink);
+    border-color: var(--jt-primary);
+}
+
+.jobtable-followup-input,
+.jobtable-followup-textarea {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    padding: 8px 10px;
+    font: inherit;
+    color: rgba(15, 23, 42, 0.85);
+    background: #ffffff;
+}
+
+.jobtable-followup-textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.jobtable-followup-content {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.jobtable-followup-content p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: rgba(15, 23, 42, 0.85);
+    white-space: pre-wrap;
+}
+
+.jobtable-followup-notes {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: rgba(15, 23, 42, 0.8);
+}
+
+.jobtable-followup-send {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.jobtable-followup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.jobtable-followup-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.jobtable-followup-dialog {
+    position: relative;
+    max-width: 520px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: hidden;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+    display: flex;
+    flex-direction: column;
+}
+
+.jobtable-followup-dialog-header {
+    padding: 1.25rem 1.5rem 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.jobtable-followup-overline {
+    margin: 0;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(15, 23, 42, 0.6);
+}
+
+.jobtable-followup-dialog-header h3 {
+    margin: 0.35rem 0 0;
+    font-size: 1.2rem;
+    color: rgba(15, 23, 42, 0.95);
+}
+
+.jobtable-followup-subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: rgba(71, 85, 105, 0.8);
+}
+
+.jobtable-followup-dialog-close {
+    border: none;
+    background: rgba(226, 232, 240, 0.6);
+    color: rgba(15, 23, 42, 0.8);
+    border-radius: 999px;
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.jobtable-followup-dialog-body {
+    padding: 0 1.5rem 1.5rem;
+    overflow-y: auto;
+    display: grid;
+    gap: 1rem;
+}
+
+.jobtable-followup-field {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.jobtable-followup-error-pane {
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    display: grid;
+    gap: 0.75rem;
+}
+
+.jobtable-followup-signature {
+    margin: 0;
+    font-size: 0.78rem;
+    color: rgba(71, 85, 105, 0.9);
+}
+
+.jobtable-followup-context {
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
+    padding-top: 1rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.jobtable-followup-context h5 {
+    margin: 0;
+    font-size: 0.85rem;
+    color: rgba(15, 23, 42, 0.75);
+}
+
+.jobtable-followup-context ul {
+    margin: 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.jobtable-followup-context-meta {
+    display: block;
+    font-size: 0.75rem;
+    color: rgba(100, 116, 139, 0.9);
+}
+
+.jobtable-followup-dialog-footer {
+    padding: 1rem 1.5rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    border-top: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.jobtable-followup-footer-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+@media (max-width: 640px) {
+    .jobtable-followup-dialog {
+        max-height: 100vh;
+        height: 100vh;
+        border-radius: 0;
+    }
+}
+
+.jobtable-chat-dialog {
+    position: relative;
+    max-width: 720px;
+    width: 100%;
+    max-height: 90vh;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.jobtable-chat-error {
+    padding: 16px 20px;
+    background: rgba(248, 113, 113, 0.12);
+    color: #b91c1c;
+    border-bottom: 1px solid rgba(185, 28, 28, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.jobtable-chat-error p {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.jobtable-chat-dialog .message-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 640px) {
+    .jobtable-chat-dialog {
+        max-height: 100vh;
+        height: 100vh;
+        border-radius: 0;
+    }
+}
+
+
+.jobtable-chat-media {
+    display: flex;
+    flex-shrink: 0;
+    gap: 12px;
+    padding: 16px;
+    overflow-x: auto;
+    background: #f8fafc;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.jobtable-chat-media figure {
+    margin: 0;
+    min-width: 160px;
+    max-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.jobtable-chat-media img,
+.jobtable-chat-media video {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 12px;
+    background: #0f172a;
+}
+
+.jobtable-chat-media video {
+    background: #000;
+}
+
+.jobtable-chat-media figcaption {
+    font-size: 0.75rem;
+    color: rgba(15, 23, 42, 0.68);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.jobtable-chat-overlay {
+    padding: 1.5rem;
+}
+
+.jobtable-chat-error .btn {
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .jobtable-chat-overlay {
+        padding: 0;
+        align-items: stretch;
+    }
+
+    .jobtable-chat-dialog {
+        max-width: 100%;
+        width: 100%;
+        height: 100vh;
+        border-radius: 0;
+    }
+
+    .jobtable-chat-media {
+        padding: 12px;
+    }
 }

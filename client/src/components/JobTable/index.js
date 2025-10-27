@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { copyText } from "../../utils/clipboard";
 import { APP_BASE_URL } from "../../config/env";
+import JobChatModal from "../JobChatModal";
 import "./styles.css";
 
 const currencyFormatterCache = new Map();
@@ -24,6 +25,33 @@ const formatCurrency = (value, currency = "USD") => {
   }
   return currencyFormatterCache.get(code).format(amount);
 };
+
+const formatWindowLabel = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return value.toLocaleString();
+  if (typeof value === "number") {
+    const numericDate = new Date(value);
+    if (!Number.isNaN(numericDate.getTime())) {
+      return numericDate.toLocaleString();
+    }
+    return String(value);
+  }
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).join(" to ");
+  }
+  if (typeof value === "object") {
+    const start =
+      value.start || value.from || value.begin || value.opens || value.windowStart;
+    const end = value.end || value.to || value.finish || value.closes || value.windowEnd;
+    if (start || end) {
+      return [start, end].filter(Boolean).join(" to ");
+    }
+    if (value.date) return String(value.date);
+  }
+  return String(value);
+};
+
 export default function JobTable({
   jobs,
   vendors = [],
@@ -40,6 +68,9 @@ export default function JobTable({
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "ascending" });
   const [expandedRow, setExpandedRow] = useState(null);
   const [noteTranslations, setNoteTranslations] = useState({});
+  const [followups, setFollowups] = useState({});
+  const [followupOverlay, setFollowupOverlay] = useState(null);
+  const [chatOverlayJobId, setChatOverlayJobId] = useState(null);
   const popRef = useRef(null);
 
   useEffect(() => {
@@ -175,6 +206,142 @@ export default function JobTable({
     }
   };
 
+  const updateFollowupState = (jobId, audience, patch) => {
+    setFollowups((prev) => {
+      const current = prev[jobId] || {};
+      const audienceState = current[audience] || {};
+      return {
+        ...prev,
+        [jobId]: {
+          ...current,
+          [audience]: { ...audienceState, ...patch },
+        },
+      };
+    });
+  };
+
+  const copyFollowupText = async (text, label) => {
+    const value = (text || "").trim();
+    if (!value) return;
+    const ok = await copyText(value);
+    if (!ok) alert(`Could not copy ${label}.`);
+  };
+
+  const handleFollowupInputChange = (jobId, audience, field, value) => {
+    const existingInputs = followups[jobId]?.[audience]?.inputs || {};
+    updateFollowupState(jobId, audience, {
+      inputs: {
+        ...existingInputs,
+        [field]: value,
+      },
+    });
+  };
+
+  const requestFollowup = async (job, audience) => {
+    if (!job?._id) return;
+    const jobId = job._id;
+    updateFollowupState(jobId, audience, {
+      loading: true,
+      error: "",
+      draft: null,
+      inputs: { message: "" },
+      context: null,
+      raw: null,
+      sending: false,
+    });
+    try {
+      const payload = {
+        jobId,
+        audience,
+        vendorId: audience === "vendor" ? job.vendorId : undefined,
+      };
+      const { data } = await api.post("/api/ai/followups", payload);
+      const draft = data?.draft || null;
+      updateFollowupState(jobId, audience, {
+        loading: false,
+        error: "",
+        draft,
+        inputs: { message: draft?.message || "" },
+        context: data?.context || null,
+        raw: data?.raw || null,
+        sending: false,
+      });
+    } catch (error) {
+      updateFollowupState(jobId, audience, {
+        loading: false,
+        draft: null,
+        inputs: { message: "" },
+        context: null,
+        raw: null,
+        sending: false,
+        error:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Could not generate follow-up. Try again.",
+      });
+    }
+  };
+
+  const openFollowupOverlay = (job, audience) => {
+    if (!job?._id) return;
+    setFollowupOverlay({ jobId: job._id, audience });
+    requestFollowup(job, audience);
+  };
+
+  const closeFollowupOverlay = () => {
+    setFollowupOverlay(null);
+  };
+
+  const openChatOverlay = (job) => {
+    if (!job?._id) return;
+    setChatOverlayJobId(job._id);
+  };
+
+  const closeChatOverlay = () => {
+    setChatOverlayJobId(null);
+  };
+
+  const sendFollowup = async (job, audience) => {
+    if (!job?._id) return;
+    const jobId = job._id;
+    const state = followups[jobId]?.[audience] || {};
+    const message = (state.inputs?.message || "").trim();
+    if (!message) {
+      alert("Message cannot be empty.");
+      return;
+    }
+
+    updateFollowupState(jobId, audience, {
+      sending: true,
+      error: "",
+    });
+
+    try {
+      const payload = {
+        jobId,
+        audience,
+        channel: "in_app",
+        body: message,
+      };
+      const { data } = await api.post("/api/ai/followups/send", payload);
+      updateFollowupState(jobId, audience, {
+        sending: false,
+        lastSentAt: data?.message?.createdAt || new Date().toISOString(),
+        lastSentChannel: "in_app",
+        sentMessage: data?.message || null,
+      });
+      closeFollowupOverlay();
+    } catch (error) {
+      updateFollowupState(jobId, audience, {
+        sending: false,
+        error:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Could not send follow-up. Try again.",
+      });
+    }
+  };
+
   const assignVendor = async (job, vendorId) => {
     if (!vendorId) return;
     await onUpdateJob(job._id, { vendorId, status: "Assigned" });
@@ -203,13 +370,13 @@ export default function JobTable({
         </div>
         <div className="jobtable-pagination">
           <button className="jobtable-pagination-btn" onClick={() => handlePageChange(page - 1)} disabled={page === 1}>
-            ? Prev
+            Prev
           </button>
           <span className="jobtable-pagination-current">
             Page <strong>{page}</strong> of <strong>{totalPages}</strong>
           </span>
           <button className="jobtable-pagination-btn" onClick={() => handlePageChange(page + 1)} disabled={page === totalPages}>
-            Next ?
+            Next
           </button>
         </div>
       </div>
@@ -254,6 +421,58 @@ export default function JobTable({
               const bidPriceClass = `jobtable-price jobtable-price--bid${
                 hasWinningPrice ? " is-filled" : ""
               }`;
+              const hasVendorContact = Boolean(
+                job.vendorId || job.vendorName || job.vendorPhone
+              );
+              const hasCustomerContact = Boolean(job.customerId || job.customerPhone);
+              const jobFollowups = followups[job._id] || {};
+              const vendorFollowup = jobFollowups.vendor || {};
+              const customerFollowup = jobFollowups.customer || {};
+              const referenceId =
+                job.jobNumber ||
+                job.referenceId ||
+                job.referenceCode ||
+                job.displayId ||
+                job.ticketId ||
+                (job._id ? `#${String(job._id).slice(-6).toUpperCase()}` : "Job");
+              const requestedAt =
+                job.requestedAt ||
+                job.requestDate ||
+                job.requestedOn ||
+                job.createdAt ||
+                job.createdOn;
+              const formattedRequestedAt = requestedAt
+                ? new Date(requestedAt).toLocaleString()
+                : null;
+              const pickupWindow =
+                job.pickupWindow ||
+                job.pickupTime ||
+                job.pickupWindowStart ||
+                job.pickupEta ||
+                job.pickupScheduledAt;
+              const dropoffWindow =
+                job.dropoffWindow ||
+                job.dropoffTime ||
+                job.dropoffWindowStart ||
+                job.dropoffEta ||
+                job.dropoffScheduledAt;
+              const customerName =
+                job.customerName ||
+                job.customerFullName ||
+                job.customerCompany ||
+                job.customerContactName;
+              const customerPhone =
+                job.customerPhone ||
+                job.customerMobile ||
+                job.customerContact ||
+                job.customerContactPhone;
+              const customerEmail =
+                job.customerEmail ||
+                job.customerContactEmail ||
+                job.customerWorkEmail;
+              const pickupWindowLabel = formatWindowLabel(pickupWindow);
+              const dropoffWindowLabel = formatWindowLabel(dropoffWindow);
+              const vendorEmail = job.vendorEmail || vendor?.email || vendor?.contactEmail;
 
               return (
                 <>
@@ -476,84 +695,266 @@ export default function JobTable({
                     <tr className="jobtable-detail-row">
                       <td colSpan={soloMode ? 8 : 9}>
                         <div className="jobtable-detail-content">
-                          <div className="jobtable-detail-section">
-                            <h4>Job Details</h4>
-                            <div className="jobtable-detail-grid">
-                              <div>
-                                <strong>Service Type:</strong> {job.serviceType || "N/A"}
-                              </div>
-                              <div>
-                                <strong>Quoted Price:</strong>{" "}
-                                {job.bidMode === "fixed"
-                                  ? displayedFixedPrice
-                                  : winningBidDisplay}
-                              </div>
-                              <div>
-                                <strong>Status:</strong> {job.status || "Unassigned"}
-                              </div>
-                              <div>
-                                <strong>Priority:</strong> {job.priority === "urgent" ? "Urgent" : "Normal"}
-                              </div>
+                          <header className="jobtable-detail-header">
+                            <div className="jobtable-detail-title">
+                              <span className="jobtable-detail-overline">{referenceId}</span>
+                              <h3>{job.serviceType || "Job summary"}</h3>
+                              {job.pickupAddress && (
+                                <p className="jobtable-detail-subtitle">{job.pickupAddress}</p>
+                              )}
+                              {formattedRequestedAt && (
+                                <span className="jobtable-detail-meta">
+                                  Requested {formattedRequestedAt}
+                                </span>
+                              )}
                             </div>
-                          </div>
-
-                          <div className="jobtable-detail-section">
-                            <h4>Address Information</h4>
-                            <div className="jobtable-detail-grid">
-                              <div>
-                                <strong>Pickup:</strong> {job.pickupAddress}
-                              </div>
-                              <div>
-                                <strong>Drop-off:</strong> {job.dropoffAddress || "N/A"}
-                              </div>
+                            <div className="jobtable-detail-chip-group">
+                              <span className={`jobtable-detail-chip status ${String(job.status || "unassigned").toLowerCase()}`}>
+                                {job.status || "Unassigned"}
+                              </span>
+                              <span className={`jobtable-detail-chip priority ${job.priority === "urgent" ? "urgent" : "standard"}`}>
+                                {job.priority === "urgent" ? "Urgent priority" : "Standard priority"}
+                              </span>
+                              <span className={`jobtable-detail-chip mode ${job.bidMode === "fixed" ? "fixed" : "open"}`}>
+                                {job.bidMode === "fixed" ? "Fixed price" : "Open bidding"}
+                              </span>
                             </div>
-                          </div>
+                          </header>
 
-                          {job.notes && (
-                            <div className="jobtable-detail-section">
-                              <h4>Notes</h4>
-                              <p>{job.notes}</p>
-                              <button
-                                type="button"
-                                className="jobtable-btn jobtable-btn-ghost"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  translateNotes(job);
-                                }}
-                                disabled={noteTranslations[job._id]?.status === "loading"}
-                              >
-                                {noteTranslations[job._id]?.status === "loading"
-                                  ? "Translating..."
-                                  : "Translate to Spanish"}
-                              </button>
-                              {noteTranslations[job._id]?.status === "ready" && (
-                                <div className="jobtable-translation">
-                                  <strong>Spanish:</strong>
-                                  <p>{noteTranslations[job._id].text}</p>
+                          <div className="jobtable-detail-body">
+                            <div className="jobtable-detail-main">
+                              <section className="jobtable-detail-card jobtable-detail-summary">
+                                <div className="jobtable-summary-grid">
+                                  <div className="jobtable-summary-item">
+                                    <span className="jobtable-summary-label">Price</span>
+                                    <p className="jobtable-summary-value">
+                                      {job.bidMode === "fixed" ? displayedFixedPrice : winningBidDisplay}
+                                    </p>
+                                    <span className="jobtable-summary-hint">
+                                      {job.bidMode === "fixed"
+                                        ? "Customer approved fixed quote"
+                                        : hasWinningPrice
+                                        ? "Latest winning bid"
+                                        : "Awaiting winning bid"}
+                                    </span>
+                                  </div>
+                                  <div className="jobtable-summary-item">
+                                    <span className="jobtable-summary-label">Pickup</span>
+                                    <p className="jobtable-summary-value">
+                                      {job.pickupAddress || "Not provided"}
+                                    </p>
+                                    {pickupWindowLabel && (
+                                      <span className="jobtable-summary-hint">
+                                        {pickupWindowLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="jobtable-summary-item">
+                                    <span className="jobtable-summary-label">Drop-off</span>
+                                    <p className="jobtable-summary-value">
+                                      {job.dropoffAddress || "Not provided"}
+                                    </p>
+                                    {dropoffWindowLabel && (
+                                      <span className="jobtable-summary-hint">
+                                        {dropoffWindowLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {formattedRequestedAt && (
+                                    <div className="jobtable-summary-item">
+                                      <span className="jobtable-summary-label">Created</span>
+                                      <p className="jobtable-summary-value">{formattedRequestedAt}</p>
+                                      <span className="jobtable-summary-hint">Local time</span>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                              {noteTranslations[job._id]?.status === "error" && (
-                                <p className="jobtable-translation-error">
-                                  {noteTranslations[job._id].error}
-                                </p>
+                              </section>
+
+                              <section className="jobtable-detail-card jobtable-detail-contacts">
+                                <h5>Contacts</h5>
+                                <div className="jobtable-contact-grid">
+                                  <div className="jobtable-contact-card">
+                                    <span className="jobtable-contact-label">Vendor</span>
+                                    {vendor ? (
+                                      <>
+                                        <span className="jobtable-contact-name">{vendor.name}</span>
+                                        {vendor.phone && (
+                                          <span className="jobtable-contact-meta">{vendor.phone}</span>
+                                        )}
+                                        {vendorEmail && (
+                                          <span className="jobtable-contact-meta">{vendorEmail}</span>
+                                        )}
+                                        {vendor.city && (
+                                          <span className="jobtable-contact-meta">{vendor.city}</span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="jobtable-contact-empty">
+                                        No vendor assigned yet
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="jobtable-contact-card">
+                                    <span className="jobtable-contact-label">Customer</span>
+                                    {customerName || customerPhone || customerEmail ? (
+                                      <>
+                                        {customerName && (
+                                          <span className="jobtable-contact-name">{customerName}</span>
+                                        )}
+                                        {customerPhone && (
+                                          <span className="jobtable-contact-meta">{customerPhone}</span>
+                                        )}
+                                        {customerEmail && (
+                                          <span className="jobtable-contact-meta">{customerEmail}</span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="jobtable-contact-empty">
+                                        No customer contact on file
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </section>
+
+                              {job.notes && (
+                                <section className="jobtable-detail-card jobtable-notes-card">
+                                  <div className="jobtable-detail-card-header">
+                                    <div>
+                                      <h5>Job notes</h5>
+                                      <span className="jobtable-detail-meta">Internal only</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="jobtable-btn jobtable-btn-ghost jobtable-notes-translate"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        translateNotes(job);
+                                      }}
+                                      disabled={noteTranslations[job._id]?.status === "loading"}
+                                    >
+                                      {noteTranslations[job._id]?.status === "loading"
+                                        ? "Translating..."
+                                        : "Translate to Spanish"}
+                                    </button>
+                                  </div>
+                                  <p className="jobtable-detail-text">{job.notes}</p>
+                                  {noteTranslations[job._id]?.status === "ready" && (
+                                    <div className="jobtable-translation">
+                                      <span className="jobtable-translation-label">Spanish</span>
+                                      <p>{noteTranslations[job._id].text}</p>
+                                    </div>
+                                  )}
+                                  {noteTranslations[job._id]?.status === "error" && (
+                                    <p className="jobtable-translation-error">
+                                      {noteTranslations[job._id].error}
+                                    </p>
+                                  )}
+                                </section>
                               )}
                             </div>
-                          )}
 
-                          <div className="jobtable-detail-actions">
-                          <button
-                            className="jobtable-btn jobtable-btn-ghost"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (onViewJob) {
-                                onViewJob(job);
-                              } else {
-                                window.open(`${window.location.origin}/jobs/${job._id}`, "_blank");
-                              }
-                            }}
-                          >
-                              View Full Details
-                            </button>
+                            <aside className="jobtable-detail-sidebar">
+                              <section className="jobtable-detail-card jobtable-followup-card">
+                                <div className="jobtable-detail-card-header">
+                                  <h5>AI Follow-up</h5>
+                                </div>
+                                <p className="jobtable-followup-hint">
+                                  Draft and send a quick update. Messages post to the job chat so the recipient can reply immediately.
+                                </p>
+                                <div className="jobtable-followup-actions">
+                                  <button
+                                    type="button"
+                                    className="jobtable-btn jobtable-btn-primary"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openFollowupOverlay(job, "vendor");
+                                    }}
+                                    disabled={!hasVendorContact || vendorFollowup.loading}
+                                  >
+                                    {vendorFollowup.loading
+                                      ? "Preparing vendor draft..."
+                                      : "Vendor follow-up"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="jobtable-btn jobtable-btn-ghost"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openFollowupOverlay(job, "customer");
+                                    }}
+                                    disabled={!hasCustomerContact || customerFollowup.loading}
+                                  >
+                                    {customerFollowup.loading
+                                      ? "Preparing customer draft..."
+                                      : "Customer follow-up"}
+                                  </button>
+                                </div>
+                                {!hasVendorContact && (
+                                  <p className="jobtable-followup-hint jobtable-followup-warning">
+                                    Assign a vendor to enable vendor outreach.
+                                  </p>
+                                )}
+                                {!hasCustomerContact && (
+                                  <p className="jobtable-followup-hint jobtable-followup-warning">
+                                    Add customer contact details to enable customer outreach.
+                                  </p>
+                                )}
+                                {vendorFollowup.lastSentAt && (
+                                  <p className="jobtable-followup-meta">
+                                    Last vendor touchpoint{" "}
+                                    {new Date(vendorFollowup.lastSentAt).toLocaleString()} via in-app chat
+                                  </p>
+                                )}
+                                {customerFollowup.lastSentAt && (
+                                  <p className="jobtable-followup-meta">
+                                    Last customer touchpoint{" "}
+                                    {new Date(customerFollowup.lastSentAt).toLocaleString()} via in-app chat
+                                  </p>
+                                )}
+                              </section>
+
+                              <section className="jobtable-detail-card jobtable-chat-card">
+                                <div className="jobtable-detail-card-header">
+                                  <h5>Job chat</h5>
+                                </div>
+                                <p className="jobtable-followup-hint">
+                                  Open the in-app conversation to coordinate with vendors and customers in real time.
+                                </p>
+                                <div className="jobtable-followup-actions">
+                                  <button
+                                    type="button"
+                                    className="jobtable-btn jobtable-btn-primary"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openChatOverlay(job);
+                                    }}
+                                  >
+                                    Open chat
+                                  </button>
+                                </div>
+                              </section>
+
+                              <section className="jobtable-detail-card jobtable-detail-quick-actions">
+                                <h5>Next steps</h5>
+                                <p className="jobtable-detail-text">
+                                  Jump into the full job workspace to adjust assignments, upload documents, and review the activity log.
+                                </p>
+                                <button
+                                  className="jobtable-btn jobtable-btn-ghost"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (onViewJob) {
+                                      onViewJob(job);
+                                    } else {
+                                      window.open(`${window.location.origin}/jobs/${job._id}`, "_blank");
+                                    }
+                                  }}
+                                >
+                                  View full details
+                                </button>
+                              </section>
+                            </aside>
                           </div>
                         </div>
                       </td>
@@ -588,9 +989,162 @@ export default function JobTable({
           </div>
         </div>
       )}
+
+      {followupOverlay && (() => {
+        const { jobId, audience } = followupOverlay;
+        const job = jobs.find((item) => item?._id === jobId);
+        if (!job) return null;
+
+        const state = followups[jobId]?.[audience] || {};
+        const inputs = state.inputs || {};
+        const messageValue = inputs.message || "";
+        const sending = Boolean(state.sending);
+        const disabled = state.loading || sending || !messageValue.trim();
+        const audienceLabel = audience === "vendor" ? "Vendor" : "Customer";
+        const dialogId = `followup-${jobId}-${audience}`;
+        const contextMessages = Array.isArray(state.context?.lastMessages)
+          ? state.context.lastMessages
+          : [];
+
+        return (
+          <div
+            className="jobtable-followup-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogId}
+          >
+            <div className="jobtable-followup-backdrop" onClick={closeFollowupOverlay} />
+            <div
+              className="jobtable-followup-dialog"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="jobtable-followup-dialog-header">
+                <div>
+                  <p className="jobtable-followup-overline">{audienceLabel} follow-up</p>
+                  <h3 id={dialogId}>
+                    {job.serviceType || "Job"} - {job.pickupAddress || "No pickup address"}
+                  </h3>
+                  <p className="jobtable-followup-subtitle">Status: {job.status || "Unassigned"}</p>
+                </div>
+                <button type="button" className="jobtable-followup-dialog-close" onClick={closeFollowupOverlay} aria-label="Close follow-up">X</button>
+              </header>
+              <div className="jobtable-followup-dialog-body">
+                {state.loading ? (
+                  <p>Generating draft...</p>
+                ) : state.error ? (
+                  <div className="jobtable-followup-error-pane">
+                    <p>{state.error}</p>
+                    <button
+                      type="button"
+                      className="jobtable-btn jobtable-btn-primary"
+                      onClick={() => requestFollowup(job, audience)}
+                      disabled={state.loading}
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <label className="jobtable-followup-field">
+                      <span>Message</span>
+                      <textarea
+                        className="jobtable-followup-textarea"
+                        rows={6}
+                        value={messageValue}
+                        onChange={(event) =>
+                          handleFollowupInputChange(
+                            job._id,
+                            audience,
+                            "message",
+                            event.target.value
+                          )
+                        }
+                        disabled={sending}
+                      />
+                    </label>
+                    <p className="jobtable-followup-signature">
+                      Signature added automatically: Best regards - Customer Service Team, ServiceOps, 1 (720) 815-7770
+                    </p>
+                    {Array.isArray(state.draft?.internalNotes) &&
+                      state.draft.internalNotes.length > 0 && (
+                        <div className="jobtable-followup-notes-block">
+                          <span className="jobtable-followup-label">Internal notes</span>
+                          <ul className="jobtable-followup-notes">
+                            {state.draft.internalNotes.map((note, index) => (
+                              <li key={`followup-note-${job._id}-${audience}-${index}`}>{note}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    {contextMessages.length > 0 && (
+                      <div className="jobtable-followup-context">
+                        <h5>Recent chat</h5>
+                        <ul>
+                          {contextMessages.map((msg, index) => (
+                            <li key={`followup-context-${job._id}-${audience}-${index}`}>
+                              <span className="jobtable-followup-context-meta">
+                                {(msg.senderName || msg.senderRole || "Participant")} •{" "}
+                                {msg.at ? new Date(msg.at).toLocaleString() : "Just now"}
+                              </span>
+                              <p>{msg.body || "…"}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <footer className="jobtable-followup-dialog-footer">
+                <button
+                  type="button"
+                  className="jobtable-btn jobtable-btn-ghost"
+                  onClick={() => requestFollowup(job, audience)}
+                  disabled={state.loading || sending}
+                >
+                  Regenerate draft
+                </button>
+                <div className="jobtable-followup-footer-actions">
+                  <button
+                    type="button"
+                    className="jobtable-btn jobtable-btn-link"
+                    onClick={() =>
+                      copyFollowupText(
+                        messageValue || state.draft?.message || "",
+                        "follow-up message"
+                      )
+                    }
+                    disabled={state.loading}
+                  >
+                    Copy text
+                  </button>
+                  <button
+                    type="button"
+                    className="jobtable-btn jobtable-btn-success"
+                    disabled={disabled}
+                    onClick={() => sendFollowup(job, audience)}
+                  >
+                    {sending ? "Sending…" : "Send follow-up"}
+                  </button>
+                </div>
+              </footer>
+            </div>
+          </div>
+        );
+      })()}
+
+      {chatOverlayJobId && (() => {
+        const job = (jobs || []).find((item) => item?._id === chatOverlayJobId);
+        if (!job) return null;
+        return <JobChatModal job={job} onClose={closeChatOverlay} />;
+      })()}
     </div>
   );
 }
+
+
+
+
 
 
 

@@ -33,6 +33,16 @@ const toInt = (value) => {
   return Number.isFinite(num) ? Math.round(num) : NaN;
 };
 
+const normalizePhone = (input) => {
+  if (!input) return "";
+  const str = String(input).trim();
+  if (!str) return "";
+  if (str.startsWith("+")) {
+    return `+${str.slice(1).replace(/\D+/g, "")}`;
+  }
+  return str.replace(/\D+/g, "");
+};
+
 const distanceKm = (lat1, lng1, lat2, lng2) => {
   if (
     !Number.isFinite(lat1) ||
@@ -60,6 +70,13 @@ async function loadVendorWithCompliance(vendorId) {
   const vendor = await Vendor.findById(vendorId).lean();
   if (!vendor) return null;
 
+  if (vendor.complianceOverride === true) {
+    if (!vendor.compliance) vendor.compliance = {};
+    vendor.compliance.allowed = true;
+    vendor.compliance.override = true;
+    return vendor;
+  }
+
   if (vendor?.compliance?.allowed || vendor?.complianceStatus === "compliant") {
     return vendor;
   }
@@ -75,6 +92,7 @@ async function loadVendorWithCompliance(vendorId) {
 router.get("/open", requireVendorAuth, async (req, res, next) => {
   const vendor = await loadVendorWithCompliance(req.vendorId);
   if (!vendor) return res.status(401).json({ message: "Vendor not found" });
+  const vendorPhone = normalizePhone(vendor.phone);
 
   if (!vendor.compliance?.allowed) {
     return res.status(403).json({
@@ -96,7 +114,7 @@ router.get("/open", requireVendorAuth, async (req, res, next) => {
       jobId: { $in: jobs.map((j) => j._id) },
       $or: [
         { vendorId: vendor._id },
-        ...(vendor.phone ? [{ vendorPhone: vendor.phone }] : []),
+        ...(vendorPhone ? [{ vendorPhone: vendorPhone }] : []),
       ],
     },
     "jobId"
@@ -152,6 +170,7 @@ router.post("/bid", requireVendorAuth, async (req, res, next) => {
 
   const vendor = await loadVendorWithCompliance(req.vendorId);
   if (!vendor) return res.status(401).json({ message: "Vendor not found" });
+  const vendorPhone = normalizePhone(vendor.phone);
 
   if (!vendor.compliance?.allowed) {
     return res.status(403).json({
@@ -187,7 +206,7 @@ router.post("/bid", requireVendorAuth, async (req, res, next) => {
       jobId: job._id,
       $or: [
         { vendorId: vendor._id },
-        ...(vendor.phone ? [{ vendorPhone: vendor.phone }] : []),
+        ...(vendorPhone ? [{ vendorPhone: vendorPhone }] : []),
       ],
     },
     {
@@ -195,7 +214,7 @@ router.post("/bid", requireVendorAuth, async (req, res, next) => {
         jobId: job._id,
         vendorId: vendor._id,
         vendorName: vendor.name,
-        vendorPhone: vendor.phone || null,
+        vendorPhone: vendorPhone || null,
         etaMinutes: eta,
         price: pr,
       },
@@ -217,10 +236,12 @@ router.get("/assigned", requireVendorAuth, async (req, res, next) => {
   const vendor = await loadVendorWithCompliance(req.vendorId);
   if (!vendor) return res.status(401).json({ message: "Vendor not found" });
 
+  const vendorPhone = normalizePhone(vendor.phone);
+
   const jobs = await Job.find({
     $or: [
       { vendorId: vendor._id },
-      ...(vendor.phone ? [{ vendorPhone: vendor.phone }] : []),
+      ...(vendorPhone ? [{ vendorPhone: vendorPhone }] : []),
     ],
   })
     .sort({ created: -1 })
@@ -254,6 +275,72 @@ router.get("/assigned", requireVendorAuth, async (req, res, next) => {
   }));
 
   res.json(jobsWithDistance);
+});
+
+router.get("/jobs/:jobId", requireVendorAuth, async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    if (!mongoose.isValidObjectId(jobId)) {
+      return res.status(400).json({ message: "Invalid job id" });
+    }
+
+    const vendor = await loadVendorWithCompliance(req.vendorId);
+    if (!vendor) return res.status(401).json({ message: "Vendor not found" });
+
+    const job = await Job.findById(jobId).lean();
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    const vendorPhone = normalizePhone(vendor.phone);
+    const jobVendorPhone = normalizePhone(job.vendorPhone);
+    const matchesId =
+      job.vendorId && String(job.vendorId) === String(vendor._id);
+    const matchesPhone =
+      !matchesId && vendorPhone && vendorPhone === jobVendorPhone;
+
+    if (!matchesId && !matchesPhone) {
+      return res.status(403).json({ message: "Job is not assigned to you." });
+    }
+
+    const vendorLat = Number.isFinite(vendor.lat) ? vendor.lat : null;
+    const vendorLng = Number.isFinite(vendor.lng) ? vendor.lng : null;
+
+    const dist =
+      vendorLat === null || vendorLng === null
+        ? null
+        : distanceKm(vendorLat, vendorLng, job.pickupLat, job.pickupLng);
+
+    res.json({
+      _id: job._id,
+      serviceType: job.serviceType,
+      pickupAddress: job.pickupAddress,
+      pickupLat: Number.isFinite(job.pickupLat) ? job.pickupLat : null,
+      pickupLng: Number.isFinite(job.pickupLng) ? job.pickupLng : null,
+      dropoffAddress: job.dropoffAddress || null,
+      dropoffLat: Number.isFinite(job.dropoffLat) ? job.dropoffLat : null,
+      dropoffLng: Number.isFinite(job.dropoffLng) ? job.dropoffLng : null,
+      notes: job.notes || null,
+      internalNotes: job.internalNotes || null,
+      heavyDuty: !!job.heavyDuty,
+      quotedPrice: Number.isFinite(job.quotedPrice) ? job.quotedPrice : 0,
+      bidMode: job.bidMode || "open",
+      status: job.status || "Unassigned",
+      created: job.created,
+      assignedAt: job.assignedAt || null,
+      customerName: job.customerName || null,
+      customerPhone: job.customerPhone || null,
+      contactName: job.contactName || null,
+      contactPhone: job.contactPhone || null,
+      vehicleMake: job.vehicleMake || null,
+      vehicleModel: job.vehicleModel || null,
+      vehicleColor: job.vehicleColor || null,
+      media: Array.isArray(job.media) ? job.media : [],
+      distanceKm: dist,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get("/alerts", requireVendorAuth, async (req, res, next) => {
@@ -352,12 +439,13 @@ router.patch(
 
     const v = await Vendor.findById(req.vendorId).lean();
     if (!v) return res.status(401).json({ message: "Vendor not found" });
+    const vendorPhone = normalizePhone(v.phone);
 
     const job = await Job.findOne({
       _id: jobId,
       $or: [
         { vendorId: v._id },
-        ...(v.phone ? [{ vendorPhone: v.phone }] : []),
+        ...(vendorPhone ? [{ vendorPhone: vendorPhone }] : []),
       ],
     });
     if (!job) return res.status(404).json({ message: "Job not found" });

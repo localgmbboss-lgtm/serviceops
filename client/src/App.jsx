@@ -30,6 +30,7 @@ import PrintReport from "./pages/PrintReport";
 import VendorLogin from "./pages/VendorLogin";
 import VendorApp from "./pages/VendorApp";
 import VendorProfile from "./pages/VendorProfile";
+import VendorJobDetail from "./pages/VendorJobDetail";
 import AdminLogin from "./pages/AdminLogin";
 
 // Public + auth
@@ -198,6 +199,14 @@ export default function App() {
                 }
               />
               <Route
+                path="/vendor/jobs/:jobId"
+                element={
+                  <ProtectedRoute requiredRole="vendor" fallbackPath="/vendor/login">
+                    <VendorJobDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/vendor/profile"
                 element={
                   <ProtectedRoute requiredRole="vendor" fallbackPath="/vendor/login">
@@ -239,3 +248,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

@@ -43,8 +43,13 @@ router.get("/", async (req, res, next) => {
     const now = new Date();
     const defaultFrom = new Date(now.getTime() - 30 * DAYS);
 
-    const from = parseDate(req.query.from, defaultFrom);
-    const to = parseDate(req.query.to, now);
+    const rawFrom = parseDate(req.query.from, defaultFrom);
+    const rawTo = parseDate(req.query.to, now);
+
+    const from = new Date(rawFrom);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(rawTo);
+    to.setHours(23, 59, 59, 999);
 
     const paymentFilter = { receivedAt: { $gte: from, $lte: to } };
     const expenseFilter = { date: { $gte: from, $lte: to } };

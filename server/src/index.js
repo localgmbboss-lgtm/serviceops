@@ -1,7 +1,9 @@
 // server/src/index.js
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { createServer } from "http";
 import { connectDB } from "./lib/db.js";
 import { initRealtime } from "./realtime/index.js";
@@ -25,6 +27,8 @@ import vendorAuth from "./routes/vendorAuth.js";
 import vendorFeed from "./routes/vendorFeed.js";
 import vendorPortal from "./routes/vendorPortal.js";
 import vendorDocuments from "./routes/vendorDocuments.js";
+import customerPush from "./routes/customerPush.js";
+import messages from "./routes/messages.js";
 import customerAuth from "./routes/customerAuth.js";
 import adminAuth from "./routes/adminAuth.js";
 import vendors from "./routes/vendors.js";
@@ -32,13 +36,17 @@ import pushRoutes from "./routes/push.js";
 import ops from "./routes/ops.js";
 import crm from "./routes/crm.js";
 import knowledge from "./routes/knowledge.js";
+import aiRouter from "./routes/ai.js";
+import paymentRoutes from "./routes/payment.js";
+import { startUnbidMonitor } from "./automation/unbidMonitor.js";
 
-dotenv.config();
 configurePush();
 
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // CORS configuration -----------------------------------------------------
 const normalizeOrigin = (origin) => {
@@ -112,6 +120,12 @@ app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"), {
+    fallthrough: true,
+  })
+);
 
 app.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 app.use("/api/documents", documents);
@@ -126,6 +140,7 @@ app.use("/api/vendor/documents", vendorDocuments);
 app.use("/api/vendor", vendorRouter);
 app.use("/api/admin/auth", adminAuth);
 app.use("/api/admin", admin);
+app.use("/api/customer/push", customerPush);
 app.use("/api/public", publicRoutes);
 app.use("/api/exports", exportRoutes);
 app.use("/api/push", pushRoutes);
@@ -135,10 +150,13 @@ app.use("/api/vendor/auth", vendorAuth);
 app.use("/api/vendor/feed", vendorFeed);
 app.use("/api/vendor", vendorPortal);
 app.use("/api/customer/auth", customerAuth);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/messages", messages);
 app.use("/api/vendors", vendors);
 app.use("/api/ops", ops);
 app.use("/api/crm", crm);
 app.use("/api/knowledge", knowledge);
+app.use("/api/ai", aiRouter);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, _req, res, _next) => {
@@ -157,6 +175,8 @@ app.use((err, _req, res, _next) => {
   });
   app.locals.io = realtime;
 
+  startUnbidMonitor();
+
   httpServer.listen(PORT, () => {
     const env = process.env.NODE_ENV || "development";
     console.log(`API listening on port ${PORT} (env: ${env})`);
@@ -171,6 +191,7 @@ app.use((err, _req, res, _next) => {
     }
   });
 })();
+
 
 
 

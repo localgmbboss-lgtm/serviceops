@@ -88,6 +88,7 @@ const VendorSchema = new mongoose.Schema(
         default: [],
       },
     },
+    complianceOverride: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

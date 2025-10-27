@@ -1,11 +1,17 @@
 // server/src/routes/public.js
 import { Router } from "express";
 import crypto from "crypto";
+import path from "path";
+import fsPromises from "fs/promises";
 import Customer from "../models/Customer.js";
 import Job from "../models/Jobs.js";
 import AdminNotification from "../models/AdminNotification.js";
 import { getClientBaseUrl } from "../lib/clientUrl.js";
-import { sendAdminPushNotifications } from "../lib/push.js";
+import {
+  sendAdminPushNotifications,
+  sendCustomerPushNotifications,
+} from "../lib/push.js";
+import { jobMediaUpload, jobMediaUploadRoot, toJobMediaRecord, JOB_MEDIA_MAX_FILES } from "../lib/jobMedia.js";
 
 const router = Router();
 
@@ -24,8 +30,32 @@ const normalizeService = (s) => {
 };
 
 // --- routes --------------------------------------------------
-router.post("/jobs", async (req, res, next) => {
+router.post("/jobs", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (req, res, next) => {
+  const storedFiles = [];
+  const files = Array.isArray(req.files) ? req.files : [];
+  for (const file of files) {
+    storedFiles.push(path.join(jobMediaUploadRoot, file.filename));
+  }
+
+  const cleanupUploaded = async () => {
+    if (!storedFiles.length) return;
+    await Promise.all(
+      storedFiles.map((filepath) => fsPromises.unlink(filepath).catch(() => {}))
+    );
+    storedFiles.length = 0;
+  };
+
   try {
+    let body = req.body || {};
+    if (typeof body.payload === "string") {
+      try {
+        body = JSON.parse(body.payload);
+      } catch (error) {
+        await cleanupUploaded();
+        return res.status(400).json({ message: "Invalid request payload" });
+      }
+    }
+
     const {
       name,
       phone,
@@ -43,10 +73,17 @@ router.post("/jobs", async (req, res, next) => {
       heavyDuty,
       shareLive,
       vehiclePinned,
-    } = req.body || {};
+      vehicleMake,
+      vehicleModel,
+      vehicleColor,
+      distanceMeters,
+      distanceText,
+      etaSeconds,
+    } = body || {};
 
     // 1) Validate basic identity
     if (!isNonEmpty(name) || !isNonEmpty(phone)) {
+      await cleanupUploaded();
       return res.status(400).json({ message: "Missing name or phone" });
     }
 
@@ -63,14 +100,19 @@ router.post("/jobs", async (req, res, next) => {
       !isNonEmpty(pickupAddress) &&
       !(Number.isFinite(pickupLat) && Number.isFinite(pickupLng))
     ) {
+      await cleanupUploaded();
       return res.status(400).json({ message: "Pickup location required" });
     }
 
     // 3) Service normalization (strict list)
     const serviceType = normalizeService(serviceTypeRaw);
     if (!serviceType) {
+      await cleanupUploaded();
       return res.status(400).json({ message: "Invalid serviceType" });
     }
+
+    const distanceMetersNumber = toNumOr(distanceMeters, undefined);
+    const etaSecondsNumber = toNumOr(etaSeconds, undefined);
 
     // 4) Upsert customer by phone
     let cust = await Customer.findOne({ phone: String(phone).trim() }).exec();
@@ -89,7 +131,10 @@ router.post("/jobs", async (req, res, next) => {
 
       serviceType,
       notes: isNonEmpty(notes) ? String(notes).trim() : undefined,
-      heavyDuty: !!heavyDuty,
+      heavyDuty:
+        typeof heavyDuty === "string"
+          ? heavyDuty.toLowerCase() === "true"
+          : Boolean(heavyDuty),
 
       pickupAddress: isNonEmpty(pickupAddress) ? pickupAddress : undefined,
       pickupLat: Number.isFinite(pickupLat) ? pickupLat : undefined,
@@ -98,13 +143,32 @@ router.post("/jobs", async (req, res, next) => {
       dropoffAddress: isNonEmpty(dropoffAddress)
         ? String(dropoffAddress).trim()
         : undefined,
-
-      shareLive: !!shareLive,
-      vehiclePinned: !!vehiclePinned,
-
+      shareLive:
+        typeof shareLive === "string"
+          ? shareLive.toLowerCase() === "true"
+          : Boolean(shareLive),
+      vehiclePinned:
+        typeof vehiclePinned === "string"
+          ? vehiclePinned.toLowerCase() === "true"
+          : Boolean(vehiclePinned ?? true),
+      vehicleMake: isNonEmpty(vehicleMake) ? vehicleMake.trim() : undefined,
+      vehicleModel: isNonEmpty(vehicleModel) ? vehicleModel.trim() : undefined,
+      vehicleColor: isNonEmpty(vehicleColor) ? vehicleColor.trim() : undefined,
+      estimatedDistance: isNonEmpty(distanceText)
+        ? String(distanceText).trim()
+        : undefined,
+      estimatedDuration: Number.isFinite(etaSecondsNumber)
+        ? Math.round(etaSecondsNumber / 60)
+        : undefined,
+      media: files.length ? files.map((file) => toJobMediaRecord(file)) : [],
+      // optionally store raw meters
+      distanceMeters: Number.isFinite(distanceMetersNumber)
+        ? distanceMetersNumber
+        : undefined,
       // bidding flags
       biddingOpen: true,
     });
+    storedFiles.length = 0;
 
     // 6) Generate tokens (idempotent-friendly)
     if (!job.vendorToken)
@@ -146,6 +210,31 @@ router.post("/jobs", async (req, res, next) => {
       console.error("Failed to notify admins about new request:", notifyError);
     }
 
+    try {
+      await sendCustomerPushNotifications([
+        {
+          customerId: cust._id,
+          jobId: job._id,
+          title: "Request received",
+          body: `${serviceType} request logged. We'll notify you when a provider responds.`,
+          severity: "info",
+          meta: {
+            role: "customer",
+            jobId: job._id,
+            kind: "status",
+            route: `/status/${job._id}`,
+            absoluteUrl: statusUrl,
+            dedupeKey: `customer:job:${job._id}:created`,
+          },
+        },
+      ]);
+    } catch (notifyCustomerError) {
+      console.error(
+        "Failed to notify customer about new request",
+        notifyCustomerError
+      );
+    }
+
     // 8) Respond with everything the client needs (fixes "undefined token" issues)
     return res.status(201).json({
       ok: true,
@@ -159,6 +248,7 @@ router.post("/jobs", async (req, res, next) => {
       customerToken: job.customerToken,
     });
   } catch (e) {
+    await cleanupUploaded();
     next(e);
   }
 });

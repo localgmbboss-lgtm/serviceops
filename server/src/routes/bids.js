@@ -7,6 +7,7 @@ import Bid from "../models/Bid.js";
 import Customer from "../models/Customer.js";
 import { notifySMS } from "../lib/notifier.js";
 import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
+import { sendCustomerPushNotifications } from "../lib/push.js";
 
 const router = Router();
 
@@ -19,6 +20,14 @@ const toInt = (v) => Number.parseInt(v, 10);
 const toNum = (v) => Number(v);
 const clamp = (n, lo, hi) =>
   Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : NaN;
+const normalizePhone = (input = "") => {
+  const str = String(input || "").trim();
+  if (!str) return "";
+  if (str.startsWith("+")) {
+    return `+${str.slice(1).replace(/\D+/g, "")}`;
+  }
+  return str.replace(/\D+/g, "");
+};
 
 // ----------------------------------------------------------
 // Vendor preview (minimal job info for bidding)
@@ -67,6 +76,14 @@ router.post("/:vendorToken", async (req, res, next) => {
         .json({ message: "vendorName and vendorPhone required" });
     }
 
+    const normalizedPhone = normalizePhone(vendorPhone);
+    if (!isNonEmpty(normalizedPhone)) {
+      return res
+        .status(400)
+        .json({ message: "Enter a valid phone number" });
+    }
+    const trimmedName = vendorName.trim();
+
     const isFixed = job.bidMode === "fixed";
     const eta = clamp(toInt(etaMinutes), 1, 720); // up to 12h
     if (!Number.isFinite(eta)) {
@@ -86,12 +103,12 @@ router.post("/:vendorToken", async (req, res, next) => {
 
     // Upsert: if this vendor (phone) already bid on this job, update it
     const bid = await Bid.findOneAndUpdate(
-      { jobId: job._id, vendorPhone: vendorPhone.trim() },
+      { jobId: job._id, vendorPhone: normalizedPhone },
       {
         $set: {
           jobId: job._id,
-          vendorName: vendorName.trim(),
-          vendorPhone: vendorPhone.trim(),
+          vendorName: trimmedName,
+          vendorPhone: normalizedPhone,
           etaMinutes: eta,
           price: pr,
         },
@@ -102,15 +119,39 @@ router.post("/:vendorToken", async (req, res, next) => {
     // Notify customer (optional, best-effort)
     try {
       const cust = await Customer.findById(job.customerId).lean();
+      const base = resolveClientBaseUrl(req) || defaultClientBase;
+      const customerRoute = job.customerToken
+        ? `/choose/${job.customerToken}`
+        : `/status/${job._id}`;
+      const customerUrl = `${base.replace(/\/$/, "")}${customerRoute}`;
+      const priceLabel = Number.isFinite(pr) ? pr : 0;
+      const messageBody = isFixed
+        ? `New ETA: ${bid.vendorName} - ETA ${bid.etaMinutes}m. Fixed price $${priceLabel}`
+        : `New bid: ${bid.vendorName} - $${bid.price}, ETA ${bid.etaMinutes}m`;
+
       if (cust?.phone && job.customerToken) {
-        const viewLink = `${base}/choose/${job.customerToken}`;
-        const priceLabel = Number.isFinite(pr) ? pr : 0;
-        const linkSuffix = viewLink ? ` . View: ${viewLink}` : "";
-        const smsMessage = isFixed
-          ? `New ETA: ${bid.vendorName} - ETA ${bid.etaMinutes}m. Fixed price $${priceLabel}${linkSuffix}`
-          : `New bid: ${bid.vendorName} - $${bid.price}, ETA ${bid.etaMinutes}m${linkSuffix}`;
+        const viewLink = `${base.replace(/\/$/, "")}/choose/${job.customerToken}`;
+        const smsMessage = `${messageBody}. View: ${viewLink}`;
         await notifySMS(cust.phone, smsMessage, job._id);
       }
+
+      await sendCustomerPushNotifications([
+        {
+          customerId: job.customerId,
+          jobId: job._id,
+          title: "New bid received",
+          body: messageBody,
+          severity: "info",
+          meta: {
+            role: "customer",
+            jobId: job._id,
+            kind: "bid",
+            route: customerRoute,
+            absoluteUrl: customerUrl,
+            dedupeKey: `customer:job:${job._id}:bid:${bid._id}`,
+          },
+        },
+      ]);
     } catch {
       /* best-effort */
     }

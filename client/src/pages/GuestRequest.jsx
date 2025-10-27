@@ -19,6 +19,12 @@ const SERVICE_SUGGESTIONS = [
   "Roadside Assistance",
 ];
 
+const MAX_MEDIA_IMAGES = 3;
+const MAX_MEDIA_VIDEOS = 1;
+const MAX_MEDIA_FILES = MAX_MEDIA_IMAGES + MAX_MEDIA_VIDEOS;
+const MAX_MEDIA_SIZE = 25 * 1024 * 1024; // 25 MB
+const MEDIA_ACCEPT = "image/*,video/*";
+
 /* global google */
 
 const PROFILE_KEYS = [
@@ -322,6 +328,9 @@ export default function GuestRequest({
       };
     });
   }, [isCustomer, user?.savedProfile]);
+
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentError, setAttachmentError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const defaultTransformRequest = (data) => ({
@@ -453,6 +462,88 @@ export default function GuestRequest({
     if (type === "current") getCurrentLocation();
   };
 
+  const formatFileSize = (bytes) => {
+    if (!Number.isFinite(bytes)) return "";
+    if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
+  };
+
+  const describeFileKind = (file) => {
+    if (file.type?.startsWith("video/")) return "video";
+    if (file.type?.startsWith("image/")) return "image";
+    return null;
+  };
+
+  const handleMediaChange = (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    const currentImages = attachments.filter((item) => item.kind === "image").length;
+    const currentVideos = attachments.filter((item) => item.kind === "video").length;
+    const availableSlots = MAX_MEDIA_FILES - attachments.length;
+
+    if (availableSlots <= 0) {
+      setAttachmentError(
+        `You can attach up to ${MAX_MEDIA_IMAGES} images and ${MAX_MEDIA_VIDEOS} video.`
+      );
+      event.target.value = "";
+      return;
+    }
+
+    const allowed = [];
+    const messages = [];
+    let nextImages = currentImages;
+    let nextVideos = currentVideos;
+
+    files.forEach((file, index) => {
+      if (index >= availableSlots) return;
+      const kind = describeFileKind(file);
+      if (!kind) {
+        messages.push(`${file.name} must be an image or video file.`);
+        return;
+      }
+      if (file.size > MAX_MEDIA_SIZE) {
+        messages.push(`${file.name} exceeds the 25 MB limit.`);
+        return;
+      }
+      if (kind === "video") {
+        if (nextVideos >= MAX_MEDIA_VIDEOS) {
+          messages.push("You can upload only 1 video per request.");
+          return;
+        }
+        nextVideos += 1;
+      } else if (kind === "image") {
+        if (nextImages >= MAX_MEDIA_IMAGES) {
+          messages.push("You can upload up to 3 images per request.");
+          return;
+        }
+        nextImages += 1;
+      }
+      allowed.push({ file, kind });
+    });
+
+    if (files.length > availableSlots) {
+      messages.push(
+        `Only ${availableSlots} more ${
+          availableSlots === 1 ? "file fits" : "files fit"
+        }; remove an attachment to add more.`
+      );
+    }
+
+    if (allowed.length) {
+      setAttachments((prev) => [...prev, ...allowed]);
+    }
+
+    setAttachmentError(messages.length ? messages.join(" ") : "");
+    event.target.value = "";
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+    setAttachmentError("");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -460,8 +551,18 @@ export default function GuestRequest({
       const transformer = transformRequest || defaultTransformRequest;
       const payload = transformer(formData);
       const submitFn = submitRequest || defaultSubmitRequest;
-      const result = await submitFn(payload);
+      let result;
+      if (attachments.length) {
+        const formDataPayload = new FormData();
+        formDataPayload.append("payload", JSON.stringify(payload));
+        attachments.forEach(({ file }) => formDataPayload.append("media", file));
+        result = await submitFn(formDataPayload);
+      } else {
+        result = await submitFn(payload);
+      }
       navigateAfterSubmit(result);
+      setAttachments([]);
+      setAttachmentError("");
     } catch (err) {
       console.error(err);
       const message =
@@ -795,6 +896,56 @@ export default function GuestRequest({
                     />
                   </div>
                 </div>
+              </section>
+
+              <section className="location-card location-card--media">
+                <div className="location-card__header">
+                  <span className="location-card__eyebrow">Photos & video</span>
+                  <h3 className="location-card__title">Share what you see (optional)</h3>
+                </div>
+                <p className="location-card__helper">
+                  You can attach up to 3 images and 1 short video (25 MB max each) to help dispatch understand the situation.
+                </p>
+                <label className="media-upload-control">
+                  <span>Select files</span>
+                  <input
+                    type="file"
+                    accept={MEDIA_ACCEPT}
+                    multiple
+                    onChange={handleMediaChange}
+                  />
+                </label>
+                {attachmentError ? (
+                  <p className="media-upload-error">{attachmentError}</p>
+                ) : (
+                  !attachments.length && (
+                    <p className="media-upload-hint">
+                      Add photos of the vehicle, surrounding area, or damage. This step is optional.
+                    </p>
+                  )
+                )}
+                {attachments.length > 0 && (
+                  <ul className="media-upload-list">
+                    {attachments.map((attachment, index) => (
+                      <li key={`${attachment.file.name}-${index}`}>
+                        <div>
+                          <span className="media-upload-name">{attachment.file.name}</span>
+                          <span className="media-upload-meta">
+                            {attachment.kind === "video" ? "Video · " : ""}
+                            {formatFileSize(attachment.file.size)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="media-upload-remove"
+                          onClick={() => removeAttachment(index)}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
             </div>
 

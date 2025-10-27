@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { copyText } from "../utils/clipboard";
 import {
@@ -12,9 +12,13 @@ import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
 import ReviewFunnel from "../components/ReviewFunnel";
+import ChatOverlay from "../components/ChatOverlay";
+import { useJobMessaging } from "../hooks/useJobMessaging";
+import { ensureCustomerPushSubscription } from "../lib/pushNotifications";
 import { useNotifications } from "../contexts/NotificationsContext";
 import {
   LuCar,
+  LuClock,
   LuFlag,
   LuMapPin,
   LuSearch,
@@ -53,6 +57,7 @@ const formatDistanceLabel = (km) => {
 
 export default function CustomerDashboard() {
   const { id } = useParams();
+  const location = useLocation();
   const [state, setState] = useState({
     customer: null,
     job: null,
@@ -67,6 +72,13 @@ export default function CustomerDashboard() {
     distanceMeters: null,
   });
   const historyRef = useRef(null);
+  const pushAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (pushAttemptedRef.current) return;
+    pushAttemptedRef.current = true;
+    ensureCustomerPushSubscription({ source: "customer-dashboard" }).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -92,6 +104,19 @@ export default function CustomerDashboard() {
   const hasGoogle = Boolean(mapsKey);
 
   const { customer, job, driver } = state;
+  const {
+    messages: chatMessages,
+    participants: chatParticipants,
+    sendMessage: sendChatMessage,
+    sending: chatSending,
+    loading: chatLoading,
+    error: chatError,
+    canMessage: chatEnabled,
+    realtimeReady: chatRealtimeReady,
+    typingIndicators: chatTypingIndicators,
+    emitTyping: emitChatTyping,
+    unreadCount: chatUnreadCount,
+  } = useJobMessaging({ jobId: job?._id, role: "customer" });
   const { publish } = useNotifications();
   const previousStatusRef = useRef(null);
   const previousDriverRef = useRef(null);
@@ -112,6 +137,26 @@ export default function CustomerDashboard() {
       ? `${driver.city} - ${driver.phone || "No phone on file"}`
       : driver.phone || "No phone on file"
     : "We'll notify you as soon as a driver accepts.";
+  const vendorDisplayName = useMemo(
+    () => chatParticipants?.vendor?.name || driver?.name || "",
+    [chatParticipants?.vendor?.name, driver?.name]
+  );
+  const chatSubtitle = useMemo(() => {
+    if (!job) return "";
+    if (chatEnabled && vendorDisplayName) {
+      return `Share updates with ${vendorDisplayName}`;
+    }
+    return "";
+  }, [chatEnabled, job, vendorDisplayName]);
+  const autoOpenChat = useMemo(() => {
+    if (location?.state?.openChat) return true;
+    try {
+      const params = new URLSearchParams(location.search || "");
+      return params.get("chat") === "1";
+    } catch {
+      return false;
+    }
+  }, [location?.state?.openChat, location.search]);
 
   const currentStage = job?.status || "Unassigned";
   const activeIndex = Math.max(STAGES.indexOf(currentStage), 0);
@@ -298,6 +343,7 @@ export default function CustomerDashboard() {
     }
     return null;
   }, [driverMarkers]);
+  
 
   const mapCenter = useMemo(() => {
     if (routeDestination?.position) return routeDestination.position;
@@ -494,6 +540,51 @@ export default function CustomerDashboard() {
     },
   ];
 
+  const summaryStats = useMemo(() => {
+    const stats = [
+      {
+        key: "status",
+        label: "Status",
+        value: currentTitle,
+        icon: stageMeta[currentStage]?.icon || LuSearch,
+      },
+      {
+        key: "eta",
+        label: "ETA",
+        value: etaText,
+        icon: LuClock,
+      },
+    ];
+
+    if (routeDistanceLabel) {
+      stats.push({
+        key: "distance",
+        label:
+          destinationRoleLabel === "customer"
+            ? "Distance to you"
+            : "Distance to destination",
+        value: routeDistanceLabel,
+        icon: LuMapPin,
+      });
+    }
+
+    stats.push({
+      key: "driver",
+      label: "Driver",
+      value: driver?.name ? driver.name : "Matching driver",
+      icon: LuTruck,
+    });
+
+    return stats;
+  }, [
+    currentTitle,
+    currentStage,
+    etaText,
+    routeDistanceLabel,
+    destinationRoleLabel,
+    driver?.name,
+  ]);
+
   if (err)
     return (
       <div className="custdash" role="status" aria-live="polite">
@@ -552,7 +643,7 @@ export default function CustomerDashboard() {
                 />
               </div>
 
-              <ul className="custdash-flow__steps" role="list">
+              <ul className="custdash-flow__steps">
                 {STAGES.map((s, i) => {
                   const done = i < activeIndex;
                   const active = i === activeIndex;
@@ -574,7 +665,7 @@ export default function CustomerDashboard() {
               </ul>
             </div>
 
-            <div>
+            <div className="custdash-hero__pane">
               <div
                 className="custdash-tracker"
                 role="status"
@@ -598,6 +689,40 @@ export default function CustomerDashboard() {
                   {isFinalStage ? "All wrapped" : nextCopy}
                 </span>
               </div>
+
+              {summaryStats.length > 0 && (
+                <div
+                  className="custdash-summary"
+                  role="list"
+                  aria-label="Job at a glance"
+                >
+                  {summaryStats.map((stat) => {
+                    const Icon = stat.icon;
+                    return (
+                      <div
+                        key={stat.key}
+                        className="custdash-summary__item"
+                        role="listitem"
+                      >
+                        <span
+                          className="custdash-summary__icon"
+                          aria-hidden="true"
+                        >
+                          <Icon />
+                        </span>
+                        <div className="custdash-summary__text">
+                          <span className="custdash-summary__label">
+                            {stat.label}
+                          </span>
+                          <span className="custdash-summary__value">
+                            {stat.value}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -767,38 +892,58 @@ export default function CustomerDashboard() {
               </div>
             )}
           </section>
+
+          <section className="card custdash-action-rail">
+            <div className="custdash-action-rail__header">
+              <h3>Control center</h3>
+              <span className="custdash-chip secondary">Quick actions</span>
+            </div>
+            <div className="custdash-action-rail__grid">
+              {quickTiles.map((tile) => (
+                <button
+                  key={tile.key}
+                  type="button"
+                  className={`custdash-action ${tile.tone}`}
+                  onClick={() => {
+                    if (!tile.disabled) tile.action();
+                  }}
+                  disabled={tile.disabled}
+                  aria-disabled={tile.disabled ? "true" : "false"}
+                >
+                  <span className="custdash-action__icon" aria-hidden="true">
+                    {tile.icon}
+                  </span>
+                  <span className="custdash-action__text">
+                    <span className="custdash-action__label">{tile.label}</span>
+                    <span className="custdash-action__caption">
+                      {tile.caption}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
 
-        <section className="card custdash-action-rail">
-          <div className="custdash-action-rail__header">
-            <h3>Control center</h3>
-            <span className="custdash-chip secondary">Quick actions</span>
-          </div>
-          <div className="custdash-action-rail__grid">
-            {quickTiles.map((tile) => (
-              <button
-                key={tile.key}
-                type="button"
-                className={`custdash-action ${tile.tone}`}
-                onClick={() => {
-                  if (!tile.disabled) tile.action();
-                }}
-                disabled={tile.disabled}
-                aria-disabled={tile.disabled ? "true" : "false"}
-              >
-                <span className="custdash-action__icon" aria-hidden="true">
-                  {tile.icon}
-                </span>
-                <span className="custdash-action__text">
-                  <span className="custdash-action__label">{tile.label}</span>
-                  <span className="custdash-action__caption">
-                    {tile.caption}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
+        {job && (
+          <ChatOverlay
+            title="Message your vendor"
+            subtitle={chatSubtitle}
+            messages={chatMessages}
+            participants={chatParticipants}
+            actorRole="customer"
+            canMessage={chatEnabled}
+            onSend={sendChatMessage}
+            sending={chatSending}
+            loading={chatLoading}
+            error={chatError}
+            realtimeReady={chatRealtimeReady}
+            typingIndicators={chatTypingIndicators}
+            onTyping={emitChatTyping}
+            unreadCount={chatUnreadCount}
+            defaultOpen={autoOpenChat && chatEnabled}
+          />
+        )}
 
         <section
           ref={historyRef}
@@ -835,6 +980,8 @@ export default function CustomerDashboard() {
     </div>
   );
 }
+
+
 
 
 

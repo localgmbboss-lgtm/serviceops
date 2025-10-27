@@ -1,8 +1,19 @@
+/* ---------- Base + variables ---------- */
+:root {
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 16px;
+  --space-4: 20px;
+  --radius-lg: 16px;
+  --muted: #6b7280;
+}
+
 .ops {
   display: flex;
   flex-direction: column;
   gap: 24px;
   padding-bottom: 32px;
+  padding-inline: var(--space-3);
 }
 
 .ops-header {
@@ -14,7 +25,7 @@
 
 .ops-header h1 {
   margin: 0;
-  font-size: 2rem;
+  font-size: clamp(1.25rem, 2.5vw + 1rem, 2rem);
 }
 
 .ops-header p {
@@ -55,7 +66,7 @@
 
 .ops-card header h2 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: clamp(1.05rem, 1.4vw + 0.9rem, 1.25rem);
 }
 
 .ops-card header p {
@@ -350,7 +361,8 @@
   border: 1px solid rgba(15, 23, 42, 0.16);
   background: #ffffff;
   border-radius: 999px;
-  padding: 6px 14px;
+  padding: 8px 16px;
+  min-height: 44px;
   font-size: 0.85rem;
   font-weight: 600;
   color: #0f172a;
@@ -370,6 +382,7 @@
   box-shadow: none;
 }
 
+/* ---------- Existing tablet collapse ---------- */
 @media (max-width: 1024px) {
   .ops-grid {
     grid-template-columns: 1fr;
@@ -380,9 +393,158 @@
   }
 }
 
+/* ---------- Additional tweaks for medium screens ---------- */
+@media (max-width: 960px) {
+  .ops-grid {
+    grid-template-columns: 1fr;
+  }
+  .ops-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  .ops-header__meta {
+    align-items: flex-start;
+  }
+}
+
+/* ---------- Phones ---------- */
 @media (max-width: 640px) {
-  .ops-pagination {
+  .ops {
+    gap: var(--space-3);
+    padding-bottom: 24px;
+  }
+
+  .ops-card {
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .ops-card header {
     flex-direction: column;
     align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  /* Header actions */
+  .ops-header__meta {
+    width: 100%;
+    gap: var(--space-2);
+  }
+  .ops-header__meta .btn {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* Scorecards & suggestions -> single column */
+  .ops-scorecards {
+    grid-template-columns: 1fr;
+  }
+  .ops-suggest__item ul {
+    gap: 10px;
+  }
+
+  /* Pagination stacks nicely */
+  .ops-pagination {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  .ops-pagination__controls {
+    justify-content: space-between;
+  }
+  .ops-pagination__btn {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  /* -------- Queue table -> stacked cards -------- */
+  .ops-table-wrap {
+    overflow: visible;
+  }
+
+  .ops-queue {
+    border-collapse: separate;
+    border-spacing: 0 10px;
+  }
+
+  .ops-queue thead {
+    display: none;
+  }
+
+  .ops-queue tbody tr {
+    display: block;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+  }
+
+  .ops-queue__row--risk {
+    background: rgba(239, 68, 68, 0.06);
+  }
+
+  .ops-queue tbody td {
+    display: grid;
+    grid-template-columns: 110px 1fr; /* label + value */
+    align-items: start;
+    gap: 8px;
+    padding: 6px 0;
+    border: 0;
+    word-break: break-word;
+  }
+
+  .ops-queue tbody td:first-child {
+    padding-top: 0;
+  }
+  .ops-queue tbody td:last-child {
+    padding-bottom: 0;
+  }
+
+  /* Show column labels taken from data-col in JSX */
+  .ops-queue tbody td::before {
+    content: attr(data-col);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--muted, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    align-self: start;
+  }
+
+  .ops-chip {
+    margin: 0 8px 6px 0;
+  }
+  .ops-queue__meta strong {
+    display: block;
+    margin-bottom: 2px;
+  }
+  .ops-queue__timer {
+    font-size: 0.8rem;
+  }
+  .ops-badge {
+    padding: 3px 10px;
+    font-size: 0.72rem;
+  }
+  .ops-pill {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+  }
+
+  .ops-compliance li {
+    padding: 10px;
+    font-size: 0.9rem;
+  }
+}
+
+/* ---------- Ultra-small screens ---------- */
+@media (max-width: 360px) {
+  .ops-queue tbody td {
+    grid-template-columns: 1fr; /* label above value */
+  }
+  .ops-queue tbody td::before {
+    margin-bottom: 2px;
   }
 }

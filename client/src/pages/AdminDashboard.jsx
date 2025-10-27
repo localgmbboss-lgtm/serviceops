@@ -43,6 +43,16 @@ function formatAbbr(num, { currency = false, decimals = 1 } = {}) {
   return `${sign}${currency ? "$" : ""}${out}`;
 }
 
+const formatCount = (value) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "0";
+  try {
+    return new Intl.NumberFormat().format(num);
+  } catch (error) {
+    return String(num);
+  }
+};
+
 export default function AdminDashboard() {
   const [summary, setSummary] = useState(null);
   const [vendors, setVendors] = useState([]);
@@ -50,6 +60,17 @@ export default function AdminDashboard() {
   const [dash, setDash] = useState(null);
   const [err, setErr] = useState("");
   const [slice, setSlice] = useState("month");
+  const [reviewRange, setReviewRange] = useState("30");
+  const [reviewCategory, setReviewCategory] = useState("all");
+  const [digestRange, setDigestRange] = useState("daily");
+  const [digest, setDigest] = useState(null);
+  const [digestMeta, setDigestMeta] = useState(null);
+  const [digestError, setDigestError] = useState("");
+  const [digestLoading, setDigestLoading] = useState(false);
+
+  const activeDigestRange = digestMeta?.range || digestRange;
+  const activeDigestRangeLabel =
+    activeDigestRange === "weekly" ? "Last 7 days" : "Last 24 hours";
 
   // trigger re-draw of canvases on window resize
   const [viewportW, setViewportW] = useState(
@@ -70,9 +91,9 @@ export default function AdminDashboard() {
         api.get("/api/admin/vendors"),
         api.get("/api/documents"),
         api.get("/api/reports/dashboard"),
-    ]);
-    setSummary(s.data);
-    setVendors(Array.isArray(v.data) ? v.data : []);
+      ]);
+      setSummary(s.data);
+      setVendors(Array.isArray(v.data) ? v.data : []);
       setDocs(dc.data);
       setDash(db.data);
       setErr("");
@@ -83,6 +104,50 @@ export default function AdminDashboard() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchDigest = async () => {
+      setDigestLoading(true);
+      setDigestError("");
+      try {
+        const { data } = await api.get(
+          `/api/ai/reports/digest?range=${digestRange}`
+        );
+        if (cancelled) return;
+        setDigest(data?.digest || null);
+        setDigestMeta({
+          generatedAt: data?.generatedAt || null,
+          range: data?.range || digestRange,
+        });
+      } catch (error) {
+        if (cancelled) return;
+        const status = error?.response?.status;
+        if (status === 503) {
+          setDigestError(
+            "AI operations digest is disabled. Add OPENAI_API_KEY on the server to enable."
+          );
+        } else {
+          setDigestError(
+            error?.response?.data?.message ||
+              "Unable to load AI operations digest."
+          );
+        }
+        setDigest(null);
+        setDigestMeta(null);
+      } finally {
+        if (!cancelled) {
+          setDigestLoading(false);
+        }
+      }
+    };
+
+    fetchDigest();
+    return () => {
+      cancelled = true;
+    };
+  }, [digestRange]);
 
   const expiring = useMemo(() => {
     const week = 7 * 24 * 3600 * 1000;
@@ -113,51 +178,340 @@ export default function AdminDashboard() {
     return { ctx, cssW, cssH };
   }
 
-  // Satisfaction donut chart
+  // Satisfaction gauge canvas
   const satCanvasRef = useRef(null);
+  const satAnimationStateRef = useRef({
+    phaseA: Math.random() * Math.PI * 2,
+    phaseB: Math.random() * Math.PI * 2,
+    speedA: 0.018 + Math.random() * 0.008,
+    speedB: 0.022 + Math.random() * 0.01,
+    targetSpeedA: 0.018 + Math.random() * 0.008,
+    targetSpeedB: 0.022 + Math.random() * 0.01,
+    freqA: 1.7 + Math.random() * 0.9,
+    freqB: 2.8 + Math.random() * 1.2,
+    targetFreqA: 1.7 + Math.random() * 0.9,
+    targetFreqB: 2.8 + Math.random() * 1.2,
+    ampA: 0.08,
+    ampB: 0.05,
+    targetAmpA: 0.08,
+    targetAmpB: 0.05,
+    jitter: 0,
+    targetJitter: 0,
+  });
+  const satisfaction = dash?.satisfaction || {};
+  const positiveReviews = Number(satisfaction.five || 0);
+  const privateReviews = Number(satisfaction.private || 0);
+  const totalReviews = positiveReviews + privateReviews;
+  const satisfactionRatio = totalReviews ? positiveReviews / totalReviews : 0;
+  const satisfactionScore10 = satisfactionRatio * 10;
+  const satisfactionScorePercent = Math.round(satisfactionRatio * 100);
+  const reviewRangeLabel =
+    reviewRange === "7"
+      ? "last 7 days"
+      : reviewRange === "30"
+      ? "last 30 days"
+      : "last 90 days";
+  const reviewWindowDays = Number(reviewRange) || 30;
+  const reviewsPerDay = totalReviews ? totalReviews / reviewWindowDays : 0;
+  const reviewsPerDayValue = reviewsPerDay
+    ? reviewsPerDay >= 10
+      ? Math.round(reviewsPerDay)
+      : reviewsPerDay >= 1
+      ? reviewsPerDay.toFixed(1)
+      : reviewsPerDay.toFixed(2)
+    : null;
+  const fiveStarSharePercent = totalReviews
+    ? Math.round((positiveReviews / totalReviews) * 100)
+    : 0;
+  const privateSharePercent = totalReviews
+    ? Math.round((privateReviews / totalReviews) * 100)
+    : 0;
+
+  const renderDigestSection = (title, items, modifier) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <section
+        className={`digest-card__section${
+          modifier ? ` digest-card__section--${modifier}` : ""
+        }`}
+      >
+        <h4>{title}</h4>
+        <ul>
+          {items.map((item, index) => (
+            <li key={`${modifier || title}-${index}`}>{item}</li>
+          ))}
+        </ul>
+      </section>
+    );
+  };
 
   // Work vs revenue trend canvas
   const workCanvasRef = useRef(null);
 
   useEffect(() => {
-    if (!dash?.satisfaction || !satCanvasRef.current) return;
-    const { five = 0, private: priv = 0 } = dash.satisfaction;
-    const total = Math.max(1, five + priv);
-    const angle = (five / total) * Math.PI * 2;
-
     const canvas = satCanvasRef.current;
-    const { ctx, cssW, cssH } = sizeCanvas(canvas);
-    ctx.clearRect(0, 0, cssW, cssH);
+    if (!canvas) return;
 
-    const r = Math.min(cssW, cssH) / 2 - 16;
-    const cx = cssW / 2;
-    const cy = cssH / 2;
+    const state = satAnimationStateRef.current;
+    let rafId = null;
 
-    ctx.lineWidth = 28;
-    ctx.strokeStyle = "#e5e7eb";
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
+    const drawWaveGauge = () => {
+      const { ctx, cssW, cssH } = sizeCanvas(canvas);
+      ctx.clearRect(0, 0, cssW, cssH);
 
-    ctx.strokeStyle = "#22c55e";
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + angle);
-    ctx.stroke();
+      const cx = cssW / 2;
+      const radius = Math.min(cssW, cssH) / 2.4;
+      const cy = cssH / 2 + 12;
 
-    ctx.fillStyle = "#111827";
-    ctx.font = "600 16px system-ui, -apple-system, Segoe UI, Roboto";
-    ctx.textAlign = "center";
-    ctx.fillText(`${Math.round((five / total) * 100)}%`, cx, cy + 4);
-    ctx.fillStyle = "#6b7280";
-    ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto";
-    ctx.fillText(`5* vs private`, cx, cy + 22);
-  }, [dash, viewportW]);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius + radius * 0.12, 0, Math.PI * 2);
+      ctx.closePath();
+      const ringGradient = ctx.createLinearGradient(cx, cy - radius, cx, cy + radius);
+      ringGradient.addColorStop(0, "rgba(56, 189, 248, 0.04)");
+      ringGradient.addColorStop(1, "rgba(129, 140, 248, 0.08)");
+      ctx.fillStyle = ringGradient;
+      ctx.fill();
+      ctx.restore();
 
-  // Work vs revenue dual line chart (14-day window)
+      ctx.lineWidth = radius * 0.12;
+      ctx.strokeStyle = "rgba(30, 64, 175, 0.35)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius + ctx.lineWidth / 2.2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const outerGlow = ctx.createLinearGradient(cx, cy - radius, cx, cy + radius);
+      outerGlow.addColorStop(0, "rgba(59, 130, 246, 0.45)");
+      outerGlow.addColorStop(1, "rgba(99, 102, 241, 0.4)");
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = outerGlow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      if (!totalReviews) {
+        ctx.fillStyle = "rgba(148, 163, 184, 0.65)";
+        ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
+        ctx.textAlign = "center";
+        ctx.fillText("No review data yet", cx, cy + 4);
+        rafId = requestAnimationFrame(drawWaveGauge);
+        return;
+      }
+
+      state.phaseA += state.speedA;
+      state.phaseB += state.speedB;
+      if (Math.random() < 0.006) state.targetSpeedA = 0.014 + Math.random() * 0.01;
+      if (Math.random() < 0.006) state.targetSpeedB = 0.018 + Math.random() * 0.012;
+      if (Math.random() < 0.008) state.targetAmpA = 0.06 + Math.random() * 0.04;
+      if (Math.random() < 0.008) state.targetAmpB = 0.04 + Math.random() * 0.035;
+      if (Math.random() < 0.007) state.targetFreqA = 1.4 + Math.random() * 1.1;
+      if (Math.random() < 0.007) state.targetFreqB = 2.2 + Math.random() * 1.4;
+      if (Math.random() < 0.01) state.targetJitter = (Math.random() - 0.5) * 0.05;
+
+      state.speedA += (state.targetSpeedA - state.speedA) * 0.04;
+      state.speedB += (state.targetSpeedB - state.speedB) * 0.04;
+      state.ampA += (state.targetAmpA - state.ampA) * 0.08;
+      state.ampB += (state.targetAmpB - state.ampB) * 0.08;
+      state.freqA += (state.targetFreqA - state.freqA) * 0.05;
+      state.freqB += (state.targetFreqB - state.freqB) * 0.05;
+      state.jitter += (state.targetJitter - state.jitter) * 0.05;
+
+      const positiveRatio = satisfactionRatio;
+      const baseLevel = cy + radius - positiveRatio * (radius * 1.95);
+      const amplitudeA = radius * state.ampA;
+      const amplitudeB = radius * state.ampB;
+      const jitter = state.jitter * radius;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      const topGradient = ctx.createLinearGradient(cx, cy - radius, cx, cy);
+      topGradient.addColorStop(0, "#20d4ff");
+      topGradient.addColorStop(1, "#1ba7f0");
+      ctx.fillStyle = topGradient;
+      ctx.fillRect(cx - radius - 8, cy - radius - 8, radius * 2 + 16, radius * 2 + 16);
+
+      const bottomGradient = ctx.createLinearGradient(cx, cy, cx, cy + radius);
+      bottomGradient.addColorStop(0, "#ff7ad9");
+      bottomGradient.addColorStop(1, "#ff5ca8");
+
+      const startX = cx - radius - 8;
+      const endX = cx + radius + 8;
+      const span = endX - startX;
+      const step = span / 160;
+
+      const waveY = (x) => {
+        const rel = (x - startX) / span;
+        const angleA = rel * Math.PI * state.freqA + state.phaseA;
+        const angleB = rel * Math.PI * state.freqB + state.phaseB;
+        const y =
+          baseLevel +
+          jitter +
+          Math.sin(angleA) * amplitudeA +
+          Math.sin(angleB) * amplitudeB;
+        const minY = cy - radius + 4;
+        const maxY = cy + radius - 4;
+        return Math.max(minY, Math.min(maxY, y));
+      };
+
+      ctx.beginPath();
+      ctx.moveTo(startX, cy + radius + 12);
+      ctx.lineTo(startX, waveY(startX));
+      for (let x = startX; x <= endX; x += step) {
+        ctx.lineTo(x, waveY(x));
+      }
+      ctx.lineTo(endX, cy + radius + 12);
+      ctx.closePath();
+      ctx.fillStyle = bottomGradient;
+      ctx.fill();
+
+      const highlightGradient = ctx.createRadialGradient(
+        cx,
+        cy - radius * 0.9,
+        radius * 0.1,
+        cx,
+        cy - radius * 0.9,
+        radius * 1.1
+      );
+      highlightGradient.addColorStop(0, "rgba(255, 255, 255, 0.35)");
+      highlightGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = highlightGradient;
+      ctx.beginPath();
+      ctx.arc(cx, cy - radius * 0.35, radius * 0.85, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+
+      ctx.restore();
+
+      ctx.fillStyle = "#f8fafc";
+      ctx.font = `600 ${Math.round(radius * 0.28)}px system-ui, -apple-system, Segoe UI, Roboto`;
+      ctx.textAlign = "center";
+      ctx.fillText(`${Math.round(positiveRatio * 100)}%`, cx, cy - radius * 0.4);
+      ctx.fillStyle = "rgba(248, 250, 252, 0.85)";
+      ctx.fillText(`${Math.round((1 - positiveRatio) * 100)}%`, cx, cy + radius * 0.45);
+
+      rafId = requestAnimationFrame(drawWaveGauge);
+    };
+
+    drawWaveGauge();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [satisfactionRatio, totalReviews, viewportW]);
+
+  // Work vs revenue dual bar chart (14-day window)
+  const workTimelineMeta = useMemo(() => {
+    const rawLabels = Array.isArray(dash?.workVsRevenue?.labels)
+      ? dash.workVsRevenue.labels
+      : [];
+    if (rawLabels.length === 0) {
+      return {
+        ticks: [],
+        range: "",
+        count: 0,
+        summary: [],
+        year: "",
+      };
+    }
+    const safeDate = (label) => {
+      if (typeof label !== "string") return null;
+      const [yy, mm, dd] = label.split("-").map((segment) => Number(segment));
+      const date = new Date(yy || 0, (mm || 1) - 1, dd || 1);
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+    const dates = rawLabels.map((label) => safeDate(label));
+    const total = rawLabels.length;
+
+    const shortFormatter = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+    const monthFormatter = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+    });
+    const yearFormatter = new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+    });
+
+    const rangeFormatter = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+    const firstDate = dates[0];
+    const lastDate = dates[dates.length - 1];
+    const range =
+      firstDate && lastDate
+        ? `${rangeFormatter.format(firstDate)} - ${rangeFormatter.format(lastDate)}`
+        : "";
+    const yearLabel = firstDate ? yearFormatter.format(firstDate) : "";
+
+    const summaryMap = new Map();
+    dates.forEach((date, index) => {
+      if (!date) return;
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      if (!summaryMap.has(key)) {
+        summaryMap.set(key, {
+          month: monthFormatter.format(date),
+          dates: [],
+          startIndex: index,
+          endIndex: index,
+        });
+      }
+      const ref = summaryMap.get(key);
+      const dayLabel = String(date.getDate()).padStart(2, "0");
+      ref.dates.push({
+        label: dayLabel,
+        index,
+      });
+      ref.endIndex = index;
+    });
+
+    const summary = Array.from(summaryMap.values()).map((entry) => {
+      const spanCount = Math.max(1, entry.endIndex - entry.startIndex + 1);
+      const startRatio = total > 0 ? entry.startIndex / total : 0;
+      const spanRatio = total > 0 ? spanCount / total : 1;
+      return {
+        month: entry.month,
+        startRatio,
+        spanRatio,
+        dates: entry.dates.map((record) => ({
+          label: record.label,
+          index: record.index,
+          positionLocal:
+            spanCount > 0
+              ? (record.index - entry.startIndex + 0.5) / spanCount
+              : 0.5,
+        })),
+      };
+    });
+
+    return {
+      ticks: dates.map((date, index) => ({
+        index,
+        label: date ? shortFormatter.format(date) : String(rawLabels[index]),
+        positionRatio: total > 0 ? (index + 0.5) / total : 0.5,
+      })),
+      range,
+      count: total,
+      summary,
+      year: yearLabel,
+    };
+  }, [dash?.workVsRevenue?.labels]);
+
+  const workTimelineTicks = workTimelineMeta.ticks;
+  const workTimelineRangeLabel = workTimelineMeta.range;
+  const workTimelinePointCount = workTimelineMeta.count;
+  const workTimelineSummary = workTimelineMeta.summary;
+  const workTimelineYearLabel = workTimelineMeta.year;
+
   useEffect(() => {
-    if (!workCanvasRef.current) return;
-    const trend = dash?.workVsRevenue;
     const canvas = workCanvasRef.current;
+    if (!canvas) return;
+    const trend = dash?.workVsRevenue;
     const { ctx, cssW, cssH } = sizeCanvas(canvas);
     ctx.clearRect(0, 0, cssW, cssH);
 
@@ -166,126 +520,182 @@ export default function AdminDashboard() {
     const revenueRaw = Array.isArray(trend?.revenue) ? trend.revenue : [];
 
     if (labels.length === 0 || jobsRaw.length === 0 || revenueRaw.length === 0) {
-      ctx.fillStyle = "#94a3b8";
+      ctx.fillStyle = "rgba(148, 163, 184, 0.65)";
       ctx.font = "14px system-ui, -apple-system, Segoe UI, Roboto";
       ctx.textAlign = "center";
       ctx.fillText("No trend data yet", cssW / 2, cssH / 2);
       return;
     }
 
-    const padding = { top: 28, right: 60, bottom: 40, left: 60 };
+    const compactViewport = cssW <= 540;
+    const padding = compactViewport
+      ? { top: 28, right: 28, bottom: 30, left: 52 }
+      : { top: 42, right: 48, bottom: 40, left: 64 };
+
     const chartW = Math.max(0, cssW - padding.left - padding.right);
     const chartH = Math.max(0, cssH - padding.top - padding.bottom);
-    if (chartW === 0 || chartH === 0) return;
+    if (chartW <= 0 || chartH <= 0) return;
 
-    const jobs = labels.map((_, idx) => Number(jobsRaw[idx] || 0));
-    const revenueK = labels.map((_, idx) => Number(revenueRaw[idx] || 0) / 1000);
+    const jobs = labels.map((_, idx) => Math.max(0, Number(jobsRaw[idx] || 0)));
+    const revenueVals = labels.map((_, idx) =>
+      Math.max(0, Number(revenueRaw[idx] || 0))
+    );
 
-    const maxScale = Math.max(...jobs, ...revenueK, 1);
-    const stepX = labels.length > 1 ? chartW / (labels.length - 1) : 0;
+    const maxRevenue = Math.max(...revenueVals, 1);
+    const maxJobs = Math.max(...jobs, 1);
+    const topHalf = compactViewport ? chartH * 0.46 : chartH / 2;
+    const bottomHalf = chartH - topHalf;
+    const axisY = padding.top + topHalf;
+    const stepX = chartW / labels.length;
+    const barWidth = Math.min(
+      compactViewport ? 18 : 26,
+      stepX * (compactViewport ? 0.62 : 0.55)
+    );
 
-    // Axes
-    ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
-    ctx.lineWidth = 1;
+    // background panel
+    const panelGradient = ctx.createLinearGradient(
+      padding.left,
+      padding.top,
+      padding.left + chartW,
+      padding.top + chartH
+    );
+    panelGradient.addColorStop(0, "rgba(14, 165, 233, 0.14)");
+    panelGradient.addColorStop(0.45, "rgba(37, 99, 235, 0.22)");
+    panelGradient.addColorStop(1, "rgba(15, 23, 42, 0.35)");
+    ctx.fillStyle = panelGradient;
+    ctx.fillRect(padding.left, padding.top, chartW, chartH);
+
+    // axis baseline
+    ctx.strokeStyle = compactViewport
+      ? "rgba(37, 99, 235, 0.4)"
+      : "rgba(37, 99, 235, 0.45)";
+    ctx.lineWidth = compactViewport ? 1 : 1.2;
     ctx.beginPath();
-    ctx.moveTo(padding.left, padding.top);
-    ctx.lineTo(padding.left, padding.top + chartH);
-    ctx.lineTo(padding.left + chartW, padding.top + chartH);
+    ctx.moveTo(padding.left, axisY);
+    ctx.lineTo(padding.left + chartW, axisY);
     ctx.stroke();
 
-    // Y ticks & grid
-    const ticks = 4;
-    ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto";
-    ctx.fillStyle = "#cbd5f5";
+    // helper to draw horizontal grid/ticks
+    ctx.font = `${compactViewport ? 10 : 11}px system-ui, -apple-system, Segoe UI, Roboto`;
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-    for (let i = 0; i <= ticks; i++) {
-      const value = (maxScale / ticks) * i;
-      const y = padding.top + chartH - (value / maxScale) * chartH;
-      ctx.fillText(
-        value >= 10 ? Math.round(value).toString() : value.toFixed(1),
-        padding.left - 10,
-        y
-      );
-      if (i !== 0) {
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.18)";
-        ctx.beginPath();
-        ctx.moveTo(padding.left, y);
-        ctx.lineTo(padding.left + chartW, y);
-        ctx.stroke();
-      }
-    }
-
-    // X labels (adaptive skipping)
-    const labelSkip = labels.length > 7 ? Math.ceil(labels.length / 7) : 1;
-    ctx.fillStyle = "#cbd5f5";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    const formatter = new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-    labels.forEach((label, idx) => {
-      if (idx % labelSkip !== 0 && idx !== labels.length - 1) return;
-      const x = padding.left + stepX * idx;
-      const [yy, mm, dd] = label.split("-").map((s) => parseInt(s, 10));
-      const dateObj = new Date(yy, (mm || 1) - 1, dd || 1);
-      ctx.fillText(formatter.format(dateObj), x, padding.top + chartH + 10);
-    });
-
-    const toPoints = (series) =>
-      series.map((value, idx) => {
-        const x = padding.left + stepX * idx;
-        const y = padding.top + chartH - (value / maxScale) * chartH;
-        return { x, y };
-      });
-
-    const drawSeries = (series, color, fill) => {
-      if (!series.length) return;
-      const points = toPoints(series);
-
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      points.forEach((pt, idx) => {
-        if (idx === 0) ctx.moveTo(pt.x, pt.y);
-        else ctx.lineTo(pt.x, pt.y);
-      });
-      ctx.stroke();
-
-      if (fill) {
-        const gradient = ctx.createLinearGradient(
-          0,
-          padding.top,
-          0,
-          padding.top + chartH
-        );
-        gradient.addColorStop(0, fill);
-        gradient.addColorStop(1, "rgba(255,255,255,0)");
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        points.forEach((pt, idx) => {
-          if (idx === 0) ctx.moveTo(pt.x, pt.y);
-          else ctx.lineTo(pt.x, pt.y);
-        });
-        ctx.lineTo(points[points.length - 1].x, padding.top + chartH);
-        ctx.lineTo(points[0].x, padding.top + chartH);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      ctx.fillStyle = color;
-      points.forEach((pt) => {
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-      });
+    const tickCount = compactViewport ? 3 : 4;
+    const formatRevenueTick = (value) => {
+      const decimals = value < 1000 ? 0 : 1;
+      return formatAbbr(value, { currency: true, decimals });
     };
 
-    drawSeries(revenueK, "rgba(37, 99, 235, 1)", "rgba(37, 99, 235, 0.16)");
-    drawSeries(jobs, "rgba(34, 197, 94, 1)");
-  }, [dash, viewportW]);
+    for (let i = 1; i <= tickCount; i++) {
+      const value = (maxRevenue / tickCount) * i;
+      const y = axisY - (value / maxRevenue) * topHalf;
+      ctx.fillStyle = "rgba(203, 213, 225, 0.78)";
+      ctx.fillText(formatRevenueTick(value), padding.left - 12, y);
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.18)";
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(padding.left + chartW, y);
+      ctx.stroke();
+    }
+    const jobTickStep = Math.max(1, Math.ceil(maxJobs / tickCount));
+    const jobTicks = [];
+    for (let value = jobTickStep; value < maxJobs; value += jobTickStep) {
+      jobTicks.push(value);
+    }
+    if (jobTicks.length === 0 || jobTicks[jobTicks.length - 1] !== maxJobs) {
+      jobTicks.push(maxJobs);
+    }
+    jobTicks.forEach((value) => {
+      const y = axisY + (value / maxJobs) * bottomHalf;
+      ctx.fillStyle = "rgba(203, 213, 225, 0.78)";
+      ctx.fillText(Math.round(value).toString(), padding.left - 12, y);
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.12)";
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(padding.left + chartW, y);
+      ctx.stroke();
+    });
+
+    // vertical tick markers for timeline
+    const tickIndexes = workTimelineTicks
+      .map((tick) => tick.index)
+      .filter((idx) => idx >= 0 && idx < labels.length);
+    if (tickIndexes.length > 0) {
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.28)";
+      tickIndexes.forEach((idx) => {
+        const centerX = padding.left + stepX * (idx + 0.5);
+        ctx.beginPath();
+        ctx.moveTo(centerX, axisY + (compactViewport ? 1 : 2));
+        ctx.lineTo(centerX, axisY + (compactViewport ? 10 : 12));
+        ctx.stroke();
+      });
+    }
+
+    const drawBar = ({
+      value,
+      max,
+      half,
+      direction,
+      colors,
+      index,
+    }) => {
+      if (!max || !value) return;
+      const height = (value / max) * half;
+      if (height <= 0) return;
+      const centerX = padding.left + stepX * (index + 0.5);
+      const barX = centerX - barWidth / 2;
+      const radius = Math.min(10, barWidth / 2, height);
+      const startY = direction === "up" ? axisY - height : axisY;
+      const endY = direction === "up" ? axisY : axisY + height;
+
+      const gradient = ctx.createLinearGradient(0, startY, 0, endY);
+      gradient.addColorStop(0, colors[0]);
+      gradient.addColorStop(1, colors[1]);
+
+      ctx.save();
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      if (direction === "up") {
+        ctx.moveTo(barX, endY);
+        ctx.lineTo(barX, startY + radius);
+        ctx.quadraticCurveTo(barX, startY, barX + radius, startY);
+        ctx.lineTo(barX + barWidth - radius, startY);
+        ctx.quadraticCurveTo(barX + barWidth, startY, barX + barWidth, startY + radius);
+        ctx.lineTo(barX + barWidth, endY);
+      } else {
+        ctx.moveTo(barX, startY);
+        ctx.lineTo(barX, endY - radius);
+        ctx.quadraticCurveTo(barX, endY, barX + radius, endY);
+        ctx.lineTo(barX + barWidth - radius, endY);
+        ctx.quadraticCurveTo(barX + barWidth, endY, barX + barWidth, endY - radius);
+        ctx.lineTo(barX + barWidth, startY);
+      }
+      ctx.closePath();
+      ctx.shadowColor =
+        direction === "up" ? "rgba(253, 224, 71, 0.28)" : "rgba(14, 165, 233, 0.28)";
+      ctx.shadowBlur = 18;
+      ctx.fill();
+      ctx.restore();
+    };
+
+    labels.forEach((_, idx) => {
+      drawBar({
+        value: revenueVals[idx] || 0,
+        max: maxRevenue,
+        half: topHalf,
+        direction: "up",
+        colors: ["rgba(253, 224, 71, 0.96)", "rgba(249, 115, 22, 0.78)"],
+        index: idx,
+      });
+      drawBar({
+        value: jobs[idx] || 0,
+        max: maxJobs,
+        half: bottomHalf,
+        direction: "down",
+        colors: ["rgba(37, 99, 235, 0.92)", "rgba(14, 165, 233, 0.72)"],
+        index: idx,
+      });
+    });
+  }, [dash, viewportW, workTimelineTicks]);
 
   const snap = dash?.revenue?.[slice] || {
     gross: 0,
@@ -294,234 +704,544 @@ export default function AdminDashboard() {
     net: 0,
   };
 
+  const onlineVendors = useMemo(
+    () => vendors.filter((vendor) => vendor && vendor.active !== false).length,
+    [vendors]
+  );
+
+  const refreshedAtLabel = useMemo(() => {
+    const stamp =
+      dash?.generatedAt ||
+      dash?.refreshedAt ||
+      summary?.generatedAt ||
+      summary?.updatedAt ||
+      null;
+    if (!stamp) return "";
+    try {
+      return new Date(stamp).toLocaleString();
+    } catch (error) {
+      return "";
+    }
+  }, [dash, summary]);
+
+  const heroStats = useMemo(
+    () => [
+      {
+        id: "jobs",
+        label: "Active jobs",
+        value: formatCount(
+          summary?.activeJobs ??
+            summary?.active ??
+            summary?.inProgress ??
+            summary?.open ??
+            0
+        ),
+      },
+      {
+        id: "net",
+        label: "Net today",
+        value: formatAbbr(
+          dash?.revenue?.day?.net ?? dash?.revenue?.day?.gross ?? 0,
+          { currency: true }
+        ),
+      },
+      {
+        id: "vendors",
+        label: "Vendors online",
+        value: formatCount(onlineVendors),
+      },
+      {
+        id: "alerts",
+        label: "Docs expiring",
+        value: formatCount(expiring.length),
+      },
+    ],
+    [dash, expiring.length, onlineVendors, summary]
+  );
+
   return (
     <div className="admindash">
-      <header className="page-head">
-        <div>
-          <h1 className="page-title">Admin Dashboard</h1>
-          <p className="page-sub">
+      <section className="admindash-hero">
+        <div className="admindash-hero__primary">
+          <p className="admindash-eyebrow">Operations control</p>
+          <h1 className="admindash-hero__title">Dispatch HQ</h1>
+          <p className="admindash-hero__subtitle">
             Mission control for live ops, revenue, and compliance.
           </p>
-        </div>
-      </header>
-
-      {err && <div className="card alert error">{err}</div>}
-
-      {/* KPI row - left-aligned, small gap (CSS handles layout) */}
-      <section className="kpis">
-        <div className="kpi-card">
-          <KPIBlock
-            label="Completed Jobs"
-            value={Number(summary?.completed ?? summary?.completedCount ?? 0)}
-            icon=""
-            trend={
-              summary?.trendJobs > 0
-                ? "up"
-                : summary?.trendJobs < 0
-                ? "down"
-                : "neutral"
-            }
-            trendValue={summary?.trendJobs}
-          />
-        </div>
-        <div className="kpi-card">
-          <KPIBlock
-            label="Avg Revenue / Job"
-            value={formatAbbr(summary?.avgRevenue || 0, { currency: true })}
-            icon=""
-            trend={
-              summary?.trendRevenue > 0
-                ? "up"
-                : summary?.trendRevenue < 0
-                ? "down"
-                : "neutral"
-            }
-            trendValue={summary?.trendRevenue}
-          />
-        </div>
-        <div className="kpi-card">
-          <KPIBlock
-            label="Avg Rating"
-            value={Number(summary?.avgRating || 0).toFixed(2)}
-            icon="*"
-            trend={
-              summary?.trendRating > 0
-                ? "up"
-                : summary?.trendRating < 0
-                ? "down"
-                : "neutral"
-            }
-            trendValue={summary?.trendRating}
-          />
-        </div>
-      </section>
-
-      {/* Revenue snapshot + Satisfaction */}
-      <section className="grid2">
-        <div className="card revenue-card">
-          <div className="card-head space">
-            <h3 className="section-title">Revenue Snapshot</h3>
-            <div className="seg">
-              {["day", "week", "month"].map((k) => (
-                <button
-                  key={k}
-                  className={`segbtn ${slice === k ? "active" : ""}`}
-                  onClick={() => setSlice(k)}
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="rev-grid">
-            <div className="rev-item">
-              <span className="muted">Gross</span>
-              <strong className="num">
-                {formatAbbr(snap.gross, { currency: true })}
-              </strong>
-            </div>
-            <div className="rev-item">
-              <span className="muted">Payouts</span>
-              <strong className="num">
-                {formatAbbr(snap.payouts, { currency: true })}
-              </strong>
-            </div>
-            <div className="rev-item">
-              <span className="muted">Expenses</span>
-              <strong className="num">
-                {formatAbbr(snap.expenses, { currency: true })}
-              </strong>
-            </div>
-            <div className={`rev-item net ${snap.net >= 0 ? "ok" : "bad"}`}>
-              <span className="muted">Net</span>
-              <strong className="num">
-                {formatAbbr(snap.net, { currency: true })}
-              </strong>
-            </div>
-          </div>
-          <p className="muted small tip">Net = Gross - Payouts - Expenses</p>
-        </div>
-
-        <div className="card satisfaction-card">
-          <div className="card-head">
-            <h3 className="section-title">Customer Satisfaction</h3>
-          </div>
-          <canvas ref={satCanvasRef} className="chart-canvas" />
-          <div className="legend">
-            <span className="dot green"></span> 5* (
-            {dash?.satisfaction?.five || 0})<span className="dot gray"></span>{" "}
-            Private ({dash?.satisfaction?.private || 0})
-          </div>
-        </div>
-      </section>
-
-      {/* Live vendors + Expiring docs */}
-      <section className="grid2">
-        <div className="card vendors-card">
-          <div className="card-head">
-            <h3 className="section-title">Live Vendors</h3>
-            <span className="online-count">
-              {vendors.filter((v) => v.active !== false).length} active
-            </span>
-          </div>
-          {hasGoogle ? (
-            <GMap vendors={vendors} showRoute={false} />
-          ) : (
-            <LiveMap vendors={vendors} />
-          )}
-        </div>
-        <div className="card docs-card">
-          <div className="card-head">
-            <h3 className="section-title">Expiring Documents (7 days)</h3>
-            <Link to="/admin/documents" className="small link view-all">
-                View all &gt;
-
+          <div className="admindash-hero__cta">
+            <Link to="/jobs" className="admindash-hero__btn">
+              Open jobs board
+            </Link>
+            <Link
+              to="/admin/vendors"
+              className="admindash-hero__btn admindash-hero__btn--ghost"
+            >
+              Manage vendors
             </Link>
           </div>
-          <ul className="doc-list">
-            {expiring.length === 0 && (
-              <li className="muted empty-state">
-                All documents are up to date 
-              </li>
-            )}
-            {expiring.map((d) => (
-              <li key={d._id} className="doc-item">
-                <div className="doc-main">
-                  <strong className="doc-title">
-                    {d.title || d.type || "Document"}
-                  </strong>
-                  <span className="doc-owner">
-                    {d.ownerType === "vendor"
-                      ? d.vendorName || "Vendor"
-                      : "Company"}
-                  </span>
-                </div>
-                <div className="doc-meta">
-                  <span
-                    className={
-                      "badge " +
-                      (d.daysLeft <= 0
-                        ? "bad"
-                        : d.daysLeft <= 3
-                        ? "warn"
-                        : "ok")
-                    }
-                  >
-                    {d.daysLeft <= 0 ? "Expired" : `${d.daysLeft}d`}
-                  </span>
-                  <span className="muted small">
-                    {new Date(d.expiresAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <span className="admindash-hero__updated">
+            {refreshedAtLabel
+              ? `Updated ${refreshedAtLabel}`
+              : "Live telemetry active"}
+          </span>
+        </div>
+        <div className="admindash-hero__stats">
+          {heroStats.map((metric) => (
+            <article key={metric.id} className="admindash-hero__stat">
+              <span className="admindash-hero__stat-label">
+                {metric.label}
+              </span>
+              <strong className="admindash-hero__stat-value">
+                {metric.value}
+              </strong>
+            </article>
+          ))}
         </div>
       </section>
 
-      {/* Trends & Top performers */}
-      <section className="grid2">
-        <div className="card trends-card">
-          <div className="card-head">
-            <h3 className="section-title">Work vs Revenue (14 days)</h3>
-          </div>
-          <canvas ref={workCanvasRef} className="chart-canvas" />
-          <div className="legend">
-            <span className="dot blue"></span> Revenue ($k)
-            <span className="dot green"></span> Completed Jobs
-          </div>
-          <p className="muted small tip">
-            Revenue plotted in thousands for a shared scale.
-          </p>
+      {err ? (
+        <div className="admindash-alert" role="alert">
+          {err}
         </div>
-        <div className="card performers-card">
-          <div className="card-head">
-            <h3 className="section-title">Top Performers (30 days)</h3>
+      ) : null}
+
+      <div className="admindash-shell">
+        <section className="admindash-panel admindash-panel--kpis">
+          <header className="admindash-panel__head">
+            <h2>Performance pulse</h2>
+            <p>Track today&apos;s core metrics at a glance.</p>
+          </header>
+          <div className="kpis">
+            <div className="kpi-card">
+              <KPIBlock
+                label="Completed Jobs"
+                value={Number(
+                  summary?.completed ?? summary?.completedCount ?? 0
+                )}
+                icon=""
+                trend={
+                  summary?.trendJobs > 0
+                    ? "up"
+                    : summary?.trendJobs < 0
+                    ? "down"
+                    : "neutral"
+                }
+                trendValue={summary?.trendJobs}
+              />
+            </div>
+            <div className="kpi-card">
+              <KPIBlock
+                label="Avg Revenue / Job"
+                value={formatAbbr(summary?.avgRevenue || 0, {
+                  currency: true,
+                })}
+                icon=""
+                trend={
+                  summary?.trendRevenue > 0
+                    ? "up"
+                    : summary?.trendRevenue < 0
+                    ? "down"
+                    : "neutral"
+                }
+                trendValue={summary?.trendRevenue}
+              />
+            </div>
+            <div className="kpi-card">
+              <KPIBlock
+                label="Avg Rating"
+                value={Number(summary?.avgRating || 0).toFixed(2)}
+                icon="*"
+                trend={
+                  summary?.trendRating > 0
+                    ? "up"
+                    : summary?.trendRating < 0
+                    ? "down"
+                    : "neutral"
+                }
+                trendValue={summary?.trendRating}
+              />
+            </div>
           </div>
-          <ul className="perf-list">
-            {(dash?.topPerformers || []).map((p) => (
-              <li key={p.vendorId || p.name} className="perf-item">
-                <div className="pf-main">
-                  <strong>{p.name}</strong>
-                  <span className="muted small">{p.city || "-"}</span>
-                </div>
-                <div className="pf-metrics">
-                  <span className="chip">{p.jobs} jobs</span>
-                  <span className="chip num">
-                    {formatAbbr(p.revenue || 0, { currency: true })}
+        </section>
+
+        <section className="admindash-summary">
+          <div className="card satisfaction-card">
+            <div className="satisfaction-card__header">
+              <div>
+                <h3 className="section-title">Summary data</h3>
+                <p className="muted small">
+                  Customer sentiment across the selected filters.
+                </p>
+              </div>
+              <div className="satisfaction-card__filters">
+                <select
+                  value={reviewRange}
+                  onChange={(event) => setReviewRange(event.target.value)}
+                  aria-label="Review range"
+                >
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                </select>
+                <select
+                  value={reviewCategory}
+                  onChange={(event) => setReviewCategory(event.target.value)}
+                  aria-label="Review category"
+                >
+                  <option value="all">All categories</option>
+                  <option value="residential">Residential</option>
+                  <option value="commercial">Commercial</option>
+                </select>
+              </div>
+            </div>
+            <div className="satisfaction-card__body">
+              <div className="satisfaction-card__gauge">
+                <span className="satisfaction-card__glow satisfaction-card__glow--left" />
+                <span className="satisfaction-card__glow satisfaction-card__glow--right" />
+                <canvas ref={satCanvasRef} className="gauge-canvas" />
+              </div>
+              <div className="satisfaction-card__info">
+                <div className="satisfaction-card__scoreblock">
+                  <span className="score-main">
+                    {totalReviews ? satisfactionScore10.toFixed(1) : "--"}
                   </span>
-                  <span className="chip">
-                    {p.avgRating?.toFixed(1) || "-"}*
+                  <span className="score-sub">
+                    Avg rating /10{" "}
+                    {totalReviews ? `(${satisfactionScorePercent}% positive)` : ""}
                   </span>
                 </div>
-              </li>
-            ))}
-            {(dash?.topPerformers || []).length === 0 && (
-              <li className="muted empty-state">No performance data yet.</li>
+                <div className="satisfaction-card__statgrid">
+                  <div className="satisfaction-card__stat">
+                    <span className="stat-label">Total reviews</span>
+                    <strong className="stat-value">
+                      {totalReviews ? formatCount(totalReviews) : "--"}
+                    </strong>
+                    <span className="stat-meta">{reviewRangeLabel}</span>
+                  </div>
+                  <div className="satisfaction-card__stat">
+                    <span className="stat-label">5-star share</span>
+                    <strong className="stat-value">
+                      {totalReviews ? `${fiveStarSharePercent}%` : "--"}
+                    </strong>
+                    <span className="stat-meta">
+                      {positiveReviews} five-star ratings
+                    </span>
+                  </div>
+                  <div className="satisfaction-card__stat">
+                    <span className="stat-label">Private feedback</span>
+                    <strong className="stat-value">
+                      {totalReviews ? privateReviews : "--"}
+                    </strong>
+                    <span className="stat-meta">
+                      {totalReviews ? `${privateSharePercent}% of responses` : "N/A"}
+                    </span>
+                  </div>
+                  <div className="satisfaction-card__stat">
+                    <span className="stat-label">Daily pace</span>
+                    <strong className="stat-value">
+                      {reviewsPerDayValue !== null ? reviewsPerDayValue : "--"}
+                    </strong>
+                    <span className="stat-meta">
+                      {reviewsPerDayValue !== null
+                        ? "Reviews per day"
+                        : "No recent activity"}
+                    </span>
+                  </div>
+                </div>
+                <p className="satisfaction-card__note muted small">
+                  {totalReviews
+                    ? `${positiveReviews} of ${totalReviews} reviews were 5-star in the ${reviewRangeLabel}.`
+                    : "We'll show review insights once feedback starts coming in."}
+                </p>
+                <div className="satisfaction-card__legend">
+                  <span className="legend-chip positive">
+                    <span className="legend-dot" aria-hidden="true" />
+                    5-star positive
+                    <strong>{totalReviews ? `${fiveStarSharePercent}%` : "--"}</strong>
+                  </span>
+                  <span className="legend-chip neutral">
+                    <span className="legend-dot" aria-hidden="true" />
+                    Private feedback
+                    <strong>{totalReviews ? `${privateSharePercent}%` : "--"}</strong>
+                  </span>
+                </div>
+                <Link
+                  to="/admin/crm/reviews"
+                  className="satisfaction-card__cta satisfaction-card__cta--full"
+                >
+                  Open reviews hub
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="admindash-layout">
+          <div className="admindash-layout__primary">
+            <div className="card revenue-card">
+              <div className="card-head space">
+                <h3 className="section-title">Revenue Snapshot</h3>
+                <div className="seg">
+                  {["day", "week", "month"].map((k) => (
+                    <button
+                      key={k}
+                      className={`segbtn ${slice === k ? "active" : ""}`}
+                      onClick={() => setSlice(k)}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="rev-grid">
+                <div className="rev-item">
+                  <span className="muted">Gross</span>
+                  <strong className="num">
+                    {formatAbbr(snap.gross, { currency: true })}
+                  </strong>
+                </div>
+                <div className="rev-item">
+                  <span className="muted">Payouts</span>
+                  <strong className="num">
+                    {formatAbbr(snap.payouts, { currency: true })}
+                  </strong>
+                </div>
+                <div className="rev-item">
+                  <span className="muted">Expenses</span>
+                  <strong className="num">
+                    {formatAbbr(snap.expenses, { currency: true })}
+                  </strong>
+                </div>
+                <div className={`rev-item net ${snap.net >= 0 ? "ok" : "bad"}`}>
+                  <span className="muted">Net</span>
+                  <strong className="num">
+                    {formatAbbr(snap.net, { currency: true })}
+                  </strong>
+                </div>
+              </div>
+              <p className="muted small tip">
+                Net = Gross - Payouts - Expenses
+              </p>
+            </div>
+
+            <div className="card trends-card">
+              <div className="card-head">
+                <h3 className="section-title">Work vs Revenue (14 days)</h3>
+              </div>
+              <canvas ref={workCanvasRef} className="chart-canvas" />
+              {workTimelineSummary.length > 0 && (
+                <div className="trends-card__timeline" role="presentation">
+                  <header className="trends-card__timeline-head">
+                    <div>
+                      <span>Timeline</span>
+                      {workTimelineYearLabel ? (
+                        <strong>{workTimelineYearLabel}</strong>
+                      ) : null}
+                    </div>
+                    <span className="trends-card__timeline-range">
+                      {workTimelineRangeLabel ||
+                        `${workTimelinePointCount} data point${
+                          workTimelinePointCount === 1 ? "" : "s"
+                        }`}
+                    </span>
+                  </header>
+                  <div className="trends-card__timeline-body">
+                    {workTimelineSummary.map((group) => (
+                      <div
+                        key={`${group.month}-${group.startRatio}`}
+                        className="timeline-month"
+                        style={{
+                          "--month-start": group.startRatio,
+                          "--month-span": group.spanRatio,
+                        }}
+                      >
+                        <span className="timeline-month__label">{group.month}</span>
+                        <div className="timeline-month__dates">
+                          {group.dates.map((slot) => (
+                            <div
+                              key={`${group.month}-${slot.index}`}
+                              className="timeline-month__date"
+                              style={{
+                                "--month-date-pos": slot.positionLocal,
+                              }}
+                            >
+                              <span className="timeline-month__dot" />
+                              <span className="timeline-month__value">{slot.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="legend">
+                <span className="dot gold"></span> Revenue
+                <span className="dot cyan"></span> Completed jobs
+              </div>
+              <p className="muted small tip">
+                Golden bars track gross revenue, cyan bars show completed jobs within the
+                same window.
+              </p>
+            </div>
+
+          </div>
+
+          <aside className="admindash-layout__sidebar">
+            <div className="card digest-card">
+              <div className="card-head space">
+                <h3 className="section-title">AI operations digest</h3>
+                <div className="seg">
+                  {["daily", "weekly"].map((rangeKey) => (
+                    <button
+                      key={rangeKey}
+                      className={`segbtn ${digestRange === rangeKey ? "active" : ""}`}
+                      onClick={() => setDigestRange(rangeKey)}
+                    >
+                      {rangeKey === "daily" ? "Daily" : "Weekly"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="digest-card__body">
+                {digestLoading ? (
+                  <p className="muted small">Generating fresh insights...</p>
+                ) : digestError ? (
+                  <p className="muted small tip">{digestError}</p>
+                ) : digest ? (
+                  <>
+                    {digestMeta?.generatedAt || activeDigestRangeLabel ? (
+                      <p className="digest-card__meta muted small">
+                        {digestMeta?.generatedAt
+                          ? `Updated ${new Date(
+                              digestMeta.generatedAt
+                            ).toLocaleString()}`
+                          : "Latest insight"}
+                        {activeDigestRangeLabel ? ` - ${activeDigestRangeLabel}` : ""}
+                      </p>
+                    ) : null}
+                    {digest.summary ? (
+                      <p className="digest-card__summary">{digest.summary}</p>
+                    ) : null}
+                    <div className="digest-card__grid">
+                      {renderDigestSection("Wins", digest.wins, "wins")}
+                      {renderDigestSection("Risks", digest.risks, "risks")}
+                    </div>
+                    {renderDigestSection("Next actions", digest.nextActions, "actions")}
+                    {renderDigestSection("Follow-ups", digest.followUps, "followups")}
+                    {digest.tone ? (
+                      <p className="digest-card__tone muted">{digest.tone}</p>
+                    ) : null}
+                    {digest.parseError ? (
+                      <p className="digest-card__warning muted small">
+                        AI response trimmed due to formatting issues. Showing best-effort
+                        summary.
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="muted small">
+                    Insights will appear once AI operations data is available.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="card performers-card">
+              <div className="card-head">
+                <h3 className="section-title">Top Performers (30 days)</h3>
+              </div>
+              <ul className="perf-list">
+                {(dash?.topPerformers || []).map((p) => (
+                  <li key={p.vendorId || p.name} className="perf-item">
+                    <div className="pf-main">
+                      <strong>{p.name}</strong>
+                      <span className="muted small">{p.city || "-"}</span>
+                    </div>
+                    <div className="pf-metrics">
+                      <span className="chip">{p.jobs} jobs</span>
+                      <span className="chip num">
+                        {formatAbbr(p.revenue || 0, { currency: true })}
+                      </span>
+                      <span className="chip">
+                        {p.avgRating?.toFixed(1) || "-"}*
+                      </span>
+                    </div>
+                  </li>
+                ))}
+                {(dash?.topPerformers || []).length === 0 && (
+                  <li className="muted empty-state">
+                    No performance data yet.
+                  </li>
+                )}
+              </ul>
+            </div>
+          </aside>
+        </div>
+
+        <div className="admindash-layout__footer">
+          <div className="card vendors-card">
+            <div className="card-head">
+              <h3 className="section-title">Live Vendors</h3>
+              <span className="online-count">{onlineVendors} active</span>
+            </div>
+            {hasGoogle ? (
+              <GMap vendors={vendors} showRoute={false} />
+            ) : (
+              <LiveMap vendors={vendors} />
             )}
-          </ul>
+          </div>
+
+          <div className="card docs-card">
+            <div className="card-head">
+              <h3 className="section-title">Expiring Documents (7 days)</h3>
+              <Link to="/admin/documents" className="small link view-all">
+                View all &gt;
+              </Link>
+            </div>
+            <ul className="doc-list">
+              {expiring.length === 0 && (
+                <li className="muted empty-state">
+                  All documents are up to date
+                </li>
+              )}
+              {expiring.map((d) => (
+                <li key={d._id} className="doc-item">
+                  <div className="doc-main">
+                    <strong className="doc-title">
+                      {d.title || d.type || "Document"}
+                    </strong>
+                    <span className="doc-owner">
+                      {d.ownerType === "vendor"
+                        ? d.vendorName || "Vendor"
+                        : "Company"}
+                    </span>
+                  </div>
+                  <div className="doc-meta">
+                    <span
+                      className={
+                        "badge " +
+                        (d.daysLeft <= 0
+                          ? "bad"
+                          : d.daysLeft <= 3
+                          ? "warn"
+                          : "ok")
+                      }
+                    >
+                      {d.daysLeft <= 0 ? "Expired" : `${d.daysLeft}d`}
+                    </span>
+                    <span className="muted small">
+                      {new Date(d.expiresAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-      </section>
+      </div>
     </div>
   );
 }
+
+

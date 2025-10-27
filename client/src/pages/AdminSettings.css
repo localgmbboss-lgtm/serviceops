@@ -176,6 +176,89 @@
     line-height: 1.4;
 }
 
+.aset-automation-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.aset-automation-summary__card {
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 16px;
+    padding: 16px;
+    background: rgba(248, 250, 252, 0.94);
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+    display: grid;
+    gap: 12px;
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.aset-automation-summary__card.is-active {
+    border-color: rgba(16, 185, 129, 0.4);
+    transform: translateY(-2px);
+}
+
+.aset-automation-summary__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.aset-automation-summary__head h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+}
+
+.aset-automation-summary__head p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.45;
+}
+
+.aset-automation-summary__status {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.aset-automation-summary__meta {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 4px;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.aset-automation-summary__action {
+    justify-self: flex-start;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: #ffffff;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.aset-automation-summary__action:hover {
+    background: var(--color-surface-soft);
+    box-shadow: 0 10px 18px rgba(15, 23, 42, 0.1);
+    transform: translateY(-1px);
+}
+
+.aset-automation-summary__action:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
 .aset input:focus {
     outline: none;
     border-color: var(--color-primary);

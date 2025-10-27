@@ -217,6 +217,7 @@ export default function GMap({
       .filter(Boolean);
   }, [landmarks]);
 
+
   useEffect(() => {
     const key = getGoogleMapsKey();
     if (!key) {

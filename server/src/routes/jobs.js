@@ -2,14 +2,22 @@
 import { Router } from "express";
 import crypto from "crypto";
 import mongoose from "mongoose";
+import path from "path";
+import fsPromises from "fs/promises";
 import { completeJobWithPayment } from "../lib/jobCompletion.js";
 import Job from "../models/Jobs.js";
 import Vendor from "../models/Vendor.js"; // Changed from Driver to Vendor
 import Customer from "../models/Customer.js";
 import { notifySMS } from "../lib/notifier.js";
 import VendorNotification from "../models/VendorNotification.js";
+import AdminNotification from "../models/AdminNotification.js";
 import { getClientBaseUrl, resolveClientBaseUrl } from "../lib/clientUrl.js";
-import { sendVendorPushNotifications } from "../lib/push.js";
+import { jobMediaUpload, toJobMediaRecord, jobMediaUploadRoot, JOB_MEDIA_MAX_FILES } from "../lib/jobMedia.js";
+import {
+  sendAdminPushNotifications,
+  sendVendorPushNotifications,
+  sendCustomerPushNotifications,
+} from "../lib/push.js";
 const router = Router();
 
 const defaultClientBase = getClientBaseUrl();
@@ -21,6 +29,107 @@ export const STATUSES = [
   "Arrived",
   "Completed",
 ];
+
+const STATUS_TITLES = {
+  Unassigned: "Request received",
+  Assigned: "Driver assigned",
+  OnTheWay: "Driver en route",
+  Arrived: "Driver arrived",
+  Completed: "Service completed",
+};
+
+const normalizePhone = (input = "") => {
+  if (!input) return "";
+  const str = String(input).trim();
+  if (!str) return "";
+  if (str.startsWith("+")) {
+    return `+${str.slice(1).replace(/\D+/g, "")}`;
+  }
+  return str.replace(/\D+/g, "");
+};
+
+const STATUS_MESSAGES = {
+  Unassigned: "We received your request and will notify you once a provider accepts.",
+  Assigned: "A provider has been assigned. Track their progress from your dashboard.",
+  OnTheWay: "Your provider is en route. Hang tight.",
+  Arrived: "Your provider has arrived at the pickup location.",
+  Completed: "Service completed. Thanks for choosing ServiceOps.",
+};
+
+const jobStatusRoute = (job) =>
+  job?.customerToken ? `/status/${job._id}` : `/status/${job?._id}`;
+
+const buildAbsoluteUrl = (baseUrl, route) => {
+  if (!route) return null;
+  const base = (baseUrl || defaultClientBase || "").replace(/\/$/, "");
+  return `${base}${route.startsWith("/") ? "" : "/"}${route}`;
+};
+
+const stringifyId = (value) =>
+  value ? String(value instanceof mongoose.Types.ObjectId ? value.toString() : value) : null;
+
+async function notifyCustomerJobChanges(previousJob, nextJob, baseUrl) {
+  if (!nextJob || !nextJob.customerId) return;
+
+  const prevStatus = previousJob?.status || null;
+  const nextStatus = nextJob.status || null;
+  const prevVendorId = stringifyId(previousJob?.vendorId);
+  const nextVendorId = stringifyId(nextJob.vendorId);
+
+  const notifications = [];
+  const route = jobStatusRoute(nextJob);
+  const absoluteUrl = buildAbsoluteUrl(baseUrl, route);
+
+  if (nextStatus && prevStatus !== nextStatus) {
+    const title = STATUS_TITLES[nextStatus] || `Job ${nextStatus}`;
+    let body = STATUS_MESSAGES[nextStatus] || `Your job status is now ${nextStatus}.`;
+
+    if (nextStatus === "Assigned" && nextJob.vendorName) {
+      body = `Your provider ${nextJob.vendorName} is confirmed and preparing to roll.`;
+    } else if (nextStatus === "OnTheWay" && nextJob.vendorName) {
+      body = `${nextJob.vendorName} is en route to you. Track their progress in the app.`;
+    }
+
+    notifications.push({
+      customerId: nextJob.customerId,
+      jobId: nextJob._id,
+      title,
+      body,
+      severity: nextStatus === "Completed" ? "success" : "info",
+      meta: {
+        role: "customer",
+        jobId: nextJob._id,
+        status: nextStatus,
+        kind: "status",
+        route,
+        absoluteUrl,
+        dedupeKey: `customer:job:${nextJob._id}:status:${nextStatus}`,
+      },
+    });
+  }
+
+  if (prevVendorId !== nextVendorId && nextVendorId && nextJob.vendorName) {
+    notifications.push({
+      customerId: nextJob.customerId,
+      jobId: nextJob._id,
+      title: "Provider assigned",
+      body: `${nextJob.vendorName} has been assigned to your request.`,
+      severity: "info",
+      meta: {
+        role: "customer",
+        jobId: nextJob._id,
+        kind: "assignment",
+        route,
+        absoluteUrl,
+        dedupeKey: `customer:job:${nextJob._id}:vendor:${nextVendorId}`,
+      },
+    });
+  }
+
+  if (notifications.length) {
+    await sendCustomerPushNotifications(notifications);
+  }
+}
 
 const ALLOWED_NEXT = {
   Unassigned: ["Assigned"],
@@ -414,13 +523,31 @@ router.get("/:id", async (req, res, next) => {
 });
 
 // ---------- CREATE ----------
-router.post("/", async (req, res, next) => {
+router.post("/", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (req, res, next) => {
+  const storedFiles = [];
+  const files = Array.isArray(req.files) ? req.files : [];
+  for (const file of files) {
+    storedFiles.push(path.join(jobMediaUploadRoot, file.filename));
+  }
+
+  const cleanupUploaded = async () => {
+    if (!storedFiles.length) return;
+    await Promise.all(
+      storedFiles.map((filepath) => fsPromises.unlink(filepath).catch(() => {}))
+    );
+    storedFiles.length = 0;
+  };
+
   try {
     const body = req.body || {};
-    if (!body.customerId)
+    if (!body.customerId) {
+      await cleanupUploaded();
       return res.status(400).json({ message: "customerId required" });
-    if (!body.pickupAddress)
+    }
+    if (!body.pickupAddress) {
+      await cleanupUploaded();
       return res.status(400).json({ message: "pickupAddress required" });
+    }
 
     const vendorId = body.vendorId ? String(body.vendorId).trim() : null;
     let vendorDoc = null;
@@ -428,6 +555,7 @@ router.post("/", async (req, res, next) => {
       assertId(vendorId);
       vendorDoc = await Vendor.findById(vendorId).lean();
       if (!vendorDoc) {
+        await cleanupUploaded();
         return res.status(404).json({ message: "Vendor not found" });
       }
     }
@@ -455,7 +583,7 @@ router.post("/", async (req, res, next) => {
     if (vendorDoc) {
       jobPayload.vendorId = vendorDoc._id;
       jobPayload.vendorName = vendorDoc.name || null;
-      jobPayload.vendorPhone = vendorDoc.phone || null;
+      jobPayload.vendorPhone = normalizePhone(vendorDoc.phone) || null;
       jobPayload.status = "Assigned";
       jobPayload.bidMode = "fixed";
       jobPayload.biddingOpen = false;
@@ -464,10 +592,41 @@ router.post("/", async (req, res, next) => {
         Number(body.finalPrice) > 0 ? Number(body.finalPrice) : quotedPrice;
     }
 
+    if (files.length) {
+      jobPayload.media = files.map((file) => toJobMediaRecord(file));
+    }
+
     const job = await Job.create(jobPayload);
+    storedFiles.length = 0;
+
+    try {
+      const customer = await Customer.findById(job.customerId).lean();
+      const adminNotification = await AdminNotification.create({
+        title: "New job created",
+        body: `${job.serviceType || "Service request"} for ${
+          customer?.name || "customer"
+        }`,
+        severity: "info",
+        jobId: job._id,
+        customerId: job.customerId || null,
+        meta: {
+          role: "admin",
+          route: `/jobs/${job._id}`,
+          jobId: job._id,
+          customerId: job.customerId || null,
+          serviceType: job.serviceType || null,
+          pickupAddress: job.pickupAddress || null,
+          priority: job.priority || "normal",
+        },
+      });
+      await sendAdminPushNotifications([adminNotification]);
+    } catch (notifyError) {
+      console.error("Failed to notify admins about new job", notifyError);
+    }
 
     res.status(201).json(job);
   } catch (e) {
+    await cleanupUploaded();
     next(e);
   }
 });
@@ -483,6 +642,7 @@ router.patch("/:id", async (req, res, next) => {
     }
 
     const job = await Job.findById(id);
+    const previousJob = job ? (typeof job.toObject === "function" ? job.toObject() : job) : null;
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     const set = {};
@@ -517,6 +677,7 @@ router.patch("/:id", async (req, res, next) => {
         set.vendorPhone = null;
         set.vendorAcceptedToken = null;
         set.biddingOpen = true;
+        set.unbidAlertSentAt = null;
       } else {
         if (!mongoose.isValidObjectId(vendorId)) {
           return res.status(400).json({ message: "Invalid vendorId" });
@@ -527,7 +688,7 @@ router.patch("/:id", async (req, res, next) => {
         }
         set.vendorId = vendor._id;
         set.vendorName = vendor.name || null;
-        set.vendorPhone = vendor.phone || null;
+        set.vendorPhone = normalizePhone(vendor.phone) || null;
         set.biddingOpen = false;
         if (!payload.status) {
           payload.status = "Assigned";
@@ -590,6 +751,7 @@ router.patch("/:id", async (req, res, next) => {
           set.vendorPhone = null;
           set.vendorAcceptedToken = null;
           set.biddingOpen = true;
+          set.unbidAlertSentAt = null;
         }
       }
     }
@@ -604,6 +766,9 @@ router.patch("/:id", async (req, res, next) => {
 
     await Job.updateOne({ _id: id }, update);
     const refreshed = await Job.findById(id).lean();
+    if (previousJob && refreshed) {
+      await notifyCustomerJobChanges(previousJob, refreshed, resolveClientBaseUrl(req));
+    }
     res.json(refreshed);
   } catch (e) {
     next(e);
@@ -616,6 +781,7 @@ router.post("/:id/scheduling", async (req, res, next) => {
     assertId(id);
 
     const job = await Job.findById(id);
+    const previousJob = job ? (typeof job.toObject === "function" ? job.toObject() : job) : null;
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     const payload = req.body || {};
@@ -642,15 +808,342 @@ router.post("/:id/scheduling", async (req, res, next) => {
   }
 });
 
-router.post("/guest", async (req, res) => {
-  return res
-    .status(403)
-    .json({ message: "Guest intake is currently disabled." });
-});
+router.post(
+  "/guest",
+  jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES),
+  async (req, res, next) => {
+    const storedFiles = [];
+    const files = Array.isArray(req.files) ? req.files : [];
+    for (const file of files) {
+      storedFiles.push(path.join(jobMediaUploadRoot, file.filename));
+    }
+
+    const cleanupUploaded = async () => {
+      if (!storedFiles.length) return;
+      await Promise.all(
+        storedFiles.map((filepath) => fsPromises.unlink(filepath).catch(() => {}))
+      );
+      storedFiles.length = 0;
+    };
+
+    try {
+      const rawPayload =
+        typeof req.body?.payload === "string" && req.body.payload.trim()
+          ? req.body.payload.trim()
+          : null;
+      let payload;
+      if (rawPayload) {
+        try {
+          payload = JSON.parse(rawPayload);
+        } catch (error) {
+          await cleanupUploaded();
+          return res.status(400).json({ message: "Invalid payload JSON." });
+        }
+      } else {
+        payload = req.body || {};
+      }
+
+      if (!payload || typeof payload !== "object") {
+        await cleanupUploaded();
+        return res.status(400).json({ message: "Request body required." });
+      }
+
+      const name = typeof payload.name === "string" ? payload.name.trim() : "";
+      const email =
+        typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
+      const phone = typeof payload.phone === "string" ? payload.phone.trim() : "";
+      const serviceType =
+        typeof payload.serviceType === "string" ? payload.serviceType.trim() : "";
+      const description =
+        typeof payload.description === "string" ? payload.description.trim() : "";
+      const pickupAddress =
+        typeof payload.address === "string" ? payload.address.trim() : "";
+      const destination =
+        typeof payload.destination === "string" ? payload.destination.trim() : "";
+
+      if (!name || !serviceType || !pickupAddress) {
+        await cleanupUploaded();
+        return res.status(400).json({
+          message: "name, serviceType, and address are required.",
+        });
+      }
+
+      if (!email && !phone) {
+        await cleanupUploaded();
+        return res.status(400).json({
+          message: "Provide at least an email or phone number.",
+        });
+      }
+
+      const vehicleMake =
+        typeof payload.vehicleMake === "string" ? payload.vehicleMake.trim() : "";
+      const vehicleModel =
+        typeof payload.vehicleModel === "string" ? payload.vehicleModel.trim() : "";
+      const vehicleColor =
+        typeof payload.vehicleColor === "string" ? payload.vehicleColor.trim() : "";
+
+      if (!vehicleMake || !vehicleModel || !vehicleColor) {
+        await cleanupUploaded();
+        return res.status(400).json({
+          message: "vehicleMake, vehicleModel, and vehicleColor are required.",
+        });
+      }
+
+      const coordinates =
+        payload.coordinates && typeof payload.coordinates === "object"
+          ? {
+              lat: Number(payload.coordinates.lat),
+              lng: Number(payload.coordinates.lng),
+            }
+          : null;
+      const destinationCoordinates =
+        payload.destinationCoordinates &&
+        typeof payload.destinationCoordinates === "object"
+          ? {
+              lat: Number(payload.destinationCoordinates.lat),
+              lng: Number(payload.destinationCoordinates.lng),
+            }
+          : null;
+
+      const urgency =
+        payload.urgency === "emergency" || payload.urgency === "urgent"
+          ? "urgent"
+          : "normal";
+
+      const now = new Date();
+
+      const savedProfile = {
+        name,
+        email: email || undefined,
+        phone: phone || undefined,
+        address: pickupAddress,
+        vehicleMake,
+        vehicleModel,
+        vehicleColor,
+        notes: description || undefined,
+        updatedAt: now,
+      };
+
+      let customerDoc = null;
+      if (email) {
+        customerDoc = await Customer.findOne({ email }).lean();
+      }
+      if (!customerDoc && phone) {
+        customerDoc = await Customer.findOne({ phone }).lean();
+      }
+
+      if (!customerDoc) {
+        customerDoc = await Customer.create({
+          name,
+          email: email || undefined,
+          phone: phone || undefined,
+          isGuest: true,
+          guestToken: makeToken(),
+          lastServiceRequest: now,
+          savedProfile,
+          serviceHistory: [
+            {
+              date: now,
+              serviceType,
+              description,
+              address: pickupAddress,
+              vehicleMake,
+              vehicleModel,
+              vehicleColor,
+            },
+          ],
+        });
+      } else {
+        const updateSet = {
+          name,
+          isGuest: customerDoc.isGuest || true,
+          savedProfile,
+          lastServiceRequest: now,
+        };
+        if (email) updateSet.email = email;
+        if (phone) updateSet.phone = phone;
+        if (!customerDoc.guestToken) {
+          updateSet.guestToken = makeToken();
+        }
+
+        await Customer.updateOne(
+          { _id: customerDoc._id },
+          {
+            $set: updateSet,
+            $push: {
+              serviceHistory: {
+                date: now,
+                serviceType,
+                description,
+                address: pickupAddress,
+                vehicleMake,
+                vehicleModel,
+                vehicleColor,
+              },
+            },
+          }
+        );
+        customerDoc = await Customer.findById(customerDoc._id).lean();
+      }
+
+      const jobPayload = {
+        customerId: customerDoc._id,
+        pickupAddress,
+        dropoffAddress: destination || undefined,
+        serviceType,
+        notes: description,
+        guestRequest: true,
+        status: "Unassigned",
+        priority: urgency === "urgent" ? "urgent" : "normal",
+        bidMode: "open",
+        biddingOpen: true,
+        vendorToken: makeToken(),
+        customerToken: makeToken(),
+        quotedPrice: Number(payload.quotedPrice) || 0,
+        finalPrice: 0,
+        vehicleMake,
+        vehicleModel,
+        vehicleColor,
+      };
+
+      if (
+        coordinates &&
+        Number.isFinite(coordinates.lat) &&
+        Number.isFinite(coordinates.lng)
+      ) {
+        jobPayload.pickupLat = coordinates.lat;
+        jobPayload.pickupLng = coordinates.lng;
+      }
+
+      if (
+        destinationCoordinates &&
+        Number.isFinite(destinationCoordinates.lat) &&
+        Number.isFinite(destinationCoordinates.lng)
+      ) {
+        jobPayload.dropoffLat = destinationCoordinates.lat;
+        jobPayload.dropoffLng = destinationCoordinates.lng;
+      }
+
+      if (files.length) {
+        jobPayload.media = files.map((file) => toJobMediaRecord(file));
+      }
+
+      const job = await Job.create(jobPayload);
+      storedFiles.length = 0;
+
+      try {
+        await AdminNotification.create({
+          title: "New guest request",
+          body: `${serviceType || "Service request"} from ${name}`,
+          severity: urgency === "urgent" ? "warning" : "info",
+          jobId: job._id,
+          customerId: job.customerId || null,
+          meta: {
+            role: "admin",
+            route: `/jobs/${job._id}`,
+            jobId: job._id,
+            guestRequest: true,
+            serviceType: job.serviceType || null,
+            pickupAddress: job.pickupAddress || null,
+            priority: job.priority || "normal",
+          },
+        });
+      } catch (notifyError) {
+        console.error("Failed to notify admins about guest job", notifyError);
+      }
+
+      const baseUrl = resolveClientBaseUrl(req);
+      const trimmedBase = baseUrl ? baseUrl.replace(/\/$/, "") : null;
+
+      res.status(201).json({
+        success: true,
+        jobId: job._id,
+        customerToken: job.customerToken,
+        jobToken: job.customerToken,
+        vendorToken: job.vendorToken,
+        statusUrl: trimmedBase ? `${trimmedBase}/status/${job._id}` : null,
+        chooseUrl:
+          job.customerToken && trimmedBase
+            ? `${trimmedBase}/choose/${job.customerToken}`
+            : null,
+      });
+    } catch (error) {
+      await cleanupUploaded();
+      next(error);
+    }
+  }
+);
 
 // ---------- GUEST STATUS (read-only by token) ----------
-router.get("/guest/:token", async (req, res) => {
-  return res.status(404).json({ message: "Guest tracking is unavailable." });
+router.get("/guest/:token", async (req, res, next) => {
+  try {
+    const token = String(req.params.token || "").trim();
+    if (!token) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing job token." });
+    }
+
+    const job = await Job.findOne({ customerToken: token }).lean();
+    if (!job) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Job not found or link expired." });
+    }
+
+    let vendor = null;
+    if (job.vendorId) {
+      vendor = await Vendor.findById(job.vendorId)
+        .select("name phone city state rating averageRating totalJobs lat lng location")
+        .lean();
+    }
+
+    const rating =
+      vendor && typeof vendor.rating === "number"
+        ? vendor.rating
+        : vendor && typeof vendor.averageRating === "number"
+        ? vendor.averageRating
+        : null;
+
+    res.json({
+      success: true,
+      job: {
+        _id: job._id,
+        status: job.status,
+        serviceType: job.serviceType,
+        pickupAddress: job.pickupAddress,
+        dropoffAddress: job.dropoffAddress || null,
+        vehicleMake: job.vehicleMake || null,
+        vehicleModel: job.vehicleModel || null,
+        vehicleColor: job.vehicleColor || null,
+        createdAt: job.created,
+        biddingOpen: !!job.biddingOpen,
+        selectedBidId: job.selectedBidId || null,
+        quotedPrice: Number.isFinite(job.quotedPrice) ? job.quotedPrice : 0,
+        finalPrice: Number.isFinite(job.finalPrice) ? job.finalPrice : 0,
+        media: Array.isArray(job.media) ? job.media : [],
+        customerToken: job.customerToken,
+        vendorToken: job.vendorToken,
+        pickupLat: Number.isFinite(job.pickupLat) ? job.pickupLat : null,
+        pickupLng: Number.isFinite(job.pickupLng) ? job.pickupLng : null,
+        dropoffLat: Number.isFinite(job.dropoffLat) ? job.dropoffLat : null,
+        dropoffLng: Number.isFinite(job.dropoffLng) ? job.dropoffLng : null,
+      },
+      vendor: vendor
+        ? {
+            _id: vendor._id,
+            name: vendor.name || null,
+            phone: vendor.phone || null,
+            city: vendor.city || null,
+            state: vendor.state || null,
+            rating,
+            totalJobs: vendor.totalJobs || null,
+          }
+        : null,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post("/:id/complete", async (req, res, next) => {
@@ -672,6 +1165,7 @@ router.post("/:id/complete", async (req, res, next) => {
     }
 
     const job = await Job.findById(id);
+    const previousJob = job ? (typeof job.toObject === "function" ? job.toObject() : job) : null;
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     const { summary, job: updatedJob, charge } = await completeJobWithPayment(job, {
@@ -717,11 +1211,13 @@ router.post("/:id/open-bidding", async (req, res, next) => {
     const { id } = req.params;
     assertId(id);
     const job = await Job.findById(id);
+    const previousJob = job ? (typeof job.toObject === "function" ? job.toObject() : job) : null;
     if (!job) return res.status(404).json({ message: "Job not found" });
 
     job.vendorToken = job.vendorToken || makeToken();
     job.customerToken = job.customerToken || makeToken();
     job.biddingOpen = true;
+    job.unbidAlertSentAt = null;
 
     await job.save();
 
@@ -875,5 +1371,6 @@ Respond in the ServiceOps vendor portal if available.`;
 });
 
 export default router;
+
 
 

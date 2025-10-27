@@ -14,6 +14,12 @@ const PushSubscriptionSchema = new mongoose.Schema(
       index: true,
       default: null,
     },
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      index: true,
+      default: null,
+    },
     role: {
       type: String,
       enum: ["vendor", "admin", "customer"],

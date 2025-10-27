@@ -1,6 +1,6 @@
 import { Router } from "express";
 import Payment from "../models/Payment.js";
-import Job from "../models/Job.js";
+import Job from "../models/Jobs.js";
 
 const r = Router();
 

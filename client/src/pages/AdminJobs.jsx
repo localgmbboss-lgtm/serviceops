@@ -9,6 +9,17 @@ import { recordAuditEvent } from "../utils/auditLog";
 import "./AdminJobs.css";
 
 const STATUSES = ["Unassigned", "Assigned", "OnTheWay", "Arrived", "Completed"];
+const DISPLAY_LINK_BASE = "https://serviceops.pro";
+
+const formatShareLink = (link) => {
+  if (!link) return "";
+  try {
+    const parsed = new URL(link);
+    return `${DISPLAY_LINK_BASE}${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch (error) {
+    return link;
+  }
+};
 
 export default function AdminJobs() {
   const navigate = useNavigate();
@@ -17,6 +28,7 @@ export default function AdminJobs() {
   const [toast, setToast] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [vendorFilter, setVendorFilter] = useState("all");
   const [loading, setLoading] = useState(false);
   const [last, setLast] = useState(null);
   const [soloMode, setSoloMode] = useState(false);
@@ -26,6 +38,7 @@ export default function AdminJobs() {
   const jobSnapshotRef = useRef(new Map());
   const jobsInitializedRef = useRef(false);
   const { publish } = useNotifications();
+  const [vendors, setVendors] = useState([]);
 
   const openCreateModal = () => setCreateOpen(true);
   const closeCreateModal = () => setCreateOpen(false);
@@ -48,6 +61,44 @@ export default function AdminJobs() {
     setTimeout(() => setBanner(""), 3500);
   };
 
+  const loadVendors = useCallback(async () => {
+    try {
+      const { data } = await api.get("/api/vendors");
+      setVendors(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.warn("Failed to load vendor directory", e);
+    }
+  }, []);
+
+  const vendorOptions = useMemo(() => {
+    if (!Array.isArray(vendors)) return [];
+    const unique = new Map();
+    vendors.forEach((vendor) => {
+      if (!vendor?._id || unique.has(vendor._id)) return;
+      const label = vendor.name?.trim() || "Unnamed vendor";
+      const location = [vendor.city, vendor.state]
+        .map((part) => (part || "").trim())
+        .filter(Boolean)
+        .join(", ");
+      const descriptor = location || vendor.phone?.trim();
+      unique.set(vendor._id, {
+        value: vendor._id,
+        label: descriptor ? `${label} - ${descriptor}` : label,
+      });
+    });
+    return Array.from(unique.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+  }, [vendors]);
+
+  useEffect(() => {
+    if (vendorFilter === "all" || vendorFilter === "unassigned") return;
+    const stillExists = vendorOptions.some(
+      (option) => option.value === vendorFilter
+    );
+    if (!stillExists) setVendorFilter("all");
+  }, [vendorFilter, vendorOptions]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -63,9 +114,10 @@ export default function AdminJobs() {
 
   useEffect(() => {
     load();
+    loadVendors();
     const id = setInterval(load, 7000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, loadVendors]);
 
   useEffect(() => {
     if (!publish) return;
@@ -227,6 +279,14 @@ export default function AdminJobs() {
     return (jobs || []).filter((j) => {
       const stOk = statusFilter === "all" || j.status === statusFilter;
       if (!stOk) return false;
+      if (vendorFilter === "unassigned" && j?.vendorId) return false;
+      if (
+        vendorFilter !== "all" &&
+        vendorFilter !== "unassigned" &&
+        j?.vendorId !== vendorFilter
+      ) {
+        return false;
+      }
       if (!q) return true;
       const hay = [
         j.serviceType,
@@ -242,7 +302,7 @@ export default function AdminJobs() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [jobs, query, statusFilter]);
+  }, [jobs, query, statusFilter, vendorFilter]);
 
   const exportCsv = () => {
     const base = api.defaults?.baseURL || "";
@@ -257,10 +317,7 @@ export default function AdminJobs() {
   };
 
   const copySelfServeLink = async () => {
-    const origin =
-      (typeof window !== "undefined" && window.location?.origin) ||
-      "https://serviceops.app";
-    const link = `${origin.replace(/\/$/, "")}/customer/login`;
+    const link = `${DISPLAY_LINK_BASE.replace(/\/$/, "")}/customer/login`;
     await copy(link, "Customer portal link");
   };
 
@@ -303,7 +360,13 @@ export default function AdminJobs() {
   const handleViewJob = useCallback(
     (job) => {
       if (!job?._id) return;
-      navigate(`/jobs/${job._id}`);
+      const path = `/jobs/${job._id}`;
+      if (typeof window !== "undefined" && window?.open) {
+        const base = window.location?.origin || "";
+        window.open(`${base}${path}`, "_blank", "noopener");
+      } else {
+        navigate(path);
+      }
     },
     [navigate]
   );
@@ -323,25 +386,69 @@ export default function AdminJobs() {
       <section className="admin-jobs-board-section">
         <div className="admin-jobs-card admin-jobs-board-card">
           <div className="admin-jobs-board-header">
-            <div className="admin-jobs-board-heading">
-              <h2>Jobs table</h2>
-              {last && (
-                <span className="admin-jobs-board-updated admin-jobs-muted admin-jobs-small">
-                  Updated {last.toLocaleTimeString()}
-                </span>
-              )}
+            <div className="admin-jobs-board-top">
+              <div className="admin-jobs-board-heading">
+                <h2>Jobs table</h2>
+                {last && (
+                  <span className="admin-jobs-board-updated admin-jobs-muted admin-jobs-small">
+                    Updated {last.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              <div className="admin-jobs-primary-actions">
+                <button
+                  type="button"
+                  className="admin-jobs-btn admin-jobs-btn-ghost admin-jobs-refresh-btn"
+                  onClick={load}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="admin-jobs-refresh-spinner" aria-hidden="true">
+                        ↻
+                      </span>
+                      <span className="admin-jobs-refresh-label">Syncing</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="admin-jobs-refresh-icon" aria-hidden="true">
+                        ↻
+                      </span>
+                      <span className="admin-jobs-refresh-label">Refresh</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="admin-jobs-btn admin-jobs-btn-primary admin-jobs-create-btn"
+                  onClick={openCreateModal}
+                >
+                  Create job
+                </button>
+              </div>
             </div>
-            <div className="admin-jobs-board-controls">
-              <button
-                type="button"
-                className="admin-jobs-btn admin-jobs-btn-primary admin-jobs-create-btn"
-                onClick={openCreateModal}
-              >
-                Create job
-              </button>
-
-              <div className="admin-jobs-filters">
+            <div
+              className="admin-jobs-toolbar"
+              role="group"
+              aria-label="Job filters and actions"
+            >
+              <div className="admin-jobs-toolbar-main">
                 <div className="admin-jobs-search-container">
+                  <span className="admin-jobs-search-icon" aria-hidden="true">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="11" cy="11" r="7" />
+                      <line x1="16.65" y1="16.65" x2="21" y2="21" />
+                    </svg>
+                  </span>
                   <input
                     className="admin-jobs-search"
                     placeholder="Search jobs..."
@@ -350,23 +457,41 @@ export default function AdminJobs() {
                     aria-label="Search jobs"
                   />
                 </div>
-
-                <div className="admin-jobs-select-container">
-                  <select
-                    className="admin-jobs-status-select"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    aria-label="Filter by status"
-                  >
-                    <option value="all">All statuses</option>
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+                <div className="admin-jobs-filter-group">
+                  <div className="admin-jobs-select-container">
+                    <select
+                      className="admin-jobs-status-select"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      aria-label="Filter by status"
+                    >
+                      <option value="all">All statuses</option>
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="admin-jobs-select-container">
+                    <select
+                      className="admin-jobs-status-select admin-jobs-vendor-select"
+                      value={vendorFilter}
+                      onChange={(e) => setVendorFilter(e.target.value)}
+                      aria-label="Filter by vendor"
+                    >
+                      <option value="all">All vendors</option>
+                      <option value="unassigned">Unassigned</option>
+                      {vendorOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-
+              </div>
+              <div className="admin-jobs-toolbar-actions">
                 <label className="admin-jobs-toggle">
                   <input
                     type="checkbox"
@@ -376,25 +501,6 @@ export default function AdminJobs() {
                   <span className="admin-jobs-toggle-slider"></span>
                   <span className="admin-jobs-toggle-text">Solo mode</span>
                 </label>
-
-                <button
-                  type="button"
-                  className="admin-jobs-btn admin-jobs-btn-ghost admin-jobs-refresh-btn"
-                  onClick={load}
-                  disabled={loading}
-                >
-                  <span
-                    className={`admin-jobs-btn-icon ${
-                      loading ? "admin-jobs-refresh-spinner" : ""
-                    }`}
-                  >
-                    {loading ? "" : ""}
-                  </span>
-                  <span className="admin-jobs-btn-text">
-                    {loading ? "Refreshing..." : "Refresh"}
-                  </span>
-                </button>
-
                 <div className="admin-jobs-dropdown-container">
                   <button
                     type="button"
@@ -454,7 +560,7 @@ export default function AdminJobs() {
           </div>
           <div className="admin-jobs-board-body">
             <div className="admin-jobs-scroll-x">
-              <JobTable
+              <JobTable vendors={vendors}
                 jobs={filteredJobs}
                 onUpdateJob={onUpdateJob}
                 soloMode={soloMode}
@@ -520,12 +626,12 @@ export default function AdminJobs() {
                       <input
                         type="text"
                         readOnly
-                        value={links.statusUrl}
+                        value={formatShareLink(links.statusUrl)}
                         onFocus={(e) => e.target.select()}
                       />
                       <button
                         className="admin-jobs-btn admin-jobs-btn-tiny admin-jobs-copy-btn"
-                        onClick={() => copy(links.statusUrl, "Status link")}
+                        onClick={() => copy(formatShareLink(links.statusUrl), "Status link")}
                       >
                         Copy
                       </button>
@@ -539,12 +645,12 @@ export default function AdminJobs() {
                       <input
                         type="text"
                         readOnly
-                        value={links.vendorLink}
+                        value={formatShareLink(links.vendorLink)}
                         onFocus={(e) => e.target.select()}
                       />
                       <button
                         className="admin-jobs-btn admin-jobs-btn-tiny admin-jobs-copy-btn"
-                        onClick={() => copy(links.vendorLink, "Vendor link")}
+                        onClick={() => copy(formatShareLink(links.vendorLink), "Vendor link")}
                       >
                         Copy
                       </button>
@@ -558,13 +664,13 @@ export default function AdminJobs() {
                       <input
                         type="text"
                         readOnly
-                        value={links.customerLink}
+                        value={formatShareLink(links.customerLink)}
                         onFocus={(e) => e.target.select()}
                       />
                       <button
                         className="admin-jobs-btn admin-jobs-btn-tiny admin-jobs-copy-btn"
                         onClick={() =>
-                          copy(links.customerLink, "Customer link")
+                          copy(formatShareLink(links.customerLink), "Customer link")
                         }
                       >
                         Copy
@@ -588,3 +694,5 @@ export default function AdminJobs() {
     </div>
   );
 }
+
+

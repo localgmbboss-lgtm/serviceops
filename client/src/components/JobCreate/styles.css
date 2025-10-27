@@ -238,6 +238,237 @@
   border-radius: 8px;
 }
 
+.jobcreate-media {
+  margin: 24px 0;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px dashed rgba(15, 23, 42, 0.16);
+  background: rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.jobcreate-media-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--color-text-strong, #0f172a);
+}
+
+.jobcreate-media-label input[type="file"] {
+  font-size: 0.9rem;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+
+.jobcreate-media-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jobcreate-media-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+}
+
+.jobcreate-media-name {
+  display: block;
+  font-weight: 600;
+  color: var(--color-text-strong, #0f172a);
+}
+
+.jobcreate-media-meta {
+  display: block;
+  font-size: 0.75rem;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.jobcreate-media-list .btn.ghost {
+  white-space: nowrap;
+}
+
+.jobcreate-ai {
+  gap: 12px;
+  border-style: dashed;
+  border-color: rgba(37, 99, 235, 0.35);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.jobcreate-vendor-ai {
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.015);
+}
+
+.jobcreate-ai-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.jobcreate-ai-header h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.jobcreate-ai-meta {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.jobcreate-ai-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.jobcreate-ai-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(15, 23, 42, 0.75);
+}
+
+.jobcreate-ai-result {
+  display: grid;
+  gap: 12px;
+}
+
+.jobcreate-ai-summary {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.95);
+}
+
+.jobcreate-ai-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.jobcreate-ai-section {
+  display: grid;
+  gap: 6px;
+}
+
+.jobcreate-ai-section h5 {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.jobcreate-ai-section ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  color: rgba(15, 23, 42, 0.85);
+  font-size: 0.85rem;
+}
+
+.jobcreate-ai-notes {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: rgba(31, 41, 55, 0.85);
+}
+
+.jobcreate-vendor-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.jobcreate-vendor-card {
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.08);
+}
+
+.jobcreate-vendor-meta {
+  display: grid;
+  gap: 6px;
+}
+
+.jobcreate-vendor-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.jobcreate-vendor-city {
+  font-size: 0.82rem;
+  color: rgba(30, 41, 59, 0.7);
+}
+
+.jobcreate-vendor-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.jobcreate-tag {
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(37, 99, 235, 0.12);
+  color: rgba(30, 64, 175, 0.95);
+}
+
+.jobcreate-tag.score {
+  background: rgba(22, 163, 74, 0.14);
+  color: #15803d;
+}
+
+.jobcreate-tag.muted {
+  background: rgba(100, 116, 139, 0.12);
+  color: rgba(71, 85, 105, 0.9);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.jobcreate-vendor-reason {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.8);
+}
+
+.jobcreate-vendor-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 720px) {
   .jobcreate .row {
     flex-direction: column;

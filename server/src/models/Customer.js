@@ -36,7 +36,7 @@ const CustomerSchema = new mongoose.Schema(
     },
     passHash: { type: String },
     isGuest: { type: Boolean, default: false },
-    guestToken: { type: String, sparse: true },
+    guestToken: { type: String, sparse: true, index: true },
     lastServiceRequest: { type: Date },
     serviceHistory: [
       {
@@ -58,8 +58,6 @@ const CustomerSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
-CustomerSchema.index({ guestToken: 1 });
 
 CustomerSchema.pre("save", function setDefaults(next) {
   if (!this.name && this.savedProfile?.name) {
