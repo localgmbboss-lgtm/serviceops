@@ -404,6 +404,110 @@ export default function AdminDashboard() {
   }, [satisfactionRatio, totalReviews, viewportW]);
 
   // Work vs revenue dual bar chart (14-day window)
+  const workTimelineMeta = useMemo(() => {
+    const rawLabels = Array.isArray(dash?.workVsRevenue?.labels)
+      ? dash.workVsRevenue.labels
+      : [];
+    if (rawLabels.length === 0) {
+      return {
+        ticks: [],
+        range: "",
+        count: 0,
+        summary: [],
+        year: "",
+      };
+    }
+    const safeDate = (label) => {
+      if (typeof label !== "string") return null;
+      const [yy, mm, dd] = label.split("-").map((segment) => Number(segment));
+      const date = new Date(yy || 0, (mm || 1) - 1, dd || 1);
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+    const dates = rawLabels.map((label) => safeDate(label));
+    const total = rawLabels.length;
+
+    const shortFormatter = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+    const monthFormatter = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+    });
+    const yearFormatter = new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+    });
+
+    const rangeFormatter = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+    const firstDate = dates[0];
+    const lastDate = dates[dates.length - 1];
+    const range =
+      firstDate && lastDate
+        ? `${rangeFormatter.format(firstDate)} - ${rangeFormatter.format(lastDate)}`
+        : "";
+    const yearLabel = firstDate ? yearFormatter.format(firstDate) : "";
+
+    const summaryMap = new Map();
+    dates.forEach((date, index) => {
+      if (!date) return;
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      if (!summaryMap.has(key)) {
+        summaryMap.set(key, {
+          month: monthFormatter.format(date),
+          dates: [],
+          startIndex: index,
+          endIndex: index,
+        });
+      }
+      const ref = summaryMap.get(key);
+      const dayLabel = String(date.getDate()).padStart(2, "0");
+      ref.dates.push({
+        label: dayLabel,
+        index,
+      });
+      ref.endIndex = index;
+    });
+
+    const summary = Array.from(summaryMap.values()).map((entry) => {
+      const spanCount = Math.max(1, entry.endIndex - entry.startIndex + 1);
+      const startRatio = total > 0 ? entry.startIndex / total : 0;
+      const spanRatio = total > 0 ? spanCount / total : 1;
+      return {
+        month: entry.month,
+        startRatio,
+        spanRatio,
+        dates: entry.dates.map((record) => ({
+          label: record.label,
+          index: record.index,
+          positionLocal:
+            spanCount > 0
+              ? (record.index - entry.startIndex + 0.5) / spanCount
+              : 0.5,
+        })),
+      };
+    });
+
+    return {
+      ticks: dates.map((date, index) => ({
+        index,
+        label: date ? shortFormatter.format(date) : String(rawLabels[index]),
+        positionRatio: total > 0 ? (index + 0.5) / total : 0.5,
+      })),
+      range,
+      count: total,
+      summary,
+      year: yearLabel,
+    };
+  }, [dash?.workVsRevenue?.labels]);
+
+  const workTimelineTicks = workTimelineMeta.ticks;
+  const workTimelineRangeLabel = workTimelineMeta.range;
+  const workTimelinePointCount = workTimelineMeta.count;
+  const workTimelineSummary = workTimelineMeta.summary;
+  const workTimelineYearLabel = workTimelineMeta.year;
+
   useEffect(() => {
     const canvas = workCanvasRef.current;
     if (!canvas) return;
@@ -423,7 +527,11 @@ export default function AdminDashboard() {
       return;
     }
 
-    const padding = { top: 42, right: 48, bottom: 56, left: 64 };
+    const compactViewport = cssW <= 540;
+    const padding = compactViewport
+      ? { top: 28, right: 28, bottom: 30, left: 52 }
+      : { top: 42, right: 48, bottom: 40, left: 64 };
+
     const chartW = Math.max(0, cssW - padding.left - padding.right);
     const chartH = Math.max(0, cssH - padding.top - padding.bottom);
     if (chartW <= 0 || chartH <= 0) return;
@@ -435,11 +543,14 @@ export default function AdminDashboard() {
 
     const maxRevenue = Math.max(...revenueVals, 1);
     const maxJobs = Math.max(...jobs, 1);
-    const topHalf = chartH / 2;
-    const bottomHalf = chartH / 2;
+    const topHalf = compactViewport ? chartH * 0.46 : chartH / 2;
+    const bottomHalf = chartH - topHalf;
     const axisY = padding.top + topHalf;
     const stepX = chartW / labels.length;
-    const barWidth = Math.min(26, stepX * 0.55);
+    const barWidth = Math.min(
+      compactViewport ? 18 : 26,
+      stepX * (compactViewport ? 0.62 : 0.55)
+    );
 
     // background panel
     const panelGradient = ctx.createLinearGradient(
@@ -455,18 +566,20 @@ export default function AdminDashboard() {
     ctx.fillRect(padding.left, padding.top, chartW, chartH);
 
     // axis baseline
-    ctx.strokeStyle = "rgba(37, 99, 235, 0.45)";
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = compactViewport
+      ? "rgba(37, 99, 235, 0.4)"
+      : "rgba(37, 99, 235, 0.45)";
+    ctx.lineWidth = compactViewport ? 1 : 1.2;
     ctx.beginPath();
     ctx.moveTo(padding.left, axisY);
     ctx.lineTo(padding.left + chartW, axisY);
     ctx.stroke();
 
     // helper to draw horizontal grid/ticks
-    ctx.font = "11px system-ui, -apple-system, Segoe UI, Roboto";
+    ctx.font = `${compactViewport ? 10 : 11}px system-ui, -apple-system, Segoe UI, Roboto`;
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-    const tickCount = 4;
+    const tickCount = compactViewport ? 3 : 4;
     const formatRevenueTick = (value) => {
       const decimals = value < 1000 ? 0 : 1;
       return formatAbbr(value, { currency: true, decimals });
@@ -483,8 +596,15 @@ export default function AdminDashboard() {
       ctx.lineTo(padding.left + chartW, y);
       ctx.stroke();
     }
-    for (let i = 1; i <= tickCount; i++) {
-      const value = (maxJobs / tickCount) * i;
+    const jobTickStep = Math.max(1, Math.ceil(maxJobs / tickCount));
+    const jobTicks = [];
+    for (let value = jobTickStep; value < maxJobs; value += jobTickStep) {
+      jobTicks.push(value);
+    }
+    if (jobTicks.length === 0 || jobTicks[jobTicks.length - 1] !== maxJobs) {
+      jobTicks.push(maxJobs);
+    }
+    jobTicks.forEach((value) => {
       const y = axisY + (value / maxJobs) * bottomHalf;
       ctx.fillStyle = "rgba(203, 213, 225, 0.78)";
       ctx.fillText(Math.round(value).toString(), padding.left - 12, y);
@@ -493,24 +613,22 @@ export default function AdminDashboard() {
       ctx.moveTo(padding.left, y);
       ctx.lineTo(padding.left + chartW, y);
       ctx.stroke();
-    }
+    });
 
-    // x labels
-    const labelSkip = labels.length > 9 ? Math.ceil(labels.length / 9) : 1;
-    ctx.fillStyle = "rgba(226, 232, 240, 0.78)";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    const formatter = new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-    labels.forEach((label, idx) => {
-      if (idx % labelSkip !== 0 && idx !== labels.length - 1) return;
-      const centerX = padding.left + stepX * (idx + 0.5);
-      const [yy, mm, dd] = label.split("-").map((s) => parseInt(s, 10));
-      const dateObj = new Date(yy, (mm || 1) - 1, dd || 1);
-      ctx.fillText(formatter.format(dateObj), centerX, padding.top + chartH + 12);
-    });
+    // vertical tick markers for timeline
+    const tickIndexes = workTimelineTicks
+      .map((tick) => tick.index)
+      .filter((idx) => idx >= 0 && idx < labels.length);
+    if (tickIndexes.length > 0) {
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.28)";
+      tickIndexes.forEach((idx) => {
+        const centerX = padding.left + stepX * (idx + 0.5);
+        ctx.beginPath();
+        ctx.moveTo(centerX, axisY + (compactViewport ? 1 : 2));
+        ctx.lineTo(centerX, axisY + (compactViewport ? 10 : 12));
+        ctx.stroke();
+      });
+    }
 
     const drawBar = ({
       value,
@@ -577,7 +695,7 @@ export default function AdminDashboard() {
         index: idx,
       });
     });
-  }, [dash, viewportW]);
+  }, [dash, viewportW, workTimelineTicks]);
 
   const snap = dash?.revenue?.[slice] || {
     gross: 0,
@@ -911,6 +1029,52 @@ export default function AdminDashboard() {
                 <h3 className="section-title">Work vs Revenue (14 days)</h3>
               </div>
               <canvas ref={workCanvasRef} className="chart-canvas" />
+              {workTimelineSummary.length > 0 && (
+                <div className="trends-card__timeline" role="presentation">
+                  <header className="trends-card__timeline-head">
+                    <div>
+                      <span>Timeline</span>
+                      {workTimelineYearLabel ? (
+                        <strong>{workTimelineYearLabel}</strong>
+                      ) : null}
+                    </div>
+                    <span className="trends-card__timeline-range">
+                      {workTimelineRangeLabel ||
+                        `${workTimelinePointCount} data point${
+                          workTimelinePointCount === 1 ? "" : "s"
+                        }`}
+                    </span>
+                  </header>
+                  <div className="trends-card__timeline-body">
+                    {workTimelineSummary.map((group) => (
+                      <div
+                        key={`${group.month}-${group.startRatio}`}
+                        className="timeline-month"
+                        style={{
+                          "--month-start": group.startRatio,
+                          "--month-span": group.spanRatio,
+                        }}
+                      >
+                        <span className="timeline-month__label">{group.month}</span>
+                        <div className="timeline-month__dates">
+                          {group.dates.map((slot) => (
+                            <div
+                              key={`${group.month}-${slot.index}`}
+                              className="timeline-month__date"
+                              style={{
+                                "--month-date-pos": slot.positionLocal,
+                              }}
+                            >
+                              <span className="timeline-month__dot" />
+                              <span className="timeline-month__value">{slot.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="legend">
                 <span className="dot gold"></span> Revenue
                 <span className="dot cyan"></span> Completed jobs

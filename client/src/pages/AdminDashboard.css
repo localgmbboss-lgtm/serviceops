@@ -555,6 +555,138 @@
 }
 
 .admindash .trends-card {
+  --chart-h: clamp(220px, 42vw, 280px);
+}
+
+.trends-card__timeline {
+  --timeline-gutter-left: clamp(36px, 8vw, 64px);
+  --timeline-gutter-right: clamp(24px, 7vw, 48px);
+  display: grid;
+  gap: 12px;
+  padding: 12px 0;
+  border-radius: 14px;
+  background: rgba(12, 18, 40, 0.72);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+}
+
+.trends-card__timeline-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 var(--timeline-gutter-right) 0 var(--timeline-gutter-left);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.trends-card__timeline-head > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trends-card__timeline-head strong {
+  font-size: 13px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: rgba(248, 250, 252, 0.92);
+}
+
+.trends-card__timeline-range {
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.trends-card__timeline-body {
+  position: relative;
+  min-height: 72px;
+  padding: 20px var(--timeline-gutter-right) 12px var(--timeline-gutter-left);
+}
+
+.trends-card__timeline-body::before {
+  content: "";
+  position: absolute;
+  left: var(--timeline-gutter-left);
+  right: var(--timeline-gutter-right);
+  top: 30px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.1) 0%,
+    rgba(59, 130, 246, 0.3) 50%,
+    rgba(56, 189, 248, 0.1) 100%
+  );
+  pointer-events: none;
+}
+
+.timeline-month {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(
+    var(--timeline-gutter-left) +
+      (100% - var(--timeline-gutter-left) - var(--timeline-gutter-right)) *
+        var(--month-start)
+  );
+  width: calc(
+    (100% - var(--timeline-gutter-left) - var(--timeline-gutter-right)) *
+      var(--month-span)
+  );
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  padding-right: 14px;
+  overflow: visible;
+}
+
+.timeline-month__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.55);
+}
+
+.timeline-month__dates {
+  position: relative;
+  flex: 1;
+  min-height: 44px;
+  overflow: visible;
+}
+
+.timeline-month__date {
+  --month-date-pos: 0.5;
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--month-date-pos) * 100%);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  text-align: center;
+}
+
+.timeline-month__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.9);
+  box-shadow: 0 0 0 5px rgba(56, 189, 248, 0.12);
+}
+
+.timeline-month__value {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.94);
+  white-space: nowrap;
+}
+
+.admindash .trends-card {
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
@@ -1081,9 +1213,40 @@
     justify-content: space-between;
   }
 
+  .trends-card__timeline {
+    --timeline-gutter-left: clamp(28px, 7vw, 48px);
+    --timeline-gutter-right: clamp(20px, 6vw, 36px);
+  }
+
+  .admindash .trends-card {
+    padding: 18px;
+    gap: var(--space-2);
+  }
+
+  .trends-card__timeline-body {
+    padding: 18px var(--timeline-gutter-right) 10px var(--timeline-gutter-left);
+  }
+
+  .timeline-month__dates {
+    min-height: 56px;
+  }
+
+  .timeline-month__dot {
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+  }
+
+  .admindash .trends-card {
+    --chart-h: clamp(200px, 60vw, 240px);
+  }
+
+  .admindash-summary {
+    display: none;
+  }
+
   .satisfaction-card__body {
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
+    gap: 16px;
   }
 
   .satisfaction-card__gauge,
@@ -1132,8 +1295,38 @@
     gap: 16px;
   }
 
+  .trends-card__timeline {
+    --timeline-gutter-left: clamp(18px, 7vw, 34px);
+    --timeline-gutter-right: clamp(14px, 6vw, 28px);
+  }
+
+  .trends-card__timeline-body {
+    padding: 16px var(--timeline-gutter-right) 10px var(--timeline-gutter-left);
+  }
+
+  .timeline-month__dates {
+    min-height: 48px;
+  }
+
+  .timeline-month__value {
+    font-size: 11px;
+  }
+
+  .admindash .trends-card {
+    --chart-h: clamp(180px, 72vw, 220px);
+    padding: 16px;
+    gap: 18px;
+  }
+
+  .timeline-month__dot {
+    width: 8px;
+    height: 8px;
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+  }
+
   .satisfaction-card__gauge {
     justify-content: center;
+    width: 100%;
   }
 
   .satisfaction-card__info {
