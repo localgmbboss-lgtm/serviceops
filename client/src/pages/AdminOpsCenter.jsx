@@ -336,13 +336,7 @@ export default function AdminOpsCenter() {
             {escalationTotal > 0 ? "Requires follow-up" : "None open"}
           </span>
         </article>
-        <article className={complianceStatClass}>
-          <span className="ops-stat__label">Compliance tasks</span>
-          <strong>{complianceTotal}</strong>
-          <span className="ops-stat__note">
-            {complianceTotal > 0 ? "Docs to review" : "Fully compliant"}
-          </span>
-        </article>
+       
       </section>
 
       {error ? <div className="ops-error">{error}</div> : null}
