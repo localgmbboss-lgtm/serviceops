@@ -6,6 +6,7 @@ import KPIBlock from "../components/KPIBlock";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
+import { useNotifications } from "../contexts/NotificationsContext";
 import "./AdminDashboard.css";
 
 // Trim trailing zeros in decimals

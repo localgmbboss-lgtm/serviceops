@@ -16,7 +16,6 @@ const URGENCY_LABEL = {
 };
 
 const QUEUE_PAGE_SIZE = 8;
-const ROUTE_PAGE_SIZE = 3;
 const COMPLIANCE_PAGE_SIZE = 6;
 const SCORECARD_PAGE_SIZE = 6;
 
@@ -65,11 +64,9 @@ function useMissionControl() {
   const [state, setState] = useState({
     queue: [],
     escalations: [],
-    routeSuggestions: [],
     vendorScorecards: [],
     complianceTasks: [],
     generatedAt: null,
-    vendorBacklog: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -156,34 +153,6 @@ function QueueRow({ item }) {
   );
 }
 
-function RouteSuggestion({ suggestion }) {
-  return (
-    <li className="ops-suggest__item">
-      <header>
-        <strong>{suggestion.jobId.slice(-6).toUpperCase()}</strong>
-        <span className={`ops-pill ops-pill--${suggestion.urgency}`}>
-          {URGENCY_LABEL[suggestion.urgency]}
-        </span>
-      </header>
-      <p>{suggestion.pickupAddress || "No pickup on file"}</p>
-      <ul>
-        {suggestion.suggestions.map((vendor) => (
-          <li key={vendor.vendorId}>
-            <div>
-              <strong>{vendor.name}</strong>
-              <span className="muted">{vendor.city || "Unknown"}</span>
-            </div>
-            <div className="ops-suggest__meta">
-              <span>{vendor.distanceKm} km</span>
-              <span>{vendor.backlog} in queue</span>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </li>
-  );
-}
-
 function VendorScorecard({ card }) {
   return (
     <article className="ops-scorecard">
@@ -245,15 +214,10 @@ export default function AdminOpsCenter() {
   const { state, loading, error, reload } = useMissionControl();
 
   const [queuePage, setQueuePage] = useState(1);
-  const [routePage, setRoutePage] = useState(1);
   const [compliancePage, setCompliancePage] = useState(1);
   const [scorecardPage, setScorecardPage] = useState(1);
 
   const queueItems = useMemo(() => state.queue ?? [], [state.queue]);
-  const routeItems = useMemo(
-    () => state.routeSuggestions ?? [],
-    [state.routeSuggestions]
-  );
   const complianceItems = useMemo(
     () => state.complianceTasks ?? [],
     [state.complianceTasks]
@@ -264,12 +228,10 @@ export default function AdminOpsCenter() {
   );
 
   const queueTotal = queueItems.length;
-  const routeTotal = routeItems.length;
   const complianceTotal = complianceItems.length;
   const scorecardTotal = scorecardItems.length;
 
   useEffect(() => setQueuePage(1), [queueTotal]);
-  useEffect(() => setRoutePage(1), [routeTotal]);
   useEffect(() => setCompliancePage(1), [complianceTotal]);
   useEffect(() => setScorecardPage(1), [scorecardTotal]);
 
@@ -280,15 +242,6 @@ export default function AdminOpsCenter() {
         queuePage * QUEUE_PAGE_SIZE
       ),
     [queueItems, queuePage]
-  );
-
-  const pagedRouteItems = useMemo(
-    () =>
-      routeItems.slice(
-        (routePage - 1) * ROUTE_PAGE_SIZE,
-        routePage * ROUTE_PAGE_SIZE
-      ),
-    [routeItems, routePage]
   );
 
   const pagedCompliance = useMemo(
@@ -314,31 +267,85 @@ export default function AdminOpsCenter() {
     [queueItems]
   );
 
+  const queueAtRiskPercent = queueTotal
+    ? Math.round((atRiskCount / queueTotal) * 100)
+    : 0;
+  const escalationTotal = Array.isArray(state.escalations)
+    ? state.escalations.length
+    : 0;
+  const lastUpdatedStamp = state.generatedAt
+    ? new Date(state.generatedAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "--";
+
+  const queueStatClass = `ops-stat ${
+    atRiskCount > 0 ? "ops-stat--risk" : "ops-stat--info"
+  }`;
+  const escalationStatClass = `ops-stat ${
+    escalationTotal > 0 ? "ops-stat--warn" : "ops-stat--calm"
+  }`;
+  const complianceStatClass = `ops-stat ${
+    complianceTotal > 0 ? "ops-stat--warn" : "ops-stat--calm"
+  }`;
+
   return (
     <div className="ops">
       <header className="ops-header">
         <div>
           <h1>Mission Control</h1>
           <p>
-            Real-time health of your field ops: dispatch queue, escalations,
-            assignments, and compliance exceptions.
+            Real-time health of your field ops: dispatch queue, escalations, and
+            compliance exceptions.
           </p>
         </div>
         <div className="ops-header__meta">
-          <button className="btn ghost" type="button" onClick={reload}>
-            Refresh
+          <button
+            className="btn ghost ops-header__refresh"
+            type="button"
+            onClick={reload}
+            disabled={loading}
+          >
+            {loading ? "Refreshing..." : "Refresh"}
           </button>
-          <span className="muted small">
-            Updated{" "}
-            {state.generatedAt
-              ? new Date(state.generatedAt).toLocaleTimeString()
-              : "�"}
+          <span className="ops-header__stamp">
+            <span
+              className={`ops-dot ${loading ? "ops-dot--pulse" : ""}`}
+              aria-hidden="true"
+            />
+            {loading ? "Syncing mission data..." : `Updated ${lastUpdatedStamp}`}
           </span>
         </div>
       </header>
 
-      {error ? <div className="ops-error">{error}</div> : null}
+      <section className="ops-stats" aria-label="Operations summary">
+        <article className={queueStatClass}>
+          <span className="ops-stat__label">Active queue</span>
+          <strong>{queueTotal}</strong>
+          <span className="ops-stat__note">
+            {queueTotal === 0
+              ? "All clear"
+              : `${atRiskCount} at risk (${queueAtRiskPercent}%)`}
+          </span>
+        </article>
+        <article className={escalationStatClass}>
+          <span className="ops-stat__label">Escalations</span>
+          <strong>{escalationTotal}</strong>
+          <span className="ops-stat__note">
+            {escalationTotal > 0 ? "Requires follow-up" : "None open"}
+          </span>
+        </article>
+        <article className={complianceStatClass}>
+          <span className="ops-stat__label">Compliance tasks</span>
+          <strong>{complianceTotal}</strong>
+          <span className="ops-stat__note">
+            {complianceTotal > 0 ? "Docs to review" : "Fully compliant"}
+          </span>
+        </article>
+      </section>
 
+      {error ? <div className="ops-error">{error}</div> : null}
       <section className="ops-grid">
         <article className="ops-card ops-card--wide">
           <header>
@@ -383,44 +390,6 @@ export default function AdminOpsCenter() {
             onChange={setQueuePage}
             label="Dispatch queue pages"
           />
-        </article>
-
-        <article className="ops-card">
-          <header>
-            <div>
-              <h2>Routing Suggestions</h2>
-              <p>
-                Smart handoffs for unassigned work based on distance and
-                backlog.
-              </p>
-            </div>
-          </header>
-          {routeTotal === 0 ? (
-            <p className="muted">
-              No routing suggestions - every job has coverage.
-            </p>
-          ) : (
-            <>
-              <ul className="ops-suggest" aria-label="Routing suggestions">
-                {pagedRouteItems.map((item) => (
-                  <RouteSuggestion
-                    key={item.jobId}
-                    suggestion={{
-                      ...item,
-                      jobId: String(item.jobId),
-                    }}
-                  />
-                ))}
-              </ul>
-              <Pagination
-                total={routeTotal}
-                page={routePage}
-                pageSize={ROUTE_PAGE_SIZE}
-                onChange={setRoutePage}
-                label="Routing suggestions pages"
-              />
-            </>
-          )}
         </article>
 
         <article className="ops-card">
@@ -499,3 +468,5 @@ export default function AdminOpsCenter() {
     </div>
   );
 }
+
+
