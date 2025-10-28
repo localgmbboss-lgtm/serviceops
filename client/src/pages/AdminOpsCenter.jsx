@@ -392,46 +392,7 @@ export default function AdminOpsCenter() {
           />
         </article>
 
-        <article className="ops-card">
-          <header>
-            <div>
-              <h2>Compliance Tasks</h2>
-              <p>Expiring docs and missing requirements that block dispatch.</p>
-            </div>
-          </header>
-          {complianceTotal === 0 ? (
-            <p className="muted">No compliance follow-ups pending.</p>
-          ) : (
-            <>
-              <ul className="ops-compliance" aria-label="Compliance tasks">
-                {pagedCompliance.map((task, index) => (
-                  <li
-                    key={`${task.type}-${task.vendorId || "vendor"}-${index}`}
-                  >
-                    <div>
-                      <strong>{task.vendorName || "Vendor"}</strong>
-                      <span className="muted">
-                        {task.type === "expiry"
-                          ? `Expiring ${new Date(
-                              task.expiresAt
-                            ).toLocaleDateString()}`
-                          : "Missing documentation"}
-                      </span>
-                    </div>
-                    <span>{task.title || task.label || "Document"}</span>
-                  </li>
-                ))}
-              </ul>
-              <Pagination
-                total={complianceTotal}
-                page={compliancePage}
-                pageSize={COMPLIANCE_PAGE_SIZE}
-                onChange={setCompliancePage}
-                label="Compliance tasks pages"
-              />
-            </>
-          )}
-        </article>
+       
       </section>
 
       <section className="ops-card ops-card--scorecards">
