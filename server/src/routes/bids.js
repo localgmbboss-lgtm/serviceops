@@ -204,40 +204,61 @@ router.get("/list/:customerToken", async (req, res, next) => {
 // Customer selects a bid (locks job, closes bidding, mints vendorAcceptedToken)
 // POST /api/bids/:bidId/select
 // ----------------------------------------------------------
+// ----------------------------------------------------------
+// Customer selects a bid (locks job, closes bidding, mints vendorAcceptedToken)
+// POST /api/bids/:bidId/select
+// ----------------------------------------------------------
 router.post("/:bidId/select", async (req, res, next) => {
   try {
     const { bidId } = req.params;
-    if (!isObjId(bidId))
+    if (!isObjId(bidId)) {
       return res.status(400).json({ message: "Invalid bid id" });
+    }
 
+    // Load bid (lean is fine here)
     const bid = await Bid.findById(bidId).lean();
-    if (!bid) return res.status(404).json({ message: "Bid not found" });
+    if (!bid) {
+      return res.status(404).json({ message: "Bid not found" });
+    }
 
+    // Load job (we'll mutate and save)
     const job = await Job.findById(bid.jobId);
-    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
 
-    // if already selected another bid, block
+    // Prevent double-selection
     if (job.selectedBidId && String(job.selectedBidId) !== String(bid._id)) {
       return res
         .status(409)
         .json({ message: "Another bid has already been selected" });
     }
 
+    // Apply selection
     job.selectedBidId = bid._id;
     job.vendorName = bid.vendorName;
     job.vendorPhone = bid.vendorPhone;
     job.status = "Assigned";
     job.biddingOpen = false;
-    job.finalPrice = job.bidMode === "fixed"
-      ? (Number.isFinite(job.quotedPrice) ? job.quotedPrice : bid.price)
-      : bid.price;
 
+    // Compute final price
+    const quoted = Number(job.quotedPrice);
+    if (job.bidMode === "fixed") {
+      job.finalPrice = Number.isFinite(quoted) ? quoted : Number(bid.price) || 0;
+    } else {
+      job.finalPrice = Number(bid.price) || 0;
+    }
+
+    // Ensure vendorAcceptedToken exists
     if (!job.vendorAcceptedToken) {
       job.vendorAcceptedToken = crypto.randomBytes(16).toString("hex");
     }
 
     await job.save();
 
+    // Build client URLs (FIX: define baseClient properly)
+    const baseClient =
+      (resolveClientBaseUrl(req) || defaultClientBase || "").replace(/\/$/, "");
     const vendorPortal = `${baseClient}/vendor/${job.vendorAcceptedToken}`;
     const statusUrl = `${baseClient}/status/${job._id}`;
 
@@ -258,14 +279,42 @@ router.post("/:bidId/select", async (req, res, next) => {
           job._id
         );
       }
+      // Optional: push notifications (reusing your helper)
+      await sendCustomerPushNotifications?.([
+        {
+          customerId: job.customerId,
+          jobId: job._id,
+          title: "Bid selected",
+          body: `Vendor assigned: ${job.vendorName}`,
+          severity: "success",
+          meta: {
+            role: "customer",
+            jobId: job._id,
+            kind: "bid_selected",
+            route: `/status/${job._id}`,
+            absoluteUrl: statusUrl,
+            dedupeKey: `customer:job:${job._id}:bid_selected:${bid._id}`,
+          },
+        },
+      ]);
     } catch {
-      /* ignore */
+      /* ignore best-effort notify errors */
     }
 
-    res.json({ ok: true, jobId: job._id, vendorPortal, statusUrl });
+    // Consistent, UI-friendly response
+    return res.json({
+      ok: true,
+      jobId: job._id,
+      selectedBidId: job.selectedBidId,
+      status: job.status,
+      finalPrice: job.finalPrice,
+      vendor: { name: job.vendorName, phone: job.vendorPhone },
+      links: { vendorPortal, statusUrl },
+    });
   } catch (e) {
     next(e);
   }
 });
+
 
 export default router;
