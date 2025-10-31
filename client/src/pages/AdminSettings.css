@@ -258,6 +258,7 @@
     cursor: pointer;
     font-weight: 600;
     font-size: 0.85rem;
+    color: var(--color-primary, #0f62fe);
     transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
