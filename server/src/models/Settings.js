@@ -70,8 +70,10 @@ const SettingsSchema = new mongoose.Schema(
 
     // 2) Workflow toggles (feature flags)
     workflow: {
+      requireDriverDocs: { type: Boolean, default: true },
       requireVendorDocs: { type: Boolean, default: true },
       showBusinessDocs: { type: Boolean, default: true },
+      showLiveDriverMap: { type: Boolean, default: true },
       showLiveVendorMap: { type: Boolean, default: true },
       advancedJobWorkflow: { type: Boolean, default: false },
       enableCustomerPaymentScreen: { type: Boolean, default: false },

@@ -235,6 +235,7 @@ router.get("/mission-control", async (_req, res, next) => {
       {
         _id: 1,
         name: 1,
+        email: 1,
         phone: 1,
         city: 1,
         services: 1,
@@ -271,6 +272,14 @@ router.get("/mission-control", async (_req, res, next) => {
     const vendorMap = new Map(
       activeVendorDocs.map((vendor) => [String(vendor._id), vendor])
     );
+
+    for (const entry of queue) {
+      if (!entry.vendorId) continue;
+      const vendor = vendorMap.get(String(entry.vendorId));
+      if (!vendor) continue;
+      entry.vendorPhone = vendor.phone || null;
+      entry.vendorEmail = vendor.email || null;
+    }
 
     const routeSuggestions = [];
     const unassignedJobs = openJobs.filter((job) => !job.vendorId);
@@ -377,6 +386,7 @@ router.get("/mission-control", async (_req, res, next) => {
         expiresAt: 1,
         status: 1,
         requirementKey: 1,
+        url: 1,
       }
     )
       .sort({ expiresAt: 1 })
@@ -389,10 +399,13 @@ router.get("/mission-control", async (_req, res, next) => {
         type: "expiry",
         vendorId: doc.vendorId,
         vendorName: vendor?.name || "Vendor",
+        vendorPhone: vendor?.phone || null,
+        vendorEmail: vendor?.email || null,
         documentId: doc._id,
         title: doc.title,
         expiresAt: doc.expiresAt,
         status: doc.status,
+        documentUrl: doc.url || null,
       });
     }
 
@@ -406,6 +419,8 @@ router.get("/mission-control", async (_req, res, next) => {
             type: "missing",
             vendorId: vendor._id,
             vendorName: vendor.name || "Vendor",
+            vendorPhone: vendor.phone || null,
+            vendorEmail: vendor.email || null,
             key: missing.key,
             label: missing.label,
             reason: missing.reason || "",

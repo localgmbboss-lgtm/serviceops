@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import "./AdminOpsCenter.css";
 
@@ -16,8 +17,16 @@ const URGENCY_LABEL = {
 };
 
 const QUEUE_PAGE_SIZE = 8;
+const ESCALATION_PAGE_SIZE = 6;
 const COMPLIANCE_PAGE_SIZE = 6;
 const SCORECARD_PAGE_SIZE = 6;
+
+const formatSlaBadge = (minutesRemaining) => {
+  if (!Number.isFinite(minutesRemaining)) return "--";
+  if (minutesRemaining > 0) return `-${minutesRemaining}m`;
+  if (minutesRemaining === 0) return "Due";
+  return `+${Math.abs(minutesRemaining)}m`;
+};
 
 function Pagination({ total, page, pageSize, onChange, label }) {
   if (total <= pageSize) return null;
@@ -98,12 +107,7 @@ function useMissionControl() {
 function QueueRow({ item }) {
   const atRisk = item.atRisk || item.severe;
   const minutesRemaining = item.minutesRemaining;
-  const badge =
-    minutesRemaining > 0
-      ? `-${minutesRemaining}m`
-      : minutesRemaining === 0
-      ? "Due"
-      : `+${Math.abs(minutesRemaining)}m`;
+  const badge = formatSlaBadge(minutesRemaining);
 
   return (
     <tr
@@ -212,12 +216,49 @@ function VendorScorecard({ card }) {
 
 export default function AdminOpsCenter() {
   const { state, loading, error, reload } = useMissionControl();
+  const navigate = useNavigate();
+
+  const handleViewJob = useCallback(
+    (jobId) => {
+      if (!jobId) return;
+      navigate(`/jobs/${jobId}`);
+    },
+    [navigate]
+  );
+
+  const handleCallVendor = useCallback((phone) => {
+    if (!phone) return;
+    const normalized = String(phone).replace(/[^\d+]/g, "");
+    if (!normalized) return;
+    if (typeof window !== "undefined") {
+      window.location.href = `tel:${normalized}`;
+    }
+  }, []);
+
+  const handleEmailVendor = useCallback((email) => {
+    if (!email) return;
+    if (typeof window !== "undefined") {
+      window.location.href = `mailto:${email}`;
+    }
+  }, []);
+
+  const handleOpenDocument = useCallback((url) => {
+    if (!url) return;
+    if (typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }, []);
 
   const [queuePage, setQueuePage] = useState(1);
+  const [escalationPage, setEscalationPage] = useState(1);
   const [compliancePage, setCompliancePage] = useState(1);
   const [scorecardPage, setScorecardPage] = useState(1);
 
   const queueItems = useMemo(() => state.queue ?? [], [state.queue]);
+  const escalationItems = useMemo(
+    () => state.escalations ?? [],
+    [state.escalations]
+  );
   const complianceItems = useMemo(
     () => state.complianceTasks ?? [],
     [state.complianceTasks]
@@ -228,10 +269,12 @@ export default function AdminOpsCenter() {
   );
 
   const queueTotal = queueItems.length;
+  const escalationTotal = escalationItems.length;
   const complianceTotal = complianceItems.length;
   const scorecardTotal = scorecardItems.length;
 
   useEffect(() => setQueuePage(1), [queueTotal]);
+  useEffect(() => setEscalationPage(1), [escalationTotal]);
   useEffect(() => setCompliancePage(1), [complianceTotal]);
   useEffect(() => setScorecardPage(1), [scorecardTotal]);
 
@@ -242,6 +285,15 @@ export default function AdminOpsCenter() {
         queuePage * QUEUE_PAGE_SIZE
       ),
     [queueItems, queuePage]
+  );
+
+  const pagedEscalations = useMemo(
+    () =>
+      escalationItems.slice(
+        (escalationPage - 1) * ESCALATION_PAGE_SIZE,
+        escalationPage * ESCALATION_PAGE_SIZE
+      ),
+    [escalationItems, escalationPage]
   );
 
   const pagedCompliance = useMemo(
@@ -270,15 +322,30 @@ export default function AdminOpsCenter() {
   const queueAtRiskPercent = queueTotal
     ? Math.round((atRiskCount / queueTotal) * 100)
     : 0;
-  const escalationTotal = Array.isArray(state.escalations)
-    ? state.escalations.length
-    : 0;
   const lastUpdatedStamp = state.generatedAt
     ? new Date(state.generatedAt).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       })
     : "--";
+  const showSkeleton = loading && !state.generatedAt && !error;
+  const [animateEntering, setAnimateEntering] = useState(false);
+  const prevShowSkeletonRef = useRef(showSkeleton);
+
+  useEffect(() => {
+    let timer;
+    if (prevShowSkeletonRef.current && !showSkeleton) {
+      setAnimateEntering(true);
+      timer = setTimeout(() => setAnimateEntering(false), 600);
+    }
+    prevShowSkeletonRef.current = showSkeleton;
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [showSkeleton]);
+
+  const getDelayClass = (delay = 0) =>
+    animateEntering ? `ops-animate-in ops-animate-delay-${delay}` : "";
 
   const queueStatClass = `ops-stat ${
     atRiskCount > 0 ? "ops-stat--risk" : "ops-stat--info"
@@ -320,28 +387,58 @@ export default function AdminOpsCenter() {
       </header>
 
       <section className="ops-stats" aria-label="Operations summary">
-        <article className={queueStatClass}>
-          <span className="ops-stat__label">Active queue</span>
-          <strong>{queueTotal}</strong>
-          <span className="ops-stat__note">
-            {queueTotal === 0
-              ? "All clear"
-              : `${atRiskCount} at risk (${queueAtRiskPercent}%)`}
-          </span>
-        </article>
-        <article className={escalationStatClass}>
-          <span className="ops-stat__label">Escalations</span>
-          <strong>{escalationTotal}</strong>
-          <span className="ops-stat__note">
-            {escalationTotal > 0 ? "Requires follow-up" : "None open"}
-          </span>
-        </article>
-       
+        {showSkeleton
+          ? [0, 1, 2].map((idx) => (
+              <article
+                key={`stat-skeleton-${idx}`}
+                className="ops-stat ops-stat--placeholder"
+              >
+                <span className="ops-skeleton ops-skeleton--label ops-skeleton--w-30" />
+                <strong className="ops-skeleton ops-skeleton--value ops-skeleton--w-45" />
+                <span className="ops-skeleton ops-skeleton--note ops-skeleton--w-60" />
+              </article>
+            ))
+          : [
+              {
+                className: queueStatClass,
+                label: "Active queue",
+                value: queueTotal,
+                note:
+                  queueTotal === 0
+                    ? "All clear"
+                    : `${atRiskCount} at risk (${queueAtRiskPercent}%)`,
+              },
+              {
+                className: escalationStatClass,
+                label: "Escalations",
+                value: escalationTotal,
+                note:
+                  escalationTotal > 0
+                    ? "Requires follow-up"
+                    : "None open",
+              },
+              {
+                className: complianceStatClass,
+                label: "Compliance",
+                value: complianceTotal,
+                note:
+                  complianceTotal > 0 ? "Docs flagged" : "All caught up",
+              },
+            ].map((stat, idx) => (
+              <article
+                key={stat.label}
+                className={`${stat.className} ${getDelayClass(idx)}`}
+              >
+                <span className="ops-stat__label">{stat.label}</span>
+                <strong>{stat.value}</strong>
+                <span className="ops-stat__note">{stat.note}</span>
+              </article>
+            ))}
       </section>
 
       {error ? <div className="ops-error">{error}</div> : null}
       <section className="ops-grid">
-        <article className="ops-card ops-card--wide">
+        <article className={`ops-card ops-card--wide ${getDelayClass(0)}`}>
           <header>
             <div>
               <h2>Dispatch Queue</h2>
@@ -352,44 +449,317 @@ export default function AdminOpsCenter() {
             <span className="ops-badge">{loading ? "Syncing..." : "Live"}</span>
           </header>
           <div className="ops-table-wrap">
-            <table className="ops-queue" aria-label="Dispatch queue">
-              <thead>
-                <tr>
-                  <th>Job</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>SLA</th>
-                  <th>Vendor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {queueTotal === 0 ? (
+            {showSkeleton ? (
+              <div className="ops-skeleton-list">
+                {[0, 1, 2, 3].map((idx) => (
+                  <div key={`queue-skeleton-${idx}`} className="ops-skeleton-card">
+                    <div className="ops-skeleton-row">
+                      <span className="ops-skeleton ops-skeleton--chip" />
+                      <div className="ops-skeleton-col">
+                        <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-75" />
+                        <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-45" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <table className="ops-queue" aria-label="Dispatch queue">
+                <thead>
                   <tr>
-                    <td colSpan={5} className="muted">
-                      All clear - no active jobs in queue.
-                    </td>
+                    <th>Job</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>SLA</th>
+                    <th>Vendor</th>
                   </tr>
-                ) : (
-                  pagedQueueItems.map((item) => (
-                    <QueueRow key={item.jobId} item={item} />
-                  ))
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {queueTotal === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="muted">
+                        All clear - no active jobs in queue.
+                      </td>
+                    </tr>
+                  ) : (
+                    pagedQueueItems.map((item) => (
+                      <QueueRow key={item.jobId} item={item} />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
-          <Pagination
-            total={queueTotal}
-            page={queuePage}
-            pageSize={QUEUE_PAGE_SIZE}
-            onChange={setQueuePage}
-            label="Dispatch queue pages"
-          />
+          {!showSkeleton ? (
+            <Pagination
+              total={queueTotal}
+              page={queuePage}
+              pageSize={QUEUE_PAGE_SIZE}
+              onChange={setQueuePage}
+              label="Dispatch queue pages"
+            />
+          ) : null}
         </article>
 
-       
+        <div className="ops-grid__secondary">
+          <article className={`ops-card ${getDelayClass(1)}`}>
+            <header>
+              <div>
+                <h2>Escalations</h2>
+                <p>
+                  {escalationTotal}{" "}
+                  {escalationTotal === 1 ? "active escalation" : "active escalations"}
+                </p>
+              </div>
+              <span
+                className={`ops-badge ${
+                  escalationTotal > 0 ? "ops-badge--warn" : "ops-badge--good"
+                }`}
+              >
+                {escalationTotal > 0 ? "Attention" : "All clear"}
+              </span>
+            </header>
+            {showSkeleton ? (
+              <div className="ops-skeleton-list">
+                {[0, 1].map((idx) => (
+                  <div key={`esc-skeleton-${idx}`} className="ops-skeleton-card">
+                    <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-60" />
+                    <div className="ops-skeleton-row">
+                      <span className="ops-skeleton ops-skeleton--chip" />
+                      <div className="ops-skeleton-col">
+                        <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-75" />
+                        <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-40" />
+                      </div>
+                    </div>
+                    <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-50" />
+                  </div>
+                ))}
+              </div>
+            ) : escalationTotal === 0 ? (
+              <p className="muted">No escalations right now.</p>
+            ) : (
+              <>
+                <ul className="ops-escalations">
+                  {pagedEscalations.map((item) => {
+                    const badge = formatSlaBadge(item.minutesRemaining);
+                    const itemClass = item.severe
+                      ? "ops-escalations__item ops-escalations__item--severe"
+                      : item.atRisk
+                      ? "ops-escalations__item ops-escalations__item--risk"
+                      : "ops-escalations__item";
+                    return (
+                      <li key={item.jobId} className={itemClass}>
+                        <div className="ops-escalations__header">
+                          <div className="ops-escalations__job">
+                            <span className="ops-chip">
+                              {String(item.jobId).slice(-6).toUpperCase()}
+                            </span>
+                            <div>
+                              <strong>{item.serviceType}</strong>
+                              <span className="muted">
+                                {item.pickupAddress || "No pickup listed"}
+                              </span>
+                            </div>
+                          </div>
+                          <span className={`ops-pill ops-pill--${item.urgency}`}>
+                            {URGENCY_LABEL[item.urgency] || "Standard"}
+                          </span>
+                        </div>
+                        <div className="ops-escalations__footer">
+                          <div className="ops-escalations__sla">
+                            <span className="ops-badge">{badge}</span>
+                            <span className="ops-escalations__note">
+                              SLA {item.slaMinutes}m {"\u2022"}{" "}
+                              {STATUS_LABEL[item.status] || item.status}
+                            </span>
+                          </div>
+                          <span className="ops-escalations__vendor">
+                            {item.vendorName
+                              ? `Vendor ${item.vendorName}`
+                              : "Unassigned"}
+                            {item.vendorPhone ? (
+                              <span className="ops-escalations__contact">
+                                {item.vendorPhone}
+                              </span>
+                            ) : null}
+                          </span>
+                        </div>
+                        <div className="ops-escalations__actions">
+                          <button
+                            type="button"
+                            className="btn ghost"
+                            onClick={() => handleViewJob(item.jobId)}
+                          >
+                            View job
+                          </button>
+                          {item.vendorPhone ? (
+                            <button
+                              type="button"
+                              className="btn ghost"
+                              onClick={() => handleCallVendor(item.vendorPhone)}
+                            >
+                              Call vendor
+                            </button>
+                          ) : null}
+                          {item.vendorEmail ? (
+                            <button
+                              type="button"
+                              className="btn ghost"
+                              onClick={() => handleEmailVendor(item.vendorEmail)}
+                            >
+                              Email vendor
+                            </button>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <Pagination
+                  total={escalationTotal}
+                  page={escalationPage}
+                  pageSize={ESCALATION_PAGE_SIZE}
+                  onChange={setEscalationPage}
+                  label="Escalations pages"
+                />
+              </>
+            )}
+          </article>
+
+          <article className={`ops-card ${getDelayClass(2)}`}>
+            <header>
+              <div>
+                <h2>Compliance Watchlist</h2>
+                <p>Expiring documents and missing requirements.</p>
+              </div>
+              <span
+                className={`ops-badge ${
+                  complianceTotal > 0 ? "ops-badge--warn" : "ops-badge--good"
+                }`}
+              >
+                {complianceTotal > 0 ? `${complianceTotal} open` : "Up to date"}
+              </span>
+            </header>
+            {showSkeleton ? (
+              <div className="ops-skeleton-list">
+                {[0, 1, 2].map((idx) => (
+                  <div key={`comp-skeleton-${idx}`} className="ops-skeleton-card">
+                    <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-75" />
+                    <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-50" />
+                    <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-40" />
+                  </div>
+                ))}
+              </div>
+            ) : complianceTotal === 0 ? (
+              <p className="muted">No compliance follow-ups.</p>
+            ) : (
+              <>
+                <ul className="ops-compliance">
+                  {pagedCompliance.map((task) => {
+                    const key =
+                      task.documentId ||
+                      task.key ||
+                      `${task.vendorId}-${task.title || "task"}`;
+                    const isExpiry = task.type === "expiry";
+                    const dueDate =
+                      isExpiry && task.expiresAt
+                        ? new Date(task.expiresAt).toLocaleDateString([], {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : null;
+                    const badgeText = isExpiry
+                      ? dueDate
+                        ? `Exp ${dueDate}`
+                        : "Expiring"
+                      : "Missing";
+                    const detail = isExpiry
+                      ? dueDate
+                        ? `Due ${dueDate}`
+                        : ""
+                      : task.reason || "";
+                    const hasActions =
+                      Boolean(task.documentUrl) ||
+                      Boolean(task.vendorPhone) ||
+                      Boolean(task.vendorEmail);
+                    return (
+                      <li key={key}>
+                        <div>
+                          <strong>{task.vendorName || "Vendor"}</strong>
+                          <span className="muted">
+                            {isExpiry
+                              ? task.title || "Document"
+                              : task.label || task.title || "Requirement"}
+                          </span>
+                          {detail ? (
+                            <span className="ops-compliance__note">{detail}</span>
+                          ) : null}
+                        </div>
+                        <div className="ops-compliance__meta">
+                          <span className="ops-badge ops-badge--warn">
+                            {badgeText}
+                          </span>
+                          {task.status ? (
+                            <span className="ops-compliance__status">
+                              {task.status}
+                            </span>
+                          ) : null}
+                          {hasActions ? (
+                            <div className="ops-compliance__actions">
+                              {task.documentUrl ? (
+                                <button
+                                  type="button"
+                                  className="btn ghost"
+                                  onClick={() =>
+                                    handleOpenDocument(task.documentUrl)
+                                  }
+                                >
+                                  Open doc
+                                </button>
+                              ) : null}
+                              {task.vendorPhone ? (
+                                <button
+                                  type="button"
+                                  className="btn ghost"
+                                  onClick={() =>
+                                    handleCallVendor(task.vendorPhone)
+                                  }
+                                >
+                                  Call vendor
+                                </button>
+                              ) : null}
+                              {task.vendorEmail ? (
+                                <button
+                                  type="button"
+                                  className="btn ghost"
+                                  onClick={() =>
+                                    handleEmailVendor(task.vendorEmail)
+                                  }
+                                >
+                                  Email vendor
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <Pagination
+                  total={complianceTotal}
+                  page={compliancePage}
+                  pageSize={COMPLIANCE_PAGE_SIZE}
+                  onChange={setCompliancePage}
+                  label="Compliance task pages"
+                />
+              </>
+            )}
+          </article>
+        </div>
       </section>
 
-      <section className="ops-card ops-card--scorecards">
+      <section className={`ops-card ops-card--scorecards ${getDelayClass(3)}`}>
         <header>
           <div>
             <h2>Vendor Scorecards (45 days)</h2>
@@ -399,7 +769,21 @@ export default function AdminOpsCenter() {
             </p>
           </div>
         </header>
-        {scorecardTotal === 0 ? (
+        {showSkeleton ? (
+          <div className="ops-scorecards ops-scorecards--skeleton">
+            {[0, 1, 2].map((idx) => (
+              <div key={`scorecard-skeleton-${idx}`} className="ops-skeleton-card ops-skeleton-card--scorecard">
+                <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-60" />
+                <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-40" />
+                <div className="ops-skeleton-row">
+                  <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-30" />
+                  <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-25" />
+                </div>
+                <span className="ops-skeleton ops-skeleton--line ops-skeleton--w-80" />
+              </div>
+            ))}
+          </div>
+        ) : scorecardTotal === 0 ? (
           <p className="muted">
             We need more job history to build meaningful scorecards.
           </p>

@@ -1,5 +1,6 @@
 import webPush from "web-push";
 import PushSubscription from "../models/PushSubscription.js";
+import { logger } from "./logger.js";
 
 const PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
 const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
@@ -158,41 +159,153 @@ function toPayload(notification, { type, defaultRoute, defaultBaseUrl }) {
   };
 }
 
-async function dispatchNotifications(subs, payload) {
-  if (!subs.length) return;
-  await Promise.all(
-    subs.map(async (sub) => {
-      try {
-        await webPush.sendNotification(sub.subscription, payload);
+const {
+  PUSH_MAX_RETRIES = "2",
+  PUSH_TIMEOUT_MS = "4000",
+  PUSH_BREAKER_THRESHOLD = "5",
+  PUSH_BREAKER_COOLDOWN_MS = "60000",
+} = process.env;
+
+const pushMaxRetries = Math.max(0, Number(PUSH_MAX_RETRIES) || 0);
+const pushTimeoutMs = Math.max(1000, Number(PUSH_TIMEOUT_MS) || 4000);
+const pushBreakerThreshold = Math.max(1, Number(PUSH_BREAKER_THRESHOLD) || 5);
+const pushBreakerCooldownMs = Math.max(
+  10000,
+  Number(PUSH_BREAKER_COOLDOWN_MS) || 60000
+);
+
+let pushConsecutiveFailures = 0;
+let pushBreakerOpenedAt = 0;
+
+const isPushBreakerOpen = () => {
+  if (!pushBreakerOpenedAt) return false;
+  const elapsed = Date.now() - pushBreakerOpenedAt;
+  if (elapsed > pushBreakerCooldownMs) {
+    pushBreakerOpenedAt = 0;
+    pushConsecutiveFailures = 0;
+    return false;
+  }
+  return true;
+};
+
+const recordPushFailure = () => {
+  pushConsecutiveFailures += 1;
+  if (pushConsecutiveFailures >= pushBreakerThreshold) {
+    pushBreakerOpenedAt = Date.now();
+    logger.warn(
+      {
+        pushConsecutiveFailures,
+        pushBreakerThreshold,
+        pushBreakerCooldownMs,
+      },
+      "Push circuit breaker opened"
+    );
+  }
+};
+
+const recordPushSuccess = () => {
+  pushConsecutiveFailures = 0;
+  pushBreakerOpenedAt = 0;
+};
+
+const pushSleep = (ms) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const withPushTimeout = (promise, ms, subId) =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("Push request timed out"));
+    }, ms);
+    promise
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+
+async function sendNotificationWithResilience(sub, payload) {
+  if (isPushBreakerOpen()) {
+    throw new Error("Push circuit breaker open");
+  }
+
+  let attempt = 0;
+  const maxAttempts = Math.max(1, pushMaxRetries + 1);
+  while (attempt < maxAttempts) {
+    try {
+      await withPushTimeout(
+        webPush.sendNotification(sub.subscription, payload),
+        pushTimeoutMs
+      );
+      await PushSubscription.updateOne(
+        { _id: sub._id },
+        {
+          $set: {
+            lastUsedAt: new Date(),
+            failCount: 0,
+            lastError: "",
+          },
+        }
+      );
+      recordPushSuccess();
+      return;
+    } catch (error) {
+      attempt += 1;
+      logger.warn(
+        {
+          attempt,
+          maxAttempts,
+          subId: sub._id,
+          error: error?.message,
+        },
+        "Push send attempt failed"
+      );
+      const status = error?.statusCode;
+      const body = error?.body || "";
+      const isGone = status === 404 || status === 410;
+      if (isGone) {
+        await PushSubscription.deleteOne({ _id: sub._id });
+        recordPushSuccess();
+        return;
+      }
+
+      if (attempt >= maxAttempts) {
         await PushSubscription.updateOne(
           { _id: sub._id },
           {
+            $inc: { failCount: 1 },
             $set: {
-              lastUsedAt: new Date(),
-              failCount: 0,
-              lastError: "",
+              lastError: body || error?.message || "push send failed",
             },
           }
         );
-      } catch (error) {
-        const status = error?.statusCode;
-        const body = error?.body || "";
-        const isGone = status === 404 || status === 410;
-        if (isGone) {
-          await PushSubscription.deleteOne({ _id: sub._id });
-        } else {
-          await PushSubscription.updateOne(
-            { _id: sub._id },
-            {
-              $inc: { failCount: 1 },
-              $set: {
-                lastError: body || error?.message || "push send failed",
-              },
-            }
-          );
-        }
+        recordPushFailure();
+        throw error;
       }
-    })
+
+      await pushSleep(200 * attempt);
+    }
+  }
+}
+
+async function dispatchNotifications(subs, payload) {
+  if (!subs.length) return;
+
+  if (isPushBreakerOpen()) {
+    logger.warn(
+      { subCount: subs.length },
+      "Push circuit breaker open, skipping dispatch"
+    );
+    return;
+  }
+
+  await Promise.allSettled(
+    subs.map((sub) => sendNotificationWithResilience(sub, payload))
   );
 }
 

@@ -12,6 +12,12 @@ import {
   sendCustomerPushNotifications,
 } from "../lib/push.js";
 import { jobMediaUpload, jobMediaUploadRoot, toJobMediaRecord, JOB_MEDIA_MAX_FILES } from "../lib/jobMedia.js";
+import { z } from "zod";
+import { validate } from "../lib/validation.js";
+import {
+  publicJobCounter,
+  publicJobDuration,
+} from "../lib/metrics.js";
 
 const router = Router();
 
@@ -29,8 +35,115 @@ const normalizeService = (s) => {
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 };
 
+const optionalNumber = z
+  .union([z.number(), z.string(), z.null(), z.undefined()])
+  .transform((val) => {
+    if (val === null || val === undefined || val === "") return undefined;
+    const num = Number(val);
+    return num;
+  })
+  .refine((val) => val === undefined || Number.isFinite(val), {
+    message: "Invalid number",
+  });
+
+const optionalBoolean = z
+  .union([z.boolean(), z.string(), z.number(), z.null(), z.undefined()])
+  .transform((val) => {
+    if (val === null || val === undefined || val === "") return undefined;
+    if (typeof val === "boolean") return val;
+    if (typeof val === "number") return val !== 0;
+    if (typeof val === "string") {
+      const lowered = val.trim().toLowerCase();
+      if (!lowered) return undefined;
+      if (["true", "1", "yes", "on"].includes(lowered)) return true;
+      if (["false", "0", "no", "off"].includes(lowered)) return false;
+    }
+    return val;
+  })
+  .refine((val) => val === undefined || typeof val === "boolean", {
+    message: "Invalid boolean",
+  });
+
+const stringOptional = z
+  .union([z.string(), z.null(), z.undefined()])
+  .transform((val) => {
+    if (val === null || val === undefined) return undefined;
+    const trimmed = String(val).trim();
+    return trimmed.length ? trimmed : undefined;
+  });
+
+const publicJobSchema = z
+  .object({
+    name: z
+      .string({
+        required_error: "name is required",
+        invalid_type_error: "name must be a string",
+      })
+      .trim()
+      .min(1, "name is required")
+      .max(120, "name too long"),
+    phone: z
+      .string({
+        required_error: "phone is required",
+        invalid_type_error: "phone must be a string",
+      })
+      .trim()
+      .min(5, "phone is required")
+      .max(32, "phone too long"),
+    serviceType: z
+      .string({
+        required_error: "serviceType is required",
+        invalid_type_error: "serviceType must be a string",
+      })
+      .min(1, "serviceType is required")
+      .transform((value) => normalizeService(value))
+      .refine((value) => Boolean(value), { message: "Invalid serviceType" }),
+    pickupAddress: stringOptional,
+    pickup: z
+      .object({
+        address: stringOptional,
+        lat: optionalNumber,
+        lng: optionalNumber,
+      })
+      .partial()
+      .optional(),
+    pickupLat: optionalNumber,
+    pickupLng: optionalNumber,
+    dropoffAddress: stringOptional,
+    notes: stringOptional,
+    heavyDuty: optionalBoolean,
+    shareLive: optionalBoolean,
+    vehiclePinned: optionalBoolean,
+    vehicleMake: stringOptional,
+    vehicleModel: stringOptional,
+    vehicleColor: stringOptional,
+    distanceMeters: optionalNumber,
+    distanceText: stringOptional,
+    etaSeconds: optionalNumber,
+  })
+  .superRefine((data, ctx) => {
+    const pickupAddress =
+      data.pickupAddress ??
+      data.pickup?.address ??
+      undefined;
+    const pickupLat = data.pickupLat ?? data.pickup?.lat;
+    const pickupLng = data.pickupLng ?? data.pickup?.lng;
+
+    if (
+      !pickupAddress &&
+      !(Number.isFinite(pickupLat) && Number.isFinite(pickupLng))
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Pickup location required",
+        path: ["pickupAddress"],
+      });
+    }
+  });
+
 // --- routes --------------------------------------------------
 router.post("/jobs", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (req, res, next) => {
+  const endTimer = publicJobDuration.startTimer();
   const storedFiles = [];
   const files = Array.isArray(req.files) ? req.files : [];
   for (const file of files) {
@@ -52,23 +165,32 @@ router.post("/jobs", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (
         body = JSON.parse(body.payload);
       } catch (error) {
         await cleanupUploaded();
+        if (req.log) {
+          req.log.warn({ err: error }, "Failed to parse public payload");
+        }
+        publicJobCounter.labels("invalid_json").inc();
+        endTimer();
         return res.status(400).json({ message: "Invalid request payload" });
       }
+    }
+
+    const validation = validate(publicJobSchema, body || {});
+    if (!validation.success) {
+      await cleanupUploaded();
+      publicJobCounter.labels("validation_error").inc();
+      endTimer();
+      return res.status(400).json(validation.error);
     }
 
     const {
       name,
       phone,
-
-      // either provide pickupAddress, or nested pickup { address, lat, lng }
+      serviceType,
       pickupAddress: pickupAddressRaw,
-      pickup: pickupRaw,
-
+      pickup,
       pickupLat: pickupLatRaw,
       pickupLng: pickupLngRaw,
-
       dropoffAddress,
-      serviceType: serviceTypeRaw,
       notes,
       heavyDuty,
       shareLive,
@@ -79,47 +201,20 @@ router.post("/jobs", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (
       distanceMeters,
       distanceText,
       etaSeconds,
-    } = body || {};
+    } = validation.data;
 
-    // 1) Validate basic identity
-    if (!isNonEmpty(name) || !isNonEmpty(phone)) {
-      await cleanupUploaded();
-      return res.status(400).json({ message: "Missing name or phone" });
-    }
-
-    // 2) Location: accept either top-level pickupAddress / pickupLat/Lng OR pickup{...}
-    let pickupAddress = isNonEmpty(pickupAddressRaw)
-      ? pickupAddressRaw.trim()
-      : (pickupRaw?.address && String(pickupRaw.address).trim()) || "";
-
-    // allow coordinates from either shape
-    let pickupLat = toNumOr(pickupLatRaw) ?? toNumOr(pickupRaw?.lat, undefined);
-    let pickupLng = toNumOr(pickupLngRaw) ?? toNumOr(pickupRaw?.lng, undefined);
-
-    if (
-      !isNonEmpty(pickupAddress) &&
-      !(Number.isFinite(pickupLat) && Number.isFinite(pickupLng))
-    ) {
-      await cleanupUploaded();
-      return res.status(400).json({ message: "Pickup location required" });
-    }
-
-    // 3) Service normalization (strict list)
-    const serviceType = normalizeService(serviceTypeRaw);
-    if (!serviceType) {
-      await cleanupUploaded();
-      return res.status(400).json({ message: "Invalid serviceType" });
-    }
-
-    const distanceMetersNumber = toNumOr(distanceMeters, undefined);
-    const etaSecondsNumber = toNumOr(etaSeconds, undefined);
+    const pickupAddress = pickupAddressRaw ?? pickup?.address ?? "";
+    const pickupLat =
+      pickupLatRaw ?? (Number.isFinite(pickup?.lat) ? pickup?.lat : undefined);
+    const pickupLng =
+      pickupLngRaw ?? (Number.isFinite(pickup?.lng) ? pickup?.lng : undefined);
 
     // 4) Upsert customer by phone
-    let cust = await Customer.findOne({ phone: String(phone).trim() }).exec();
+    let cust = await Customer.findOne({ phone }).exec();
     if (!cust) {
       cust = await Customer.create({
-        name: String(name).trim(),
-        phone: String(phone).trim(),
+        name,
+        phone,
       });
     }
 
@@ -130,40 +225,27 @@ router.post("/jobs", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (
       created: new Date(),
 
       serviceType,
-      notes: isNonEmpty(notes) ? String(notes).trim() : undefined,
-      heavyDuty:
-        typeof heavyDuty === "string"
-          ? heavyDuty.toLowerCase() === "true"
-          : Boolean(heavyDuty),
+      notes,
+      heavyDuty: heavyDuty ?? false,
 
-      pickupAddress: isNonEmpty(pickupAddress) ? pickupAddress : undefined,
+      pickupAddress: pickupAddress || undefined,
       pickupLat: Number.isFinite(pickupLat) ? pickupLat : undefined,
       pickupLng: Number.isFinite(pickupLng) ? pickupLng : undefined,
 
-      dropoffAddress: isNonEmpty(dropoffAddress)
-        ? String(dropoffAddress).trim()
-        : undefined,
-      shareLive:
-        typeof shareLive === "string"
-          ? shareLive.toLowerCase() === "true"
-          : Boolean(shareLive),
-      vehiclePinned:
-        typeof vehiclePinned === "string"
-          ? vehiclePinned.toLowerCase() === "true"
-          : Boolean(vehiclePinned ?? true),
-      vehicleMake: isNonEmpty(vehicleMake) ? vehicleMake.trim() : undefined,
-      vehicleModel: isNonEmpty(vehicleModel) ? vehicleModel.trim() : undefined,
-      vehicleColor: isNonEmpty(vehicleColor) ? vehicleColor.trim() : undefined,
-      estimatedDistance: isNonEmpty(distanceText)
-        ? String(distanceText).trim()
-        : undefined,
-      estimatedDuration: Number.isFinite(etaSecondsNumber)
-        ? Math.round(etaSecondsNumber / 60)
+      dropoffAddress,
+      shareLive: shareLive ?? false,
+      vehiclePinned: vehiclePinned ?? true,
+      vehicleMake,
+      vehicleModel,
+      vehicleColor,
+      estimatedDistance: distanceText,
+      estimatedDuration: Number.isFinite(etaSeconds)
+        ? Math.round(etaSeconds / 60)
         : undefined,
       media: files.length ? files.map((file) => toJobMediaRecord(file)) : [],
       // optionally store raw meters
-      distanceMeters: Number.isFinite(distanceMetersNumber)
-        ? distanceMetersNumber
+      distanceMeters: Number.isFinite(distanceMeters)
+        ? distanceMeters
         : undefined,
       // bidding flags
       biddingOpen: true,
@@ -207,7 +289,12 @@ router.post("/jobs", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (
       });
       await sendAdminPushNotifications([adminNotification]);
     } catch (notifyError) {
-      console.error("Failed to notify admins about new request:", notifyError);
+      if (req.log) {
+        req.log.error(
+          { err: notifyError, jobId: job._id },
+          "Failed to notify admins about new request"
+        );
+      }
     }
 
     try {
@@ -229,11 +316,28 @@ router.post("/jobs", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (
         },
       ]);
     } catch (notifyCustomerError) {
-      console.error(
-        "Failed to notify customer about new request",
-        notifyCustomerError
+      if (req.log) {
+        req.log.error(
+          { err: notifyCustomerError, jobId: job._id },
+          "Failed to notify customer about new request"
+        );
+      }
+    }
+
+    if (req.log) {
+      req.log.debug(
+        {
+          jobId: job._id,
+          customerId: cust._id,
+          serviceType,
+          pickupAddress: pickupAddress || null,
+        },
+        "Public job intake created"
       );
     }
+
+    publicJobCounter.labels("success").inc();
+    endTimer();
 
     // 8) Respond with everything the client needs (fixes "undefined token" issues)
     return res.status(201).json({
@@ -249,6 +353,11 @@ router.post("/jobs", jobMediaUpload.array("media", JOB_MEDIA_MAX_FILES), async (
     });
   } catch (e) {
     await cleanupUploaded();
+    if (req.log) {
+      req.log.error({ err: e }, "Public job intake failed");
+    }
+    publicJobCounter.labels("error").inc();
+    endTimer();
     next(e);
   }
 });

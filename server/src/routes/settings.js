@@ -206,6 +206,25 @@ const serializeSettings = (settingsDoc) => {
   const settings = settingsDoc.toObject({ virtuals: false });
   const intervals = settings.intervals || {};
 
+  const workflowDefaults = {
+    requireDriverDocs: true,
+    requireVendorDocs: true,
+    showBusinessDocs: true,
+    showLiveDriverMap: true,
+    showLiveVendorMap: true,
+    advancedJobWorkflow: false,
+    enableCustomerPaymentScreen: false,
+    enableReviewFunnel: true,
+    multiServiceMode: true,
+    showReportsTab: true,
+    enableMessaging: false,
+  };
+
+  const workflow = {
+    ...workflowDefaults,
+    ...(settings.workflow || {}),
+  };
+
   const vendorPollSec = toNumber(intervals.vendorPollSec, 7);
   const vendorPushSec = toNumber(intervals.vendorPushSec, 15);
   const mapRefreshSec = toNumber(intervals.mapRefreshSec, 7);
@@ -217,6 +236,7 @@ const serializeSettings = (settingsDoc) => {
 
   return {
     ...settings,
+    workflow,
     intervals: {
       ...intervals,
       vendorPollSec,
