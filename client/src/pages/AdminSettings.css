@@ -148,15 +148,28 @@
 
 .aset-toggle-group {
     display: grid;
-    gap: 8px;
-    align-content: flex-start;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    align-items: center;
 }
 
-.aset-toggle-group span {
+.aset-toggle-group > span {
+    grid-column: 1 / -1;
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--muted);
+}
+
+.aset-toggle-group .aset-toggle {
+    justify-content: flex-start;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--panel);
+}
+
+.aset-toggle-group .aset-toggle input[type="checkbox"] {
+    flex-shrink: 0;
 }
 
 .aset-toggle--inline {

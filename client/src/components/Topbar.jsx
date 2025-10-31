@@ -15,7 +15,7 @@ const NAV_SCROLL_ID = "topbar-nav-items";
 export default function Topbar() {
   const loc = useLocation();
   const navigate = useNavigate();
-  const { user, logout, isAdmin, isVendor, isCustomer } = useAuth();
+  const { user, token, logout, isAdmin, isVendor, isCustomer } = useAuth();
   const { unreadCount, markAllRead } = useNotifications();
   const { workflow } = useSettings();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -215,12 +215,12 @@ export default function Topbar() {
   }, [isVendor]);
 
   useEffect(() => {
-    if (!isAdmin || adminPushAttemptedRef.current) return undefined;
+    if (!isAdmin || !token || adminPushAttemptedRef.current) return undefined;
     adminPushAttemptedRef.current = true;
     ensureAdminPushSubscription({ source: "admin-app" }).catch((error) => {
       console.warn("Admin push subscription failed:", error);
     });
-  }, [isAdmin]);
+  }, [isAdmin, token]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
