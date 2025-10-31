@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useNotifications } from "../contexts/NotificationsContext";
 import { FaStar, FaStarHalfAlt, FaRegStar } from "react-icons/fa";
 import { LuBriefcase, LuBuilding2, LuCalendarDays, LuEye, LuMapPin, LuShield, LuTag, LuUser } from "react-icons/lu";
+import { useWorkflowFlag } from "../contexts/SettingsContext";
 import "./ReviewHub.css";
 
 const STATUS_OPTIONS = [
@@ -45,6 +47,14 @@ function RatingStars({ rating }) {
 
 
 export default function ReviewHub() {
+  const allowReviews = useWorkflowFlag("enableReviewFunnel", true);
+  if (!allowReviews) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <ReviewHubContent />;
+}
+
+function ReviewHubContent() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

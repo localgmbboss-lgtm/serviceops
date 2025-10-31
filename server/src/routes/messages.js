@@ -12,6 +12,7 @@ import { requireConversationAccess } from "../middleware/conversationAccess.js";
 import { getIo } from "../realtime/index.js";
 import { sendCustomerPushNotifications, sendVendorPushNotifications } from "../lib/push.js";
 import { resolveClientBaseUrl } from "../lib/clientUrl.js";
+import { isMessagingEnabled } from "../lib/workflow.js";
 
 const router = Router();
 
@@ -247,6 +248,12 @@ router.get(
       const { conversationContext } = req;
       const { actor, job } = conversationContext;
 
+      if (!(await isMessagingEnabled())) {
+        return res
+          .status(403)
+          .json({ message: "Messaging is disabled by the administrator." });
+      }
+
       const jobStatusNormalized = String(job?.status || "").toLowerCase();
       if (
         conversationContext.isVendor &&
@@ -319,6 +326,12 @@ router.post(
         vendorId,
         customerId,
       } = conversationContext;
+
+      if (!(await isMessagingEnabled())) {
+        return res
+          .status(403)
+          .json({ message: "Messaging is disabled by the administrator." });
+      }
 
       if (
         isVendor &&
@@ -530,6 +543,12 @@ router.post(
     try {
       const { conversationContext } = req;
       const { job, isCustomer, isVendor, isAdmin } = conversationContext;
+
+      if (!(await isMessagingEnabled())) {
+        return res
+          .status(403)
+          .json({ message: "Messaging is disabled by the administrator." });
+      }
 
       if (!isCustomer && !isVendor && !isAdmin) {
         return res.status(403).json({ message: "Not allowed" });

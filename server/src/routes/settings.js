@@ -5,6 +5,7 @@ import {
   getVendorComplianceConfig,
   refreshVendorCompliance,
 } from "../lib/compliance.js";
+import { getWorkflowSettings } from "../lib/workflow.js";
 
 const router = Router();
 
@@ -403,6 +404,7 @@ router.put("/", async (req, res, next) => {
     const response = serializeSettings(saved);
     res.json(response);
 
+    await getWorkflowSettings({ force: true });
     const nextVendorConfig = await getVendorComplianceConfig();
     if (
       JSON.stringify(previousVendorConfig) !==

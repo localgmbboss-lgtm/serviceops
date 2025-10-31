@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { vendorApi } from "../lib/vendorApi";
 import { getSocket } from "../lib/socket";
 import { useAuth } from "../contexts/AuthContext";
+import { useWorkflowFlag } from "../contexts/SettingsContext";
 
 const ROLE_PROPERTY = {
   customer: "readByCustomer",
@@ -21,6 +22,7 @@ const normalizeFiles = (files) => {
 export function useJobMessaging({ jobId, role }) {
   const { token } = useAuth();
   const httpClient = role === "vendor" ? vendorApi : api;
+  const messagingEnabled = useWorkflowFlag("enableMessaging", false);
 
   const [messages, setMessages] = useState([]);
   const [participants, setParticipants] = useState({
@@ -71,6 +73,11 @@ export function useJobMessaging({ jobId, role }) {
       resetState();
       return;
     }
+    if (!messagingEnabled) {
+      resetState();
+      setError("Messaging is disabled by your administrator.");
+      return;
+    }
     setLoading(true);
     try {
       const { data } = await httpClient.get(`/api/messages/job/${jobId}`);
@@ -103,14 +110,14 @@ export function useJobMessaging({ jobId, role }) {
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [httpClient, jobId, resetState, role, token]);
+  }, [httpClient, jobId, messagingEnabled, resetState, role, token]);
 
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
 
   useEffect(() => {
-    if (!jobId || !token) return undefined;
+    if (!jobId || !token || !messagingEnabled) return undefined;
     const socket = getSocket();
 
     const handleNewMessage = (payload) => {
@@ -228,12 +235,18 @@ export function useJobMessaging({ jobId, role }) {
       socket.off("disconnect", handleDisconnect);
       socket.off("messages:typing", handleTyping);
     };
-  }, [jobId, token, actor.role]);
+  }, [jobId, token, actor.role, messagingEnabled]);
 
   const sendMessage = useCallback(
     async ({ body, files }) => {
       if (!jobId) {
         throw new Error("Missing jobId");
+      }
+      if (!messagingEnabled) {
+        const disabledMessage =
+          "Messaging is disabled by your administrator.";
+        setError(disabledMessage);
+        throw new Error(disabledMessage);
       }
       const attachments = normalizeFiles(files).slice(0, MAX_ATTACHMENTS);
       if (!body && attachments.length === 0) {
@@ -272,17 +285,17 @@ export function useJobMessaging({ jobId, role }) {
         setSending(false);
       }
     },
-    [httpClient, jobId]
+    [httpClient, jobId, messagingEnabled]
   );
 
   const markConversationRead = useCallback(async () => {
-    if (!jobId) return;
+    if (!jobId || !messagingEnabled) return;
     try {
       await httpClient.post(`/api/messages/job/${jobId}/read`);
     } catch {
       /* ignore */
     }
-  }, [httpClient, jobId]);
+  }, [httpClient, jobId, messagingEnabled]);
 
   const needsReadReceipt = useMemo(() => {
     if (!messages.length) return false;
@@ -319,7 +332,7 @@ export function useJobMessaging({ jobId, role }) {
 
   const emitTyping = useCallback(
     (isTyping = true) => {
-      if (!jobId || !token) return;
+      if (!jobId || !token || !messagingEnabled) return;
       const socket = getSocket();
       socket.emit("messages:typing", {
         token,
@@ -339,7 +352,7 @@ export function useJobMessaging({ jobId, role }) {
         typingEmitTimeoutRef.current = null;
       }
     },
-    [jobId, token]
+    [jobId, token, messagingEnabled]
   );
 
   useEffect(
@@ -358,6 +371,7 @@ export function useJobMessaging({ jobId, role }) {
 
 
   return {
+    enabled: messagingEnabled,
     messages,
     participants,
     actor,

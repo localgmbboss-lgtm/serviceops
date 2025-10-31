@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { api } from "../lib/api";
 import KPIBlock from "../components/KPIBlock";
 import { readAuditLog, clearAuditLog } from "../utils/auditLog";
+import { useWorkflowFlag } from "../contexts/SettingsContext";
 import "./AdminReports.css";
 
 const VENDORS_PER_PAGE = 4;
@@ -21,6 +23,14 @@ const defaultFromDate = () =>
 const defaultToDate = () => new Date().toISOString().slice(0, 10);
 
 export default function AdminReports() {
+  const allowReports = useWorkflowFlag("showReportsTab", true);
+  if (!allowReports) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <AdminReportsContent />;
+}
+
+function AdminReportsContent() {
   const defaultDatesRef = useRef(null);
   if (!defaultDatesRef.current) {
     defaultDatesRef.current = {

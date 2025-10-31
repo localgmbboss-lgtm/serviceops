@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 import Document from "../models/Document.js";
 import { refreshVendorCompliance } from "../lib/compliance.js";
+import { getWorkflowSettings } from "../lib/workflow.js";
 
 const router = Router();
 
@@ -31,8 +32,29 @@ async function triggerCompliance({ ownerType, vendorId }) {
 // GET /api/documents?ownerType=&driverId=&vendorId=&status=
 router.get("/", async (req, res, next) => {
   try {
+    const workflow = await getWorkflowSettings();
+    const allowedOwners = [];
+    if (workflow.requireVendorDocs !== false) allowedOwners.push("vendor");
+    if (workflow.requireDriverDocs !== false) allowedOwners.push("driver");
+    if (workflow.showBusinessDocs !== false) allowedOwners.push("company");
+
+    if (!allowedOwners.length) {
+      return res.json([]);
+    }
+
     const query = {};
-    if (req.query.ownerType) query.ownerType = req.query.ownerType;
+    const requestedOwnerType = req.query.ownerType
+      ? String(req.query.ownerType).toLowerCase()
+      : "";
+    if (requestedOwnerType) {
+      if (!allowedOwners.includes(requestedOwnerType)) {
+        return res.status(403).json({ message: "Document access disabled." });
+      }
+      query.ownerType = requestedOwnerType;
+    } else {
+      query.ownerType = { $in: allowedOwners };
+    }
+
     if (req.query.status) query.status = req.query.status;
     if (req.query.driverId) {
       if (!isValidId(req.query.driverId)) {
@@ -76,6 +98,15 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
+    const workflow = await getWorkflowSettings();
+    if (
+      (ownerType === "vendor" && workflow.requireVendorDocs === false) ||
+      (ownerType === "driver" && workflow.requireDriverDocs === false) ||
+      (ownerType === "company" && workflow.showBusinessDocs === false)
+    ) {
+      return res.status(403).json({ message: "Document type disabled." });
+    }
+
     if (ownerType === "driver" && driverId && !isValidId(driverId)) {
       return res.status(400).json({ message: "Invalid driverId" });
     }
@@ -110,6 +141,8 @@ router.post("/", async (req, res, next) => {
 // PATCH /api/documents/:id
 router.patch("/:id", async (req, res, next) => {
   try {
+    const workflow = await getWorkflowSettings();
+
     const updates = {};
     [
       "title",
@@ -138,10 +171,20 @@ router.patch("/:id", async (req, res, next) => {
       }
     });
 
+    const current = await Document.findById(req.params.id);
+    if (!current) return res.status(404).json({ message: "Document not found" });
+
+    if (
+      (current.ownerType === "vendor" && workflow.requireVendorDocs === false) ||
+      (current.ownerType === "driver" && workflow.requireDriverDocs === false) ||
+      (current.ownerType === "company" && workflow.showBusinessDocs === false)
+    ) {
+      return res.status(403).json({ message: "Document type disabled." });
+    }
+
     const doc = await Document.findByIdAndUpdate(req.params.id, updates, {
       new: true,
     });
-    if (!doc) return res.status(404).json({ message: "Document not found" });
 
     await triggerCompliance({ ownerType: doc.ownerType, vendorId: doc.vendorId });
 
@@ -154,9 +197,20 @@ router.patch("/:id", async (req, res, next) => {
 // DELETE /api/documents/:id
 router.delete("/:id", async (req, res, next) => {
   try {
-    const doc = await Document.findByIdAndDelete(req.params.id);
+    const workflow = await getWorkflowSettings();
+
+    const doc = await Document.findById(req.params.id);
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
+    if (
+      (doc.ownerType === "vendor" && workflow.requireVendorDocs === false) ||
+      (doc.ownerType === "driver" && workflow.requireDriverDocs === false) ||
+      (doc.ownerType === "company" && workflow.showBusinessDocs === false)
+    ) {
+      return res.status(403).json({ message: "Document type disabled." });
+    }
+
+    await Document.deleteOne({ _id: doc._id });
     await triggerCompliance({ ownerType: doc.ownerType, vendorId: doc.vendorId });
 
     res.json({ ok: true });

@@ -6,6 +6,7 @@ import LiveMap from "../components/LiveMap";
 import MessagingPanel from "../components/MessagingPanel";
 import { getGoogleMapsKey } from "../config/env.js";
 import { useJobMessaging } from "../hooks/useJobMessaging";
+import { useWorkflowFlag } from "../contexts/SettingsContext";
 import "./AdminJobDetail.css";
 
 const MILES_PER_KM = 0.621371;
@@ -105,6 +106,8 @@ export default function AdminJobDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const hasGoogleMaps = Boolean(getGoogleMapsKey());
+  const advancedWorkflowEnabled = useWorkflowFlag("advancedJobWorkflow", true);
+  const customerPaymentEnabled = useWorkflowFlag("enableCustomerPaymentScreen", true);
 
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -287,12 +290,12 @@ export default function AdminJobDetail() {
 
   const tabs = useMemo(() => {
     const list = [{ id: "overview", label: "Overview" }];
-    if (hasLocation) {
+    if (advancedWorkflowEnabled && hasLocation) {
       list.push({ id: "map", label: "Live map" });
     }
     list.push({ id: "conversation", label: "Conversation" });
     return list;
-  }, [hasLocation]);
+  }, [advancedWorkflowEnabled, hasLocation]);
 
   const heroFinancials = useMemo(() => {
     const priority = paymentSummary.filter(
@@ -732,7 +735,7 @@ export default function AdminJobDetail() {
                       </dl>
                     </section>
 
-                    {timelineItemsSorted.length ? (
+                    {advancedWorkflowEnabled && timelineItemsSorted.length ? (
                       <section className="admin-job-detail__card">
                         <header>
                           <h2>Timeline</h2>
@@ -755,19 +758,21 @@ export default function AdminJobDetail() {
                       </section>
                     ) : null}
 
-                    <section className="admin-job-detail__card">
-                      <header>
-                        <h2>Payment</h2>
-                      </header>
-                      <dl className="admin-job-detail__data-grid admin-job-detail__data-grid--compact">
-                        {paymentSummary.map((item) => (
-                          <div key={item.label}>
-                            <dt>{item.label}</dt>
-                            <dd>{item.value || "-"}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </section>
+                    {customerPaymentEnabled ? (
+                      <section className="admin-job-detail__card">
+                        <header>
+                          <h2>Payment</h2>
+                        </header>
+                        <dl className="admin-job-detail__data-grid admin-job-detail__data-grid--compact">
+                          {paymentSummary.map((item) => (
+                            <div key={item.label}>
+                              <dt>{item.label}</dt>
+                              <dd>{item.value || "-"}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </section>
+                    ) : null}
 
                     {notes ? (
                       <section className="admin-job-detail__card">
@@ -850,12 +855,13 @@ export default function AdminJobDetail() {
                       )}
                     </section>
 
-                    <section className="admin-job-detail__card admin-job-detail__card--nearby">
-                      <header>
-                        <h2>Nearby vendors</h2>
-                      </header>
-                      {nearbyList.length ? (
-                        <>
+                    {advancedWorkflowEnabled ? (
+                      <section className="admin-job-detail__card admin-job-detail__card--nearby">
+                        <header>
+                          <h2>Nearby vendors</h2>
+                        </header>
+                        {nearbyList.length ? (
+                          <>
                           <ul className="admin-job-detail__vendor-list">
                             {nearbyList.map((entry) => {
                               const key = String(entry._id);
@@ -904,19 +910,20 @@ export default function AdminJobDetail() {
                           >
                             {pingBusy ? "Pinging vendors..." : "Ping selected vendors"}
                           </button>
-                        </>
-                      ) : (
-                        <p className="admin-job-detail__empty">
-                          No nearby vendors found for this pickup.
-                        </p>
-                      )}
-                    </section>
+                          </>
+                        ) : (
+                          <p className="admin-job-detail__empty">
+                            No nearby vendors found for this pickup.
+                          </p>
+                        )}
+                      </section>
+                    ) : null}
                   </aside>
                 </div>
               </div>
             ) : null}
 
-            {activeTab === "map" ? (
+            {advancedWorkflowEnabled && activeTab === "map" ? (
               <div className="admin-job-detail__panel admin-job-detail__panel--map">
                 <section className="admin-job-detail__map-card">
                   <header>

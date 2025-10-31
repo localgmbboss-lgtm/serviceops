@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { useSettings } from "../contexts/SettingsContext";
 import "./AdminSettings.css";
 
 const MODE_LABELS = {
@@ -15,6 +16,7 @@ const MODE_DESCRIPTIONS = {
 };
 
 export default function AdminSettings() {
+  const { setSettings: setGlobalSettings } = useSettings();
   const [s, setS] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,11 +36,14 @@ export default function AdminSettings() {
   useEffect(() => {
     api
       .get("/api/settings")
-      .then((response) => setS(response.data))
+      .then((response) => {
+        setS(response.data);
+        setGlobalSettings(response.data);
+      })
       .catch((error) => {
         setErr(error?.response?.data?.message || "Failed to load settings");
       });
-  }, []);
+  }, [setGlobalSettings]);
 
   const save = async () => {
     if (!s) return;
@@ -56,6 +61,7 @@ export default function AdminSettings() {
       };
       const { data } = await api.put("/api/settings", body);
       setS(data);
+      setGlobalSettings(data);
       setErr("");
       // Surface a quick confirmation in the dev console so admins know the payload persisted.
       // eslint-disable-next-line no-console

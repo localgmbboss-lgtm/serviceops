@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LuSettings, LuChevronLeft, LuChevronRight } from "react-icons/lu";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationsContext";
+import { useSettings } from "../contexts/SettingsContext";
 import brandMark from "../assets/brand-mark.png";
 import {
   ensureAdminPushSubscription,
@@ -16,6 +17,7 @@ export default function Topbar() {
   const navigate = useNavigate();
   const { user, logout, isAdmin, isVendor, isCustomer } = useAuth();
   const { unreadCount, markAllRead } = useNotifications();
+  const { workflow } = useSettings();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [userMenuPosition, setUserMenuPosition] = useState(null);
@@ -275,21 +277,42 @@ export default function Topbar() {
     []
   );
 
+  const workflowFlags = workflow || {};
   const navItems = useMemo(() => {
     if (!user) return guestLinks;
     if (isAdmin) {
-      return [
+      const showLeads = workflowFlags.multiServiceMode !== false;
+      const showReviews = workflowFlags.enableReviewFunnel !== false;
+      const showReports = workflowFlags.showReportsTab !== false;
+      const showDocs =
+        workflowFlags.showBusinessDocs !== false ||
+        Boolean(workflowFlags.requireDriverDocs) ||
+        Boolean(workflowFlags.requireVendorDocs);
+      const showLiveMap = workflowFlags.showLiveDriverMap !== false;
+
+      const items = [
         { to: "/admin/ops", label: "Ops Center" },
         { to: "/jobs", label: "Jobs" },
-        { to: "/admin/crm/leads", label: "Leads" },
-        { to: "/admin/crm/reviews", label: "Reviews" },
-        { to: "/reports", label: "Reports" },
-        { to: "/financials", label: "Financials" },
-        { to: "/admin/vendors", label: "Vendors" },
-        { to: "/admin/documents", label: "Docs" },
-        { to: "/admin/knowledge", label: "Knowledge" },
-        { to: "/admin/map", label: "Live Map" },
       ];
+      if (showLeads) {
+        items.push({ to: "/admin/crm/leads", label: "Leads" });
+      }
+      if (showReviews) {
+        items.push({ to: "/admin/crm/reviews", label: "Reviews" });
+      }
+      if (showReports) {
+        items.push({ to: "/reports", label: "Reports" });
+      }
+      items.push({ to: "/financials", label: "Financials" });
+      items.push({ to: "/admin/vendors", label: "Vendors" });
+      if (showDocs) {
+        items.push({ to: "/admin/documents", label: "Docs" });
+      }
+      items.push({ to: "/admin/knowledge", label: "Knowledge" });
+      if (showLiveMap) {
+        items.push({ to: "/admin/map", label: "Live Map" });
+      }
+      return items;
     }
     if (isVendor) {
       return [
@@ -304,7 +327,20 @@ export default function Topbar() {
       ];
     }
     return [];
-  }, [user, isAdmin, isVendor, isCustomer, guestLinks]);
+  }, [
+    guestLinks,
+    isAdmin,
+    isCustomer,
+    isVendor,
+    user,
+    workflowFlags.enableReviewFunnel,
+    workflowFlags.multiServiceMode,
+    workflowFlags.requireDriverDocs,
+    workflowFlags.requireVendorDocs,
+    workflowFlags.showBusinessDocs,
+    workflowFlags.showLiveDriverMap,
+    workflowFlags.showReportsTab,
+  ]);
 
   const navScrollWrapperClassName = useMemo(() => {
     const classes = ["nav-scroll-wrapper"];

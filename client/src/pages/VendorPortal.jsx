@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import GMap from "../components/GMap";
+import { useWorkflowFlag } from "../contexts/SettingsContext";
 import "./VendorPortal.css";
 
 const ALLOWED_NEXT = {
@@ -50,6 +51,7 @@ export default function VendorPortal() {
   const [completeOpen, setCompleteOpen] = useState(false);
   const [completeBusy, setCompleteBusy] = useState(false);
   const [completeErr, setCompleteErr] = useState("");
+  const paymentScreenEnabled = useWorkflowFlag("enableCustomerPaymentScreen", true);
   const [completeForm, setCompleteForm] = useState({
     amount: "",
     method: PAYMENT_OPTIONS[0].value,
@@ -318,102 +320,110 @@ export default function VendorPortal() {
                   ) : null}
                 </div>
 
-                <button
-                  type="button"
-                  className="vp-complete-toggle"
-                  disabled={completeBusy}
-                  onClick={() => setCompleteOpen((prev) => !prev)}
-                >
-                  <span>{completeOpen ? "Hide completion form" : "Report completion"}</span>
-                </button>
-
-                {completeOpen ? (
-                  <form className="vp-complete-form" onSubmit={submitCompletion}>
-                    <h3 className="vp-section-title">Report payment received</h3>
-                    <label>
-                      <span>Total collected</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={completeForm.amount}
-                        onChange={(e) =>
-                          setCompleteForm((prev) => ({ ...prev, amount: e.target.value }))
-                        }
-                        required
-                      />
-                    </label>
-                    <label>
-                      <span>Payment method</span>
-                      <select
-                        value={completeForm.method}
-                        onChange={(e) =>
-                          setCompleteForm((prev) => ({ ...prev, method: e.target.value }))
-                        }
-                      >
-                        {PAYMENT_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>Notes (optional)</span>
-                      <textarea
-                        value={completeForm.note}
-                        onChange={(e) =>
-                          setCompleteForm((prev) => ({ ...prev, note: e.target.value }))
-                        }
-                        placeholder="Add any quick details (cash split, receipts, etc.)"
-                        rows={3}
-                      />
-                    </label>
-                    {completeErr ? <p className="error small">{completeErr}</p> : null}
-                    <button className="btn primary" type="submit" disabled={completeBusy}>
-                      {completeBusy ? "Submitting..." : "Submit completion"}
+                {paymentScreenEnabled ? (
+                  <>
+                    <button
+                      type="button"
+                      className="vp-complete-toggle"
+                      disabled={completeBusy}
+                      onClick={() => setCompleteOpen((prev) => !prev)}
+                    >
+                      <span>{completeOpen ? "Hide completion form" : "Report completion"}</span>
                     </button>
-                  </form>
+
+                    {completeOpen ? (
+                      <form className="vp-complete-form" onSubmit={submitCompletion}>
+                        <h3 className="vp-section-title">Report payment received</h3>
+                        <label>
+                          <span>Total collected</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={completeForm.amount}
+                            onChange={(e) =>
+                              setCompleteForm((prev) => ({ ...prev, amount: e.target.value }))
+                            }
+                            required
+                          />
+                        </label>
+                        <label>
+                          <span>Payment method</span>
+                          <select
+                            value={completeForm.method}
+                            onChange={(e) =>
+                              setCompleteForm((prev) => ({ ...prev, method: e.target.value }))
+                            }
+                          >
+                            {PAYMENT_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Notes (optional)</span>
+                          <textarea
+                            value={completeForm.note}
+                            onChange={(e) =>
+                              setCompleteForm((prev) => ({ ...prev, note: e.target.value }))
+                            }
+                            placeholder="Add any quick details (cash split, receipts, etc.)"
+                            rows={3}
+                          />
+                        </label>
+                        {completeErr ? <p className="error small">{completeErr}</p> : null}
+                        <button className="btn primary" type="submit" disabled={completeBusy}>
+                          {completeBusy ? "Submitting..." : "Submit completion"}
+                        </button>
+                      </form>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
-            ) : (
+            ) : paymentScreenEnabled ? (
               <p className="muted small">This job has been completed. Review the payment summary below.</p>
+            ) : (
+              <p className="muted small">This job has been completed.</p>
             )}
           </section>
         </div>
 
         <aside className="vp-summary">
-          <section className="vp-card vp-summary-card">
-            <h3 className="section-title">Latest payment report</h3>
-            {completionSummary ? (
-              <ul className="vp-summary-list">
-                <li>
-                  <strong>Amount</strong>
-                  <span>{formatCurrency(completionSummary.amount)}</span>
-                </li>
-                <li>
-                  <strong>Method</strong>
-                  <span>{methodLabel(completionSummary.method)}</span>
-                </li>
-                <li>
-                  <strong>Reported</strong>
-                  <span>
-                    {completionSummary.reportedAt
-                      ? new Date(completionSummary.reportedAt).toLocaleString()
-                      : "-"}
-                  </span>
-                </li>
-                {completionSummary.note ? (
+          {paymentScreenEnabled ? (
+            <section className="vp-card vp-summary-card">
+              <h3 className="section-title">Latest payment report</h3>
+              {completionSummary ? (
+                <ul className="vp-summary-list">
                   <li>
-                    <strong>Notes</strong>
-                    <span>{completionSummary.note}</span>
+                    <strong>Amount</strong>
+                    <span>{formatCurrency(completionSummary.amount)}</span>
                   </li>
-                ) : null}
-              </ul>
-            ) : (
-              <p className="muted small">No payment reported yet.</p>
-            )}
-          </section>
+                  <li>
+                    <strong>Method</strong>
+                    <span>{methodLabel(completionSummary.method)}</span>
+                  </li>
+                  <li>
+                    <strong>Reported</strong>
+                    <span>
+                      {completionSummary.reportedAt
+                        ? new Date(completionSummary.reportedAt).toLocaleString()
+                        : "-"}
+                    </span>
+                  </li>
+                  {completionSummary.note ? (
+                    <li>
+                      <strong>Notes</strong>
+                      <span>{completionSummary.note}</span>
+                    </li>
+                  ) : null}
+                </ul>
+              ) : (
+                <p className="muted small">No payment reported yet.</p>
+              )}
+            </section>
+          ) : null}
 
           <section className="vp-card vp-summary-card">
             <h3 className="section-title">Commission</h3>
@@ -447,7 +457,11 @@ export default function VendorPortal() {
                 ) : null}
               </ul>
             ) : (
-              <p className="muted small">Commission will calculate when you report payment.</p>
+              <p className="muted small">
+                {paymentScreenEnabled
+                  ? "Commission will calculate when you report payment."
+                  : "Commission details will appear once dispatch processes this job."}
+              </p>
             )}
 
             {job.flags?.underReport ? (

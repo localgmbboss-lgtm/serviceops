@@ -4,6 +4,7 @@ import Job from "../models/Jobs.js";
 import Customer from "../models/Customer.js";
 import Vendor from "../models/Vendor.js";
 import { completeJobWithPayment } from "../lib/jobCompletion.js";
+import { getWorkflowSettings } from "../lib/workflow.js";
 
 const router = Router();
 
@@ -116,6 +117,13 @@ router.post("/:token/complete", async (req, res, next) => {
   try {
     const { token } = req.params;
     const { amount, method, note } = req.body || {};
+
+    const workflow = await getWorkflowSettings();
+    if (workflow.enableCustomerPaymentScreen === false) {
+      return res
+        .status(403)
+        .json({ message: "Vendor completion reporting is disabled." });
+    }
 
     const rawAmount = Number(amount);
     if (!Number.isFinite(rawAmount) || rawAmount <= 0) {

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { Navigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { useWorkflow } from "../contexts/SettingsContext";
 import "./DocumentsHub.css";
 
 const OWNER_OPTIONS = [
   { value: "vendor", label: "Vendor" },
+  { value: "driver", label: "Driver" },
   { value: "company", label: "Company" },
 ];
 
@@ -113,10 +116,39 @@ const summaryTone = (status) => {
 };
 
 export default function DocumentsHub() {
+  const workflow = useWorkflow();
+  const allowVendorDocs = workflow.requireVendorDocs !== false;
+  const allowDriverDocs = workflow.requireDriverDocs !== false;
+  const allowBusinessDocs = workflow.showBusinessDocs !== false;
+  const allowDocs = allowVendorDocs || allowDriverDocs || allowBusinessDocs;
+  if (!allowDocs) {
+    return <Navigate to="/admin" replace />;
+  }
+  const defaultOwnerType = allowVendorDocs
+    ? "vendor"
+    : allowDriverDocs
+    ? "driver"
+    : "company";
+  return (
+    <DocumentsHubContent
+      allowVendorDocs={allowVendorDocs}
+      allowDriverDocs={allowDriverDocs}
+      allowBusinessDocs={allowBusinessDocs}
+      defaultOwnerType={defaultOwnerType}
+    />
+  );
+}
+
+function DocumentsHubContent({
+  allowVendorDocs,
+  allowDriverDocs,
+  allowBusinessDocs,
+  defaultOwnerType,
+}) {
   const [docs, setDocs] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [filters, setFilters] = useState({
-    ownerType: "vendor",
+    ownerType: defaultOwnerType,
     vendorId: "",
     status: "",
   });
@@ -126,6 +158,31 @@ export default function DocumentsHub() {
   const [vendorError, setVendorError] = useState("");
   const [busy, setBusy] = useState({});
   const [lastRefresh, setLastRefresh] = useState("");
+
+  const ownerOptions = useMemo(
+    () =>
+      OWNER_OPTIONS.filter((option) => {
+        if (option.value === "vendor") return allowVendorDocs;
+        if (option.value === "driver") return allowDriverDocs;
+        if (option.value === "company") return allowBusinessDocs;
+        return false;
+      }),
+    [allowBusinessDocs, allowDriverDocs, allowVendorDocs]
+  );
+
+  useEffect(() => {
+    if (!ownerOptions.length) return;
+    setFilters((prev) => {
+      if (ownerOptions.some((option) => option.value === prev.ownerType)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        ownerType: ownerOptions[0].value,
+        vendorId: "",
+      };
+    });
+  }, [ownerOptions]);
 
   useEffect(() => {
     let ignore = false;
@@ -374,7 +431,7 @@ export default function DocumentsHub() {
                 }))
               }
             >
-              {OWNER_OPTIONS.map((option) => (
+              {ownerOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

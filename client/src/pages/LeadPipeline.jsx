@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useNotifications } from "../contexts/NotificationsContext";
+import { useWorkflowFlag } from "../contexts/SettingsContext";
 import "./LeadPipeline.css";
 
 const STAGE_LABELS = {
@@ -22,6 +24,14 @@ const STATUS_OPTIONS = [
 const STAGE_ORDER = ["inbox", "nurturing", "negotiation", "won", "lost"];
 
 export default function LeadPipeline() {
+  const allowLeadPipeline = useWorkflowFlag("multiServiceMode", true);
+  if (!allowLeadPipeline) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <LeadPipelineContent />;
+}
+
+function LeadPipelineContent() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -381,4 +391,3 @@ export default function LeadPipeline() {
     </div>
   );
 }
-

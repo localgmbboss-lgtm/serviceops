@@ -6,6 +6,7 @@ import { vendorApi } from "../lib/vendorApi";
 import { getGoogleMapsKey } from "../config/env";
 import ChatOverlay from "../components/ChatOverlay";
 import { useJobMessaging } from "../hooks/useJobMessaging";
+import { useWorkflowFlag } from "../contexts/SettingsContext";
 import "./VendorJobDetail.css";
 
 const KM_TO_MI = 0.621371;
@@ -300,6 +301,8 @@ export default function VendorJobDetail() {
   const [isCompactLayout, setIsCompactLayout] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth <= 768 : false
   );
+  const showLiveMap = useWorkflowFlag("showLiveVendorMap", true);
+  const paymentScreenEnabled = useWorkflowFlag("enableCustomerPaymentScreen", true);
   const jobStatus = job?.status || "Assigned";
   const jobStatusNormalized = String(jobStatus || "").toLowerCase();
   const chatStatusAllowed = ["assigned", "ontheway", "arrived"].includes(
@@ -912,14 +915,16 @@ export default function VendorJobDetail() {
                       <dd>{dropoffAddress}</dd>
                     </div>
                   ) : null}
-                  <div>
-                    <dt>Payment</dt>
-                    <dd>
-                      {job.paymentMode === "cash"
-                        ? "Collect cash on completion"
-                        : "Paid via platform"}
-                    </dd>
-                  </div>
+                  {paymentScreenEnabled ? (
+                    <div>
+                      <dt>Payment</dt>
+                      <dd>
+                        {job.paymentMode === "cash"
+                          ? "Collect cash on completion"
+                          : "Paid via platform"}
+                      </dd>
+                    </div>
+                  ) : null}
                   <div>
                     <dt>Quoted price</dt>
                     <dd>
@@ -983,178 +988,209 @@ export default function VendorJobDetail() {
             </div>
 
             <div className="vendor-job-detail__column">
-              <div className="vendor-map-card">
-                <div className="map-head">
-                  <h2>Live map</h2>
-                  <p className="muted">
-                    {pickupCoordinates && vendorCoordinates
-                      ? "Visualizing your location and the pickup point."
-                      : "Waiting for location lock."}
-                  </p>
-                </div>
-                <div className="map-body">
-                  {hasGoogle ? (
-                    <GMap
-                      vendors={vendorPins}
-                      destination={destinationPoint}
-                      center={
-                        pickupCoordinates || vendorCoordinates || {
-                          lat: 37.7749,
-                          lng: -122.4194,
-                        }
-                      }
-                      showRoute={Boolean(vendorPins.length && destinationPoint)}
-                      onRouteResult={handleGoogleRoute}
-                    />
-                  ) : (
-                    <LiveMap
-                      vendors={vendorPins}
-                      destination={liveMapDestination}
-                      showRoute={Boolean(vendorPins.length && liveMapDestination)}
-                      routeCoordinates={routeCoordinates}
-                      routeDistanceMeters={
-                        Number.isFinite(navData.distanceValue)
-                          ? navData.distanceValue
-                          : null
-                      }
-                    />
-                  )}
-                </div>
-                <div className="map-footer">
-                  <div className="map-footer__summary">
-                    <strong>{navDistanceLabel}</strong>
-                    {navDurationLabel ? <span>{navDurationLabel}</span> : null}
+              {showLiveMap ? (
+                <div className="vendor-map-card">
+                  <div className="map-head">
+                    <h2>Live map</h2>
+                    <p className="muted">
+                      {pickupCoordinates && vendorCoordinates
+                        ? "Visualizing your location and the pickup point."
+                        : "Waiting for location lock."}
+                    </p>
                   </div>
-                  {navigationUrl ? (
-                    <a
-                      href={navigationUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="map-footer__external"
-                    >
-                      Open in Google Maps
-                    </a>
-                  ) : null}
-                </div>
-                <div className={`map-navigation${navStarted ? " is-active" : ""}${isCompactLayout ? " map-navigation--compact" : ""}`}>
-                  <div className="map-navigation__head">
-                    <div className="map-navigation__summary">
-                      <span className="map-navigation__title">Trip navigation</span>
-                      {routeReady ? (
-                        <>
-                          <span className="map-navigation__meta">
-                            {navDistanceLabel}
-                            {navDurationLabel ? ` - ${navDurationLabel}` : ""}
-                          </span>
-                          {currentStep ? (
-                            <span className="map-navigation__current">
-                              {navStarted ? "Next up" : "Preview"}: {currentStep.instruction || "Continue straight"}
-                            </span>
-                          ) : null}
-                        </>
-                      ) : null}
-                      {navProviderLabel ? (
-                        <span className="map-navigation__provider">{navProviderLabel}</span>
-                      ) : null}
+                  <div className="map-body">
+                    {hasGoogle ? (
+                      <GMap
+                        vendors={vendorPins}
+                        destination={destinationPoint}
+                        center={
+                          pickupCoordinates || vendorCoordinates || {
+                            lat: 37.7749,
+                            lng: -122.4194,
+                          }
+                        }
+                        showRoute={Boolean(vendorPins.length && destinationPoint)}
+                        onRouteResult={handleGoogleRoute}
+                      />
+                    ) : (
+                      <LiveMap
+                        vendors={vendorPins}
+                        destination={liveMapDestination}
+                        showRoute={Boolean(vendorPins.length && liveMapDestination)}
+                        routeCoordinates={routeCoordinates}
+                        routeDistanceMeters={
+                          Number.isFinite(navData.distanceValue)
+                            ? navData.distanceValue
+                            : null
+                        }
+                      />
+                    )}
+                  </div>
+                  <div className="map-footer">
+                    <div className="map-footer__summary">
+                      <strong>{navDistanceLabel}</strong>
+                      {navDurationLabel ? <span>{navDurationLabel}</span> : null}
                     </div>
-                    <div className="map-navigation__actions">
-                      {routeReady && stepCount > 1 ? (
+                    {navigationUrl ? (
+                      <a
+                        href={navigationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="map-footer__external"
+                      >
+                        Open in Google Maps
+                      </a>
+                    ) : null}
+                  </div>
+                  <div className={`map-navigation${navStarted ? " is-active" : ""}${isCompactLayout ? " map-navigation--compact" : ""}`}>
+                    <div className="map-navigation__head">
+                      <div className="map-navigation__summary">
+                        <span className="map-navigation__title">Trip navigation</span>
+                        {routeReady ? (
+                          <>
+                            <span className="map-navigation__meta">
+                              {navDistanceLabel}
+                              {navDurationLabel ? ` - ${navDurationLabel}` : ""}
+                            </span>
+                            {currentStep ? (
+                              <span className="map-navigation__current">
+                                {navStarted ? "Next up" : "Preview"}: {currentStep.instruction || "Continue straight"}
+                              </span>
+                            ) : null}
+                          </>
+                        ) : null}
+                        {navProviderLabel ? (
+                          <span className="map-navigation__provider">{navProviderLabel}</span>
+                        ) : null}
+                      </div>
+                      <div className="map-navigation__actions">
+                        {routeReady && stepCount > 1 ? (
+                          <button
+                            type="button"
+                            className="btn ghost map-navigation__toggle-steps"
+                            onClick={() => setShowStepList((prev) => !prev)}
+                          >
+                            {showStepList ? "Hide steps" : "View steps"}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
-                          className="btn ghost map-navigation__toggle-steps"
-                          onClick={() => setShowStepList((prev) => !prev)}
+                          className="btn map-navigation__toggle"
+                          onClick={handleToggleNavigation}
+                          disabled={navLoading || !routeReady}
                         >
-                          {showStepList ? "Hide steps" : "View steps"}
+                          {navLoading
+                            ? "Calculating..."
+                            : navStarted
+                            ? "Pause navigation"
+                            : routeReady
+                            ? "Start navigation"
+                            : "Preparing route"}
                         </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="btn map-navigation__toggle"
-                        onClick={handleToggleNavigation}
-                        disabled={navLoading || !routeReady}
-                      >
-                        {navLoading
-                          ? "Calculating..."
-                          : navStarted
-                          ? "Pause navigation"
-                          : routeReady
-                          ? "Start navigation"
-                          : "Preparing route"}
-                      </button>
+                      </div>
                     </div>
-                  </div>
-                  {navError ? (
-                    <p className="map-navigation__error">{navError}</p>
-                  ) : routeReady ? (
-                    <>
-                      {currentStep ? (
-                        <div className="map-navigation__step-card">
-                          <span className="map-navigation__index">{boundedStepIndex + 1}</span>
-                          <div className="map-navigation__step-detail">
-                            <span className="map-navigation__chip">{navStarted ? "Next up" : "Preview"}</span>
-                            <p className="map-navigation__instruction">
-                              {currentStep.instruction || "Continue straight"}
-                            </p>
-                            <p className="map-navigation__step-meta">
-                              {[currentStep.distanceText || "--", currentStep.durationText]
-                                .filter(Boolean)
-                                .join(" - ") || "--"}
-                            </p>
+                    {navError ? (
+                      <p className="map-navigation__error">{navError}</p>
+                    ) : routeReady ? (
+                      <>
+                        {currentStep ? (
+                          <div className="map-navigation__step-card">
+                            <span className="map-navigation__index">{boundedStepIndex + 1}</span>
+                            <div className="map-navigation__step-detail">
+                              <span className="map-navigation__chip">{navStarted ? "Next up" : "Preview"}</span>
+                              <p className="map-navigation__instruction">
+                                {currentStep.instruction || "Continue straight"}
+                              </p>
+                              <p className="map-navigation__step-meta">
+                                {[currentStep.distanceText || "--", currentStep.durationText]
+                                  .filter(Boolean)
+                                  .join(" - ") || "--"}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
-                      {stepCount > 1 ? (
-                        <ol className={`map-navigation__steps${showStepList ? " is-expanded" : ""}`}>
-                          {navData.steps.map((step, index) => (
-                            <li
-                              key={`nav-step-${index}`}
-                              className={`map-navigation__step${navStarted && index === boundedStepIndex ? " is-active" : ""}`}
+                        ) : null}
+                        {stepCount > 1 ? (
+                          <ol className={`map-navigation__steps${showStepList ? " is-expanded" : ""}`}>
+                            {navData.steps.map((step, index) => (
+                              <li
+                                key={`nav-step-${index}`}
+                                className={`map-navigation__step${navStarted && index === boundedStepIndex ? " is-active" : ""}`}
+                              >
+                                <span className="map-navigation__index">{index + 1}</span>
+                                <div className="map-navigation__body">
+                                  <p className="map-navigation__instruction">
+                                    {step.instruction || "Continue"}
+                                  </p>
+                                  <p className="map-navigation__step-meta">
+                                    {[step.distanceText || "--", step.durationText]
+                                      .filter(Boolean)
+                                      .join(" - ") || "--"}
+                                  </p>
+                                </div>
+                              </li>
+                            ))}
+                          </ol>
+                        ) : null}
+                        {navStarted && stepCount > 0 ? (
+                          <div className="map-navigation__controls">
+                            <button
+                              type="button"
+                              className="btn ghost"
+                              onClick={handlePrevStep}
+                              disabled={boundedStepIndex === 0}
                             >
-                              <span className="map-navigation__index">{index + 1}</span>
-                              <div className="map-navigation__body">
-                                <p className="map-navigation__instruction">
-                                  {step.instruction || "Continue"}
-                                </p>
-                                <p className="map-navigation__step-meta">
-                                  {[step.distanceText || "--", step.durationText]
-                                    .filter(Boolean)
-                                    .join(" - ") || "--"}
-                                </p>
-                              </div>
-                            </li>
-                          ))}
-                        </ol>
-                      ) : null}
-                      {navStarted && stepCount > 0 ? (
-                        <div className="map-navigation__controls">
-                          <button
-                            type="button"
-                            className="btn ghost"
-                            onClick={handlePrevStep}
-                            disabled={boundedStepIndex === 0}
-                          >
-                            Back
-                          </button>
-                          <button
-                            type="button"
-                            className="btn"
-                            onClick={handleNextStep}
-                            disabled={isLastStep}
-                          >
-                            {isLastStep ? "Arrived" : "Next step"}
-                          </button>
-                        </div>
-                      ) : null}
-                    </>
-                  ) : navLoading ? (
-                    <p className="map-navigation__status">Calculating the best route...</p>
-                  ) : (
-                    <p className="map-navigation__status">
-                      Tap "Start navigation" to view step-by-step directions.
-                    </p>
-                  )}
+                              Back
+                            </button>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={handleNextStep}
+                              disabled={isLastStep}
+                            >
+                              {isLastStep ? "Arrived" : "Next step"}
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : navLoading ? (
+                      <p className="map-navigation__status">Calculating the best route...</p>
+                    ) : (
+                      <p className="map-navigation__status">
+                        Tap "Start navigation" to view step-by-step directions.
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="vendor-map-card">
+                  <div className="map-head">
+                    <h2>Navigation</h2>
+                    <p className="muted">
+                      Live mapping is disabled by your administrator. Use the link below
+                      to launch your preferred navigation app.
+                    </p>
+                  </div>
+                  <div className="map-body">
+                    <p className="muted small">
+                      {navigationUrl
+                        ? "Tap the button to open Google Maps with the pickup destination pre-filled."
+                        : "Navigation is unavailable for this job."}
+                    </p>
+                  </div>
+                  {navigationUrl ? (
+                    <div className="map-footer">
+                      <a
+                        href={navigationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="map-footer__external"
+                      >
+                        Open in Google Maps
+                      </a>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
           </section>
         </>

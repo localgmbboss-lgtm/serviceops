@@ -5,6 +5,7 @@ import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { LiveVendorsProvider } from "./contexts/LiveVendorsContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Import pages
@@ -51,12 +52,13 @@ import "./App.css";
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NotificationsProvider>
-        <LiveVendorsProvider>
-          <ScrollToTop />
-          <Topbar />
-          <main className="container">
+    <SettingsProvider>
+      <AuthProvider>
+        <NotificationsProvider>
+          <LiveVendorsProvider>
+            <ScrollToTop />
+            <Topbar />
+            <main className="container">
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<Landing />} />
@@ -246,6 +248,6 @@ export default function App() {
         </LiveVendorsProvider>
       </NotificationsProvider>
     </AuthProvider>
+    </SettingsProvider>
   );
 }
-

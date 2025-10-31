@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import GMap from "../components/GMap";
 import LiveMap from "../components/LiveMap";
 import { getGoogleMapsKey } from "../config/env.js";
 import { useLiveVendors } from "../contexts/LiveVendorsContext";
+import { useWorkflowFlag } from "../contexts/SettingsContext";
 import { distanceBetweenPointsKm } from "../utils/geo";
 import "./AdminLiveMap.css";
 
@@ -21,13 +23,21 @@ const loadStoredHq = () => {
     ) {
       return { lat: Number(parsed.lat), lng: Number(parsed.lng) };
     }
-  } catch (error) {
-    console.warn("Failed to read HQ coordinates", error);
+  } catch (_error) {
+    /* ignore stored HQ parse errors */
   }
   return null;
 };
 
 export default function AdminLiveMap() {
+  const allowLiveMap = useWorkflowFlag("showLiveDriverMap", true);
+  if (!allowLiveMap) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <AdminLiveMapContent />;
+}
+
+function AdminLiveMapContent() {
   const { vendors, status, error, refresh } = useLiveVendors();
   const [onlyActive, setOnlyActive] = useState(true);
   const [city, setCity] = useState("");
@@ -49,8 +59,8 @@ export default function AdminLiveMap() {
       } else {
         window.localStorage.removeItem(HQ_STORAGE_KEY);
       }
-    } catch (storageError) {
-      console.warn("Failed to persist HQ information", storageError);
+    } catch (_storageError) {
+      /* ignore persistence errors */
     }
   }, [hq]);
 
@@ -76,12 +86,12 @@ export default function AdminLiveMap() {
 
   const statusLabel = useMemo(() => {
     if (status === "ready" || status === "refreshing") {
-      return `Live refresh every 20s • ${filteredVendors.length} of ${vendors.length} vendors`;
+      return `Live refresh every 20s - ${filteredVendors.length} of ${vendors.length} vendors`;
     }
     if (status === "error") {
       return "Live feed unavailable";
     }
-    return "Loading live data…";
+    return "Loading live data...";
   }, [status, filteredVendors.length, vendors.length]);
 
   const mapDestination = useMemo(() => {

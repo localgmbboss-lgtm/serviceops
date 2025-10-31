@@ -10,6 +10,7 @@ import {
   getVendorComplianceConfig,
   refreshVendorCompliance,
 } from "../lib/compliance.js";
+import { getWorkflowSettings } from "../lib/workflow.js";
 
 const router = Router();
 
@@ -68,6 +69,15 @@ router.post(
 
 
       const storedFilePath = path.join(uploadRoot, req.file.filename);
+
+      const workflow = await getWorkflowSettings();
+      if (workflow.requireVendorDocs === false) {
+        await fsPromises.unlink(storedFilePath).catch(() => {});
+        return res
+          .status(403)
+          .json({ message: "Vendor document uploads are disabled." });
+      }
+
       if (!requirementKey) {
         await fsPromises.unlink(storedFilePath).catch(() => {});
         return res.status(400).json({ message: "Select the document type." });

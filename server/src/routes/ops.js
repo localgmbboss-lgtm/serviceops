@@ -5,6 +5,7 @@ import Vendor from "../models/Vendor.js";
 import Feedback from "../models/Feedback.js";
 import Document from "../models/Document.js";
 import Settings from "../models/Settings.js";
+import { getWorkflowSettings } from "../lib/workflow.js";
 
 const router = Router();
 
@@ -193,6 +194,8 @@ router.get("/mission-control", async (_req, res, next) => {
     const settingsDoc = await Settings.findOne({}, { automation: 1 }).lean();
     const remindDays =
       settingsDoc?.automation?.compliance?.remindBeforeExpiryDays || 7;
+    const workflow = await getWorkflowSettings();
+    const vendorDocsEnabled = workflow.requireVendorDocs !== false;
 
     const openJobs = await Job.find(
       {
@@ -371,61 +374,63 @@ router.get("/mission-control", async (_req, res, next) => {
         })
     );
 
-    const expiringDocs = await Document.find(
-      {
-        ownerType: "vendor",
-        expiresAt: {
-          $gte: now,
-          $lte: new Date(now.getTime() + remindDays * 864e5),
-        },
-      },
-      {
-        _id: 1,
-        title: 1,
-        vendorId: 1,
-        expiresAt: 1,
-        status: 1,
-        requirementKey: 1,
-        url: 1,
-      }
-    )
-      .sort({ expiresAt: 1 })
-      .lean();
-
     const complianceTasks = [];
-    for (const doc of expiringDocs.slice(0, 20)) {
-      const vendor = vendorMap.get(String(doc.vendorId));
-      complianceTasks.push({
-        type: "expiry",
-        vendorId: doc.vendorId,
-        vendorName: vendor?.name || "Vendor",
-        vendorPhone: vendor?.phone || null,
-        vendorEmail: vendor?.email || null,
-        documentId: doc._id,
-        title: doc.title,
-        expiresAt: doc.expiresAt,
-        status: doc.status,
-        documentUrl: doc.url || null,
-      });
-    }
+    if (vendorDocsEnabled) {
+      const expiringDocs = await Document.find(
+        {
+          ownerType: "vendor",
+          expiresAt: {
+            $gte: now,
+            $lte: new Date(now.getTime() + remindDays * 864e5),
+          },
+        },
+        {
+          _id: 1,
+          title: 1,
+          vendorId: 1,
+          expiresAt: 1,
+          status: 1,
+          requirementKey: 1,
+          url: 1,
+        }
+      )
+        .sort({ expiresAt: 1 })
+        .lean();
 
-    for (const vendor of activeVendorDocs) {
-      if (
-        Array.isArray(vendor?.compliance?.missing) &&
-        vendor.compliance.missing.length
-      ) {
-        vendor.compliance.missing.slice(0, 3).forEach((missing) => {
-          complianceTasks.push({
-            type: "missing",
-            vendorId: vendor._id,
-            vendorName: vendor.name || "Vendor",
-            vendorPhone: vendor.phone || null,
-            vendorEmail: vendor.email || null,
-            key: missing.key,
-            label: missing.label,
-            reason: missing.reason || "",
-          });
+      for (const doc of expiringDocs.slice(0, 20)) {
+        const vendor = vendorMap.get(String(doc.vendorId));
+        complianceTasks.push({
+          type: "expiry",
+          vendorId: doc.vendorId,
+          vendorName: vendor?.name || "Vendor",
+          vendorPhone: vendor?.phone || null,
+          vendorEmail: vendor?.email || null,
+          documentId: doc._id,
+          title: doc.title,
+          expiresAt: doc.expiresAt,
+          status: doc.status,
+          documentUrl: doc.url || null,
         });
+      }
+
+      for (const vendor of activeVendorDocs) {
+        if (
+          Array.isArray(vendor?.compliance?.missing) &&
+          vendor.compliance.missing.length
+        ) {
+          vendor.compliance.missing.slice(0, 3).forEach((missing) => {
+            complianceTasks.push({
+              type: "missing",
+              vendorId: vendor._id,
+              vendorName: vendor.name || "Vendor",
+              vendorPhone: vendor.phone || null,
+              vendorEmail: vendor.email || null,
+              key: missing.key,
+              label: missing.label,
+              reason: missing.reason || "",
+            });
+          });
+        }
       }
     }
 

@@ -18,6 +18,8 @@ import {
   sendVendorPushNotifications,
   sendCustomerPushNotifications,
 } from "../lib/push.js";
+import { getWorkflowSettings } from "../lib/workflow.js";
+
 const router = Router();
 
 const defaultClientBase = getClientBaseUrl();
@@ -1152,6 +1154,14 @@ router.post("/:id/complete", async (req, res, next) => {
     assertId(id);
 
     const { amount, method, note, autoCharge } = req.body || {};
+
+    const workflow = await getWorkflowSettings();
+    if (workflow.enableCustomerPaymentScreen === false) {
+      return res
+        .status(403)
+        .json({ message: "Job completion with payment is disabled." });
+    }
+
     const rawAmount = Number(amount);
     if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
       return res.status(400).json({ message: "amount must be greater than 0" });
