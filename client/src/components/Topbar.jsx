@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LuSettings, LuChevronLeft, LuChevronRight } from "react-icons/lu";
+import {
+  LuSettings,
+  LuChevronLeft,
+  LuChevronRight,
+  LuCloudDownload,
+} from "react-icons/lu";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationsContext";
 import { useSettings } from "../contexts/SettingsContext";
@@ -9,6 +14,7 @@ import {
   ensureAdminPushSubscription,
   ensureVendorPushSubscription,
 } from "../lib/pushNotifications.js";
+import useInstallPrompt from "../hooks/useInstallPrompt.js";
 
 const NAV_SCROLL_ID = "topbar-nav-items";
 
@@ -18,10 +24,12 @@ export default function Topbar() {
   const { user, token, logout, isAdmin, isVendor, isCustomer } = useAuth();
   const { unreadCount, markAllRead } = useNotifications();
   const { workflow } = useSettings();
+  const { canInstall, isInstalled, install, platform } = useInstallPrompt();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [userMenuPosition, setUserMenuPosition] = useState(null);
   const [isHidden, setIsHidden] = useState(false);
+  const [installing, setInstalling] = useState(false);
   const [navScrollState, setNavScrollState] = useState({
     isOverflow: false,
     canScrollStart: false,
@@ -34,6 +42,7 @@ export default function Topbar() {
   const userMenuButtonRef = useRef(null);
   const vendorPushAttemptedRef = useRef(false);
   const adminPushAttemptedRef = useRef(false);
+  const installButtonVisible = !isInstalled;
   const updateUserMenuPosition = useCallback(() => {
     if (
       typeof window === "undefined" ||
@@ -117,6 +126,52 @@ export default function Topbar() {
     },
     [menuOpen, navScrollState.isOverflow]
   );
+
+  const handleInstallClick = useCallback(async () => {
+    if (isInstalled || installing) {
+      return;
+    }
+    if (canInstall) {
+      try {
+        setInstalling(true);
+        const result = await install();
+        if (result?.outcome !== "accepted" && typeof window !== "undefined") {
+          window.alert?.(
+            "Install prompt was dismissed. You can still add the app from your browser menu."
+          );
+        }
+      } catch (error) {
+        console.error("PWA install prompt failed", error);
+        if (typeof window !== "undefined" && typeof window.alert === "function") {
+          window.alert(
+            "We couldn't launch the install prompt. Please use your browser's install option."
+          );
+        }
+      } finally {
+        setInstalling(false);
+      }
+      return;
+    }
+    if (typeof window !== "undefined" && typeof window.alert === "function") {
+      if (platform === "ios") {
+        window.alert(
+          "To install this app on iPhone or iPad, tap the Share icon and choose 'Add to Home Screen'."
+        );
+      } else if (platform === "mac") {
+        window.alert(
+          "Install this app from your browser menu. In Safari, use Share → Add to Dock. In Chrome-based browsers, choose Install from the address bar."
+        );
+      } else if (platform === "android") {
+        window.alert(
+          "If you don’t see the install prompt, open your browser menu and choose 'Install app' or 'Add to Home screen'."
+        );
+      } else {
+        window.alert(
+          "Use your browser menu to install this app (look for Install App or Add to Home Screen)."
+        );
+      }
+    }
+  }, [canInstall, install, installing, isInstalled, platform]);
 
   useEffect(() => {
     closeMenu();
@@ -528,6 +583,18 @@ export default function Topbar() {
         </nav>
 
         <div className="topbar-actions">
+          {installButtonVisible ? (
+            <button
+              type="button"
+              className="topbar-install"
+              onClick={handleInstallClick}
+              disabled={installing}
+              aria-label={installing ? "Installing app" : "Install app"}
+            >
+              <LuCloudDownload aria-hidden="true" />
+              <span>{installing ? "Installing..." : "Install App"}</span>
+            </button>
+          ) : null}
           {user && (
             <>
               <button
