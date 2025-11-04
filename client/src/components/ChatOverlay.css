@@ -50,27 +50,27 @@
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(8px);
   display: grid;
-  place-items: end;
-  padding: 16px;
+  place-items: center;
+  padding: clamp(16px, 4vw, 32px);
   z-index: 1500;
 }
 
 .chat-overlay__modal {
-  width: min(420px, 100%);
-  max-height: min(640px, calc(100% - 32px));
-  height: min(640px, 100%);
+  width: min(520px, 100%);
+  max-height: min(720px, calc(100% - 64px));
+  height: auto;
   display: flex;
   flex-direction: column;
-  animation: chat-slide-up 0.3s ease forwards;
+  animation: chat-fade-in 0.28s ease forwards;
 }
 
-@keyframes chat-slide-up {
+@keyframes chat-fade-in {
   from {
-    transform: translateY(12px);
+    transform: translateY(10px) scale(0.98);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }

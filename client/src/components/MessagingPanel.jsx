@@ -25,7 +25,7 @@ const joinUrl = (base, path) => {
 
 const resolveAttachmentUrl = (value = "") => {
   if (!value) return "";
-  if (/^https?:\/\//i.test(value)) return value;
+  if (/^(?:https?:|data:|blob:)/i.test(value)) return value;
   const sanitized = value.startsWith("/") ? value : `/${value}`;
   if (sanitized.startsWith("/uploads/") || sanitized.startsWith("/media/")) {
     const candidate =
@@ -68,6 +68,36 @@ const initialsFor = (name = "") => {
   if (!pieces.length) return "?";
   if (pieces.length === 1) return pieces[0].slice(0, 2).toUpperCase();
   return `${pieces[0][0]}${pieces[pieces.length - 1][0]}`.toUpperCase();
+};
+
+const ensureUploadPath = (key = "") => {
+  if (!key) return "";
+  const raw = String(key).replace(/^\/+/, "");
+  if (!raw) return "";
+  if (raw.startsWith("uploads/")) return `/${raw}`;
+  if (raw.startsWith("messages/")) return `/uploads/${raw}`;
+  return `/uploads/messages/${raw}`;
+};
+
+const collectMessageAttachments = (message) => {
+  const attachments = Array.isArray(message?.attachments)
+    ? message.attachments
+    : [];
+  const media = Array.isArray(message?.media) ? message.media : [];
+  return [...attachments, ...media].filter(
+    (entry) => entry !== null && entry !== undefined
+  );
+};
+
+const looksLikeVideo = (mime = "", url = "") => {
+  const normalizedMime = String(mime).toLowerCase();
+  if (normalizedMime.startsWith("video/")) return true;
+  const extension = String(url)
+    .split("?")[0]
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+  return ["mp4", "mov", "webm", "m4v"].includes(extension);
 };
 
 export default function MessagingPanel({
@@ -331,6 +361,7 @@ export default function MessagingPanel({
                 : initialsFor(nameHint);
 
               const label = mine ? "You" : roleLabel(msg.senderRole, nameHint);
+              const attachments = collectMessageAttachments(msg);
 
               return (
                 <li
@@ -356,24 +387,44 @@ export default function MessagingPanel({
                     {msg.body ? (
                       <p className="message-panel__text">{msg.body}</p>
                     ) : null}
-                    {Array.isArray(msg.attachments) &&
-                    msg.attachments.length > 0 ? (
+                    {attachments.length > 0 ? (
                       <div className="message-panel__attachments">
-                        {msg.attachments.map((file, index) => {
-                          const rawUrl =
-                            file?.url ||
-                            file?.downloadUrl ||
-                            file?.path ||
-                            file?.href ||
-                            "";
-                          const resolvedUrl = resolveAttachmentUrl(rawUrl);
+                        {attachments.map((file, index) => {
+                          const rawUrl = (() => {
+                            if (typeof file === "string") return file;
+                            return (
+                              file?.url ||
+                              file?.downloadUrl ||
+                              file?.path ||
+                              file?.href ||
+                              file?.location ||
+                              file?.previewUrl ||
+                              ""
+                            );
+                          })();
+                          const keyFallback =
+                            typeof file === "object"
+                              ? ensureUploadPath(
+                                  file?.key ||
+                                    file?.fileKey ||
+                                    file?.filename ||
+                                    file?.id
+                                )
+                              : "";
+                          const resolvedUrl = resolveAttachmentUrl(
+                            rawUrl || keyFallback
+                          );
                           if (!resolvedUrl) return null;
                           const key = file?.key || resolvedUrl || index;
                           const displayName =
-                            file?.fileName || file?.name || "Attachment";
-                          const mime = file?.mimeType || "";
+                            file?.fileName ||
+                            file?.name ||
+                            file?.filename ||
+                            "Attachment";
+                          const mime = file?.mimeType || file?.type || "";
                           const isVideo =
-                            file?.kind === "video" || mime.startsWith("video/");
+                            file?.kind === "video" ||
+                            looksLikeVideo(mime, resolvedUrl);
 
                           if (isVideo) {
                             return (

@@ -26,6 +26,10 @@ const resolveTarget = (notification) => {
     return meta.route;
   }
 
+  if (meta.role === "vendor" && typeof meta.tab === "string" && meta.tab) {
+    return `/vendor/app?tab=${meta.tab}`;
+  }
+
   // role-based routing
   if (meta.role === "customer") {
     if (meta.kind === "bid" && meta.customerToken) {

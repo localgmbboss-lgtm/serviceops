@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { vendorApi } from "../lib/vendorApi";
 import { useNotifications } from "../contexts/NotificationsContext";
 import VendorHeroHeader from "../components/vendor/VendorHeroHeader";
@@ -146,6 +146,16 @@ function extractNote(job) {
   return normalizeMultiline(raw);
 }
 const GEO_PROMPT_STORAGE_KEY = "va.geoPrompt.dismissed";
+const VALID_VENDOR_TABS = ["open", "assigned", "history"];
+
+const vendorTabRoute = (tab) =>
+  VALID_VENDOR_TABS.includes(tab) ? `/vendor/app?tab=${tab}` : "/vendor/app";
+
+const vendorJobRoute = (jobId, options = {}) => {
+  if (!jobId) return "/vendor/app";
+  const base = `/vendor/jobs/${jobId}`;
+  return options.chat ? `${base}?chat=1` : base;
+};
 
 export default function VendorApp() {
   const [me, setMe] = useState(null);
@@ -166,6 +176,7 @@ export default function VendorApp() {
   const { publish } = useNotifications();
 
   const nav = useNavigate();
+  const location = useLocation();
   const pollRef = useRef(null);
   const openJobsSnapshotRef = useRef(new Map());
   const openJobsInitializedRef = useRef(false);
@@ -330,8 +341,16 @@ export default function VendorApp() {
               : {};
           if (!meta.role) meta.role = "vendor";
           if (!meta.kind) meta.kind = "ping";
-          if (!meta.route) meta.route = "/vendor/app";
           if (!meta.jobId && alert.jobId) meta.jobId = alert.jobId;
+          if (!meta.route) {
+            if (meta.jobId) {
+              meta.route = vendorJobRoute(meta.jobId, { chat: meta.chat });
+            } else if (meta.tab) {
+              meta.route = vendorTabRoute(meta.tab);
+            } else {
+              meta.route = "/vendor/app";
+            }
+          }
 
           publish({
             id: alertId,
@@ -385,6 +404,14 @@ export default function VendorApp() {
   const COMPLETED_PAGE_SIZE = 4;
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get("tab");
+    if (tabParam && VALID_VENDOR_TABS.includes(tabParam)) {
+      setActiveTab((prev) => (prev === tabParam ? prev : tabParam));
+    }
+  }, [location.search]);
+
+  useEffect(() => {
     const previous = openJobsSnapshotRef.current;
     const next = new Map();
     const isInitial = !openJobsInitializedRef.current;
@@ -408,7 +435,8 @@ export default function VendorApp() {
             role: "vendor",
             jobId: job._id,
             kind: "job",
-            route: "/vendor/app",
+            tab: "open",
+            route: vendorTabRoute("open"),
           },
           dedupeKey: "vendor:open:" + job._id,
           createdAt: job.created || new Date().toISOString(),
@@ -471,7 +499,8 @@ export default function VendorApp() {
               jobId: job._id,
               kind: "assignment",
               status: job.status || "Assigned",
-              route: "/vendor/app",
+              tab: "assigned",
+              route: vendorJobRoute(job._id),
             },
             dedupeKey: "vendor:assigned:" + job._id,
             createdAt: job.created || new Date().toISOString(),
@@ -506,7 +535,7 @@ export default function VendorApp() {
             jobId: job._id,
             kind: "status",
             status: job.status,
-            route: "/vendor/app",
+            route: vendorJobRoute(job._id),
           },
           dedupeKey: "vendor:assigned:" + job._id + ":status:" + job.status,
           createdAt: new Date().toISOString(),
