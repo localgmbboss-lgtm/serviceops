@@ -119,6 +119,15 @@ function suggestedPrice(job) {
   return Math.max(40, rounded);
 }
 
+function formatBidPrice(value) {
+  if (!Number.isFinite(value)) return null;
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
+  }).format(value);
+}
+
 function normalizeMultiline(value) {
   if (value === null || value === undefined) return "";
   return String(value)
@@ -152,6 +161,7 @@ export default function VendorApp() {
   const [bidSheet, setBidSheet] = useState(null);
   const [bidError, setBidError] = useState("");
   const [bidSubmitting, setBidSubmitting] = useState(false);
+  const [bidConfirmation, setBidConfirmation] = useState(null);
 
   const { publish } = useNotifications();
 
@@ -178,6 +188,10 @@ export default function VendorApp() {
   const [noteTranslations, setNoteTranslations] = useState({});
   const [requestingLocation, setRequestingLocation] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const [recentAssignmentId, setRecentAssignmentId] = useState(null);
+  const [assignmentQueue, setAssignmentQueue] = useState([]);
+  const [assignmentPrompt, setAssignmentPrompt] = useState(null);
+  const [assignmentCountdown, setAssignmentCountdown] = useState(0);
 
   const handleToggleNoteLanguage = async (event, job) => {
     event?.stopPropagation?.();
@@ -408,6 +422,29 @@ export default function VendorApp() {
     }
   }, [openJobs, publish]);
 
+  const openAssignmentJob = useCallback((job) => {
+    if (!job?._id) return;
+    setActiveTab("assigned");
+    setExpandedJobId(job._id);
+    setRecentAssignmentId(job._id);
+  }, []);
+
+  const enqueueAssignmentPrompt = useCallback(
+    (job) => {
+      if (!job?._id) return;
+      if (assignmentPrompt && assignmentPrompt._id === job._id) {
+        return;
+      }
+      setAssignmentQueue((prev) => {
+        if (prev.some((item) => item?._id === job._id)) {
+          return prev;
+        }
+        return [...prev, job];
+      });
+    },
+    [assignmentPrompt]
+  );
+
   useEffect(() => {
     const previous = assignedSnapshotRef.current;
     const next = new Map();
@@ -422,6 +459,7 @@ export default function VendorApp() {
 
       if (!previousJob) {
         if (!isInitial) {
+          enqueueAssignmentPrompt(job);
           publish({
             title: "Bid accepted",
             body: job.serviceType
@@ -480,7 +518,55 @@ export default function VendorApp() {
     if (!assignedInitializedRef.current && (assigned || []).length > 0) {
       assignedInitializedRef.current = true;
     }
-  }, [assigned, publish]);
+  }, [assigned, publish, enqueueAssignmentPrompt]);
+
+  useEffect(() => {
+    if (!assignmentPrompt && assignmentQueue.length > 0) {
+      setAssignmentPrompt(assignmentQueue[0]);
+      setAssignmentQueue((prev) => prev.slice(1));
+    }
+  }, [assignmentPrompt, assignmentQueue]);
+
+  useEffect(() => {
+    if (!assignmentPrompt) {
+      setAssignmentCountdown(0);
+      return;
+    }
+    setAssignmentCountdown(4);
+    const autoOpenTimer = setTimeout(() => {
+      openAssignmentJob(assignmentPrompt);
+      setAssignmentPrompt(null);
+    }, 4000);
+    const tick = setInterval(() => {
+      setAssignmentCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => {
+      clearTimeout(autoOpenTimer);
+      clearInterval(tick);
+    };
+  }, [assignmentPrompt, openAssignmentJob]);
+
+  const handleAssignmentPromptAccept = useCallback(() => {
+    if (!assignmentPrompt) return;
+    openAssignmentJob(assignmentPrompt);
+    setAssignmentPrompt(null);
+  }, [assignmentPrompt, openAssignmentJob]);
+
+  const handleAssignmentPromptSkip = useCallback(() => {
+    setAssignmentPrompt(null);
+  }, []);
+
+  useEffect(() => {
+    if (!recentAssignmentId) {
+      return;
+    }
+    const job = assigned.find((item) => item?._id === recentAssignmentId);
+    if (!job) {
+      return;
+    }
+    openAssignedJobDetail(job);
+    setRecentAssignmentId(null);
+  }, [recentAssignmentId, assigned, openAssignedJobDetail]);
 
   const openPageCount = Math.max(
     1,
@@ -751,6 +837,9 @@ export default function VendorApp() {
     setBidSubmitting(false);
   };
 
+  const dismissBidConfirmation = () => setBidConfirmation(null);
+  const dismissErr = () => setErr("");
+
   const updateBidField = (field, value) => {
     setBidSheet((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
@@ -759,6 +848,13 @@ export default function VendorApp() {
     if (!bidSheet?.job) return;
     const eta = Number(bidSheet.eta);
     const price = Number(bidSheet.price);
+    const bidSnapshot = {
+      jobId: bidSheet.job._id,
+      serviceType: bidSheet.job.serviceType || "Service",
+      pickupAddress: bidSheet.job.pickupAddress || "",
+      etaMinutes: eta,
+      price,
+    };
 
     if (!Number.isFinite(eta) || eta <= 0) {
       setBidError("Enter a valid ETA in minutes.");
@@ -777,6 +873,7 @@ export default function VendorApp() {
         price,
       });
       await load();
+      setBidConfirmation(bidSnapshot);
       closeBidSheet();
     } catch (e) {
       setBidError(e?.response?.data?.message || "Failed to submit bid");
@@ -785,6 +882,7 @@ export default function VendorApp() {
   };
 
   const lastSyncLabel = lastUpdated ? timeAgo(lastUpdated) : "not yet";
+  const bidPriceLabel = formatBidPrice(bidConfirmation?.price);
 
   const statCards = [
     {
@@ -805,7 +903,8 @@ export default function VendorApp() {
   ];
 
   return (
-    <div className="vendor-app fade-up">
+    <>
+      <div className="vendor-app fade-up">
       <VendorHeroHeader
         vendorName={me?.name}
         lastSyncLabel={lastSyncLabel}
@@ -820,7 +919,21 @@ export default function VendorApp() {
         onToggleCityFilter={setCityFilter}
       />
 
-      {err && <div className="va-alert error card">{err}</div>}
+        {err ? (
+          <div className="va-alert error va-alert--dismissible">
+            <div className="va-alert__body">
+              <strong>Action required</strong>
+              <p className="va-alert__caption">{err}</p>
+            </div>
+            <button
+              type="button"
+              className="va-alert__dismiss"
+              onClick={dismissErr}
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
 
       <section className="va-stats">
         {statCards.map((card) => (
@@ -831,6 +944,38 @@ export default function VendorApp() {
           </article>
         ))}
       </section>
+
+      {bidConfirmation ? (
+        <div className="va-alert info va-alert--dismissible">
+          <div className="va-alert__body">
+            <strong>
+              Bid sent for {bidConfirmation.serviceType || "this job"}
+            </strong>
+            <p className="va-alert__caption">
+              We'll notify you the instant dispatch selects a vendor. If they
+              go with you, the trip will open automatically on this device.
+            </p>
+            {(Number.isFinite(bidConfirmation.etaMinutes) || bidPriceLabel) && (
+              <p className="va-alert__caption">
+                {Number.isFinite(bidConfirmation.etaMinutes)
+                  ? `ETA ${bidConfirmation.etaMinutes} min`
+                  : null}
+                {Number.isFinite(bidConfirmation.etaMinutes) && bidPriceLabel
+                  ? " • "
+                  : ""}
+                {bidPriceLabel}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            className="va-alert__dismiss"
+            onClick={dismissBidConfirmation}
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <section className="va-workflows">
         <div className="va-tabs" role="tablist" aria-label="Job views">
@@ -1013,6 +1158,23 @@ export default function VendorApp() {
                           <div className="va-job__meta muted">
                             <span>Posted {timeAgo(job.created)}</span>
                           </div>
+                          {hasBid ? (
+                            <div className="va-job__status va-job__status--waiting">
+                              <span
+                                className="va-job__status-dot"
+                                aria-hidden="true"
+                              />
+                              <div>
+                                <p className="va-job__status-title">
+                                  Bid sent to dispatch
+                                </p>
+                                <p className="va-job__status-caption">
+                                  We'll move this trip into Assigned
+                                  automatically if they award it to you.
+                                </p>
+                              </div>
+                            </div>
+                          ) : null}
                           {expanded && detailRows.length > 0 ? (
                             <div className="va-job__details">
                               {detailRows.map((row) => (
@@ -1636,5 +1798,46 @@ export default function VendorApp() {
         </div>
       )}
     </div>
+
+    {assignmentPrompt ? (
+      <div
+        className="va-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-live="assertive"
+      >
+        <div className="va-modal__backdrop" />
+        <div className="va-modal__dialog">
+          <p className="va-overline">Dispatch update</p>
+          <h3 className="va-modal__title">You've been selected!</h3>
+          <p className="va-modal__text">
+            {assignmentPrompt.serviceType || "Service"} at{" "}
+            {assignmentPrompt.pickupAddress || "the customer location"}.
+          </p>
+          <p className="va-modal__text">
+            Switching to the Assigned tab in {assignmentCountdown || 0}{" "}
+            {assignmentCountdown === 1 ? "second" : "seconds"} so you can kick
+            off the job.
+          </p>
+          <div className="va-modal__actions">
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={handleAssignmentPromptSkip}
+            >
+              Stay on this tab
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={handleAssignmentPromptAccept}
+            >
+              Open now
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }

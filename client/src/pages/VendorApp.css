@@ -146,9 +146,14 @@
 }
 
 .va-alert.error {
-  border-color: rgba(255, 102, 102, 0.55);
-  background: rgba(255, 102, 102, 0.12);
-  color: var(--color-danger-soft);
+  border-color: rgba(248, 113, 113, 0.7);
+  background: linear-gradient(
+    135deg,
+    rgba(254, 226, 226, 0.96),
+    rgba(254, 242, 242, 0.92)
+  );
+  color: #991b1b;
+  box-shadow: 0 18px 34px -18px rgba(185, 28, 28, 0.35);
 }
 
 .va-alert.compact {
@@ -172,6 +177,9 @@
   line-height: 1.5;
   color: rgba(15, 23, 42, 0.68);
 }
+.va-alert.error .va-alert__caption {
+  color: rgba(127, 29, 29, 0.92);
+}
 
 .va-alert__actions {
   display: flex;
@@ -191,9 +199,18 @@
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
+.va-alert.error .va-alert__dismiss {
+  background: rgba(153, 27, 27, 0.12);
+  color: #991b1b;
+  border: 1px solid rgba(185, 28, 28, 0.3);
+}
+
 .va-alert__dismiss:hover {
   background: rgba(15, 23, 42, 0.16);
   transform: translateY(-1px);
+}
+.va-alert.error .va-alert__dismiss:hover {
+  background: rgba(220, 38, 38, 0.15);
 }
 
 .va-alert__dismiss:focus-visible {
@@ -680,6 +697,40 @@
   color: #111827;
 }
 
+.va-job__status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.08);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.va-job__status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  background: #38bdf8;
+  box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.2);
+}
+
+.va-job__status-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+}
+
+.va-job__status-caption {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.72);
+  line-height: 1.4;
+}
+
 .va-job__messaging {
   margin: 16px 0;
 }
@@ -970,6 +1021,61 @@
   padding: 0 14px;
   font-weight: 600;
   color: var(--color-text-muted);
+}
+
+.va-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.va-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(3px);
+}
+
+.va-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(460px, 100%);
+  padding: clamp(20px, 4vw, 32px);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
+  color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.va-modal__title {
+  margin: 0;
+  font-size: clamp(1.3rem, 2vw, 1.6rem);
+}
+
+.va-modal__text {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.va-modal__actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.va-modal__actions .btn {
+  min-width: 150px;
 }
 
 .va-pill-row {
